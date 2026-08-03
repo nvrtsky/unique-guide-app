@@ -59,7 +59,7 @@ function loadPrototype(file, appSelector, search) {
   };
   vm.runInNewContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
 
-  function actualElement(dataset) {
+  function findElement(dataset) {
     const tags = root.html.match(/<[^>]+>/g) || [];
     const match = tags.find((tag) => Object.entries(dataset).every(([key, value]) => {
       const attribute = dataAttribute(key);
@@ -67,8 +67,17 @@ function loadPrototype(file, appSelector, search) {
       return new RegExp('\\s' + escapeRegExp(attribute) + '="' + escapeRegExp(value) + '"').test(tag);
     }));
     assert.ok(match, `actual element ${JSON.stringify(dataset)} must exist before interaction`);
+    return match;
+  }
+
+  function actualElement(dataset) {
+    const match = findElement(dataset);
     assert.doesNotMatch(match, /\sdisabled(?:[\s>]|="")/, `element ${JSON.stringify(dataset)} must be enabled`);
     return match;
+  }
+
+  function assertDisabled(dataset) {
+    assert.match(findElement(dataset), /\sdisabled(?:[\s>]|="")/, `element ${JSON.stringify(dataset)} must be disabled`);
   }
 
   function click(dataset) {
@@ -89,7 +98,7 @@ function loadPrototype(file, appSelector, search) {
     (listeners.submit || []).forEach((handler) => handler({ preventDefault() {}, target: form }));
   }
 
-  return { root, click, input, submit, storage };
+  return { root, click, input, submit, storage, assertDisabled };
 }
 
 // Existing mobile Leads remain a separate navigation section.
@@ -124,6 +133,7 @@ tours.click({ action: 'next-operation' });
 assert.match(tours.root.innerHTML, /Данные записи/);
 tours.click({ action: 'save-form' });
 assert.match(tours.root.innerHTML, /Сверка данных/);
+tours.assertDisabled({ action: 'apply-conflict' });
 tours.click({ action: 'pick-conflict-source', id: 't1' });
 tours.click({ action: 'apply-conflict' });
 assert.match(tours.root.innerHTML, /Состав · 2/, 'conflict resolution creates one common record');

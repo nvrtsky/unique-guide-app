@@ -1756,7 +1756,7 @@
           stage: formOverlay.stage,
           members: formOverlay.members.slice(),
           sources: sources,
-          sourceId: formOverlay.sourceId !== 'blank' ? formOverlay.sourceId : null,
+          sourceId: null,
           previousDraft: Object.assign({}, state.draft),
           dirtyFields: new Set(formOverlay.dirtyFields || [])
         };
@@ -1790,6 +1790,7 @@
     }
     if (action === 'apply-conflict') {
       var conflictOverlay = state.overlay;
+      if (!conflictOverlay.sourceId) return;
       var source = effectiveRecord(conflictOverlay.stage, conflictOverlay.sourceId);
       var mergedValues = Object.assign({}, cleanRecord(source, conflictOverlay.stage));
       Array.from(conflictOverlay.dirtyFields || []).forEach(function (key) {
