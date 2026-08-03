@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, prototype/mobile-crm-2026-08-03]
 
 jobs:
   smoke:
@@ -17,9 +17,11 @@ jobs:
           node-version: 20
       - run: node --check mobile-leads.js
       - run: node --check tour-operations.js
+      - run: node --check prototype-smoke-test.js
+      - run: node prototype-smoke-test.js
       - name: Verify isolated mock adapter
         run: |
-          if grep -En 'fetch[[:space:]]*\(|XMLHttpRequest|/api/' mobile-leads.js tour-operations.js; then
+          if grep -En 'fetch[[:space:]]*\(|new[[:space:]]+XMLHttpRequest|new[[:space:]]+WebSocket|new[[:space:]]+EventSource|sendBeacon[[:space:]]*\(|/api/' mobile-leads.js tour-operations.js; then
             echo "The prototype must not call an API"
             exit 1
           fi
@@ -31,9 +33,3 @@ jobs:
           test -s tour-operations.html
           test -s tour-operations.css
           test -s tour-operations.js
-      - name: Verify tour operations scenarios
-        run: |
-          grep -Fq 'Сверка данных' tour-operations.js
-          grep -Fq 'apply-operation-split' tour-operations.js
-          grep -Fq 'apply-tourist-group' tour-operations.js
-          grep -Fq "departure: {" tour-operations.js
