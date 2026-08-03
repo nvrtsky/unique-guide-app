@@ -16,11 +16,24 @@ jobs:
         with:
           node-version: 20
       - run: node --check mobile-leads.js
+      - run: node --check tour-operations.js
       - name: Verify isolated mock adapter
         run: |
-          if grep -En 'fetch[[:space:]]*\(|XMLHttpRequest|/api/' mobile-leads.js; then
+          if grep -En 'fetch[[:space:]]*\(|XMLHttpRequest|/api/' mobile-leads.js tour-operations.js; then
             echo "The prototype must not call an API"
             exit 1
           fi
       - name: Verify standalone pages
-        run: test -f mobile-leads.html && test -f mobile-leads-tz.html && test -f index.html
+        run: |
+          test -f mobile-leads.html
+          test -f mobile-leads-tz.html
+          test -f index.html
+          test -s tour-operations.html
+          test -s tour-operations.css
+          test -s tour-operations.js
+      - name: Verify tour operations scenarios
+        run: |
+          grep -Fq 'Сверка данных' tour-operations.js
+          grep -Fq 'apply-operation-split' tour-operations.js
+          grep -Fq 'apply-tourist-group' tour-operations.js
+          grep -Fq "departure: {" tour-operations.js

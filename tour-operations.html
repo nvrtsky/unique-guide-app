@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4f6f8">
+  <title>UNIQUE · Рейсы, отели и группы туристов</title>
+  <link rel="stylesheet" href="tour-operations.css">
+</head>
+<body>
+  <header class="site-header">
+    <a class="brand" href="index.html" aria-label="Вернуться к основному прототипу">
+      <strong>UNIQUE</strong>
+      <span>МОБИЛЬНЫЙ ПРОТОТИП</span>
+    </a>
+    <nav aria-label="Навигация прототипа">
+      <a class="site-tab active" href="tour-operations.html">Туры и туристы</a>
+      <a class="site-tab" href="index.html">Текущий прототип</a>
+    </nav>
+  </header>
+
+  <main class="showcase">
+    <section class="showcase-copy">
+      <p class="eyebrow">UNIQUE <span>TOUR OPERATIONS</span></p>
+      <h1>Рейсы, отели и группы туристов</h1>
+      <p>Новый сценарий встроен в существующие мобильные экраны тура и туристов. Он повторяет механику сводной таблицы на mock-данных и не обращается к production API.</p>
+      <div class="scenario-list" aria-label="Сценарии прототипа">
+        <span><b>1</b> Добавьте рейс или отель нескольким туристам</span>
+        <span><b>2</b> Разрешите конфликт через выбор основной записи</span>
+        <span><b>3</b> Объедините туристов и отделите участника от записи</span>
+      </div>
+      <p class="hint">Для проверки конфликта выберите Анну и Илью в разделе «Прибытие».</p>
+    </section>
+
+    <section class="phone" aria-label="Интерактивный мобильный прототип">
+      <div id="app" class="phone-screen"></div>
+    </section>
+  </main>
+
+  <script src="tour-operations.js"></script>
+</body>
+</html>
