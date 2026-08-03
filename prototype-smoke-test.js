@@ -987,6 +987,7 @@ assert.doesNotMatch(fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync
 
 const specMarkdown = fs.readFileSync('mobile-leads-tz.md', 'utf8');
 const specHtml = fs.readFileSync('mobile-leads-tz.html', 'utf8');
+const specCss = fs.readFileSync('mobile-leads-tz.css', 'utf8');
 const specImages = [
   '01-lead-to-summary.png',
   '02-tour-summary.png',
@@ -1010,6 +1011,10 @@ specImages.forEach((image) => {
   assert.equal(specHtml.split(path).length - 1, 2, `${path} must be linked and rendered once in the visual spec`);
   assert.match(specMarkdown, new RegExp(`\\(${escapeRegExp(path)}\\)`), `${path} must be documented in Markdown`);
 });
+assert.doesNotMatch(specHtml, /<span class="marker/, 'decorative screenshot markers must be hidden from assistive technology');
+assert.ok((specHtml.match(/aria-hidden="true" class="marker/g) || []).length >= 40, 'annotated screenshots must keep their visual markers');
+assert.match(specCss, /\.shot-frame:focus-within::after\s*\{[^}]*border:\s*4px solid #0b57d0/s, 'screenshot links need an internal keyboard focus ring');
+assert.doesNotMatch(specCss, /min\(100%\s*-\s*24px/, 'mobile width must use valid calc syntax');
 const idPattern = /\b(?:SCOPE|MVP|FLOW|MODEL|IA|LEAD|TOUR|CARD|READY|STATUS|OPS|GROUP|LIST|DOC|ROLE|DIR|STATE|VIS|API|AC|NG|BL)-\d+\b/g;
 const markdownIds = [...new Set(specMarkdown.match(idPattern) || [])].sort();
 const htmlIds = [...new Set(specHtml.match(idPattern) || [])].sort();
