@@ -1,0 +1,26 @@
+name: Prototype smoke test
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+
+jobs:
+  smoke:
+    name: Prototype smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --check mobile-leads.js
+      - name: Verify isolated mock adapter
+        run: |
+          if grep -En 'fetch[[:space:]]*\(|XMLHttpRequest|/api/' mobile-leads.js; then
+            echo "The prototype must not call an API"
+            exit 1
+          fi
+      - name: Verify standalone pages
+        run: test -f mobile-leads.html && test -f mobile-leads-tz.html && test -f index.html
