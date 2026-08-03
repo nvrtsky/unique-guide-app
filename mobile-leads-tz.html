@@ -4,70 +4,594 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="spec-source" content="mobile-leads-tz.md">
-  <meta name="spec-sha256" content="f0f16d457e24988c7c8c5eafd4ae5771c030339ce43110960035bf35cee9b7db">
-  <meta name="theme-color" content="#f4f6f8">
-  <title>ТЗ · Единая мобильная сводная и карточка туриста</title>
-  <style>
-    :root{color-scheme:light;--ink:#14171a;--muted:#66707c;--line:#e3e7ec;--blue:#2f6bd8;--paper:#fff;--app:#f1f3f6}
-    *{box-sizing:border-box}
-    html{scroll-behavior:smooth}
-    body{margin:0;background:var(--app);color:var(--ink);font-family:Manrope,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;line-height:1.55}
-    header{position:sticky;top:0;z-index:10;display:flex;align-items:center;gap:20px;padding:14px max(18px,env(safe-area-inset-left));background:#14171af2;color:#fff;backdrop-filter:blur(12px)}
-    header a{color:inherit;text-decoration:none}
-    .brand{min-height:44px;display:inline-flex;align-items:center;font-weight:800;letter-spacing:3px}
-    nav{margin-left:auto;display:flex;gap:6px}
-    nav a{min-height:44px;padding:11px 14px;border-radius:10px;color:#c8ced6;font-size:13px;font-weight:700}
-    nav a.active{background:#fff;color:var(--ink)}
-    main{width:min(920px,calc(100% - 28px));margin:28px auto 72px}
-    .hero,.section{background:var(--paper);border:1px solid var(--line);border-radius:18px;box-shadow:0 10px 30px rgba(20,23,26,.05)}
-    .hero{padding:34px;margin-bottom:16px}
-    .eyebrow{margin:0 0 8px;color:var(--blue);font-size:12px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase}
-    h1{margin:0;font-size:clamp(28px,5vw,46px);line-height:1.08;letter-spacing:-1.2px}
-    .lead{max-width:760px;margin:16px 0 0;color:var(--muted);font-size:16px}
-    .meta{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px}
-    .meta span{padding:6px 10px;border-radius:999px;background:#eef3fb;color:#2557ae;font-size:12px;font-weight:750}
-    .section{padding:26px 30px;margin-top:14px;scroll-margin-top:86px}
-    h2{margin:0 0 12px;font-size:22px;letter-spacing:-.3px}
-    h3{margin:20px 0 8px;font-size:15px}
-    p{margin:8px 0;color:#38414b}
-    ul{margin:10px 0;padding-left:22px}
-    li{margin:7px 0;color:#38414b}
-    code{padding:2px 5px;border-radius:5px;background:#eef1f4;color:#243246;font-size:.92em}
-    pre{overflow:auto;padding:16px;border-radius:14px;background:#15191e;color:#e5e9ef;font-size:13px;line-height:1.5}
-    .req{color:var(--ink)}
-    .req strong{color:var(--blue)}
-    .field-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin-top:12px}
-    .field-card{padding:14px;border:1px solid var(--line);border-radius:13px;background:#fafbfc}
-    .field-card strong{display:block;margin-bottom:5px}
-    .field-card span{color:var(--muted);font-size:13px}
-    table{width:100%;border-collapse:collapse;margin-top:12px;font-size:13px}
-    th,td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}
-    th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.5px}
-    .priority{border-left:4px solid var(--blue);padding:10px 14px;background:#f4f7fc;border-radius:0 12px 12px 0}
-    .note{padding:14px;border-radius:13px;background:#fff6df;color:#654b13}
-    footer{padding:28px;text-align:center;color:var(--muted);font-size:12px}
-    @media(max-width:640px){header{align-items:flex-start}.brand{padding-top:11px}nav{overflow:auto;max-width:70%}nav a{white-space:nowrap}.hero,.section{padding:22px 18px}.field-grid{grid-template-columns:1fr}table{display:block;overflow:auto}main{margin-top:14px}}
-    @media print{header{display:none}body{background:#fff}main{width:100%;margin:0}.hero,.section{box-shadow:none;break-inside:avoid}.section{border-radius:0;border-width:1px 0 0}}
-  </style>
+  <meta name="spec-sha256" content="1d1305af46faf549b588cb20bf9b40d0e4375a6c596196a02e90145b8452cdfd">
+  <meta name="theme-color" content="#14171a">
+  <meta name="description" content="Визуальное ТЗ MVP мобильной CRM: сводная тура, карточка туриста, группировка и справочник.">
+  <title>Визуальное ТЗ · MVP мобильной CRM</title>
+  <link rel="stylesheet" href="mobile-leads-tz.css">
 </head>
 <body>
-  <header>
+  <a class="skip-link" href="#main-content">Перейти к содержанию</a>
+  <header class="site-header">
     <a class="brand" href="index.html">UNIQUE</a>
     <nav aria-label="Навигация прототипа">
       <a href="mobile-leads.html">Лиды</a>
       <a href="tour-operations.html">Прототип</a>
-      <a class="active" href="mobile-leads-tz.html">ТЗ</a>
+      <a class="active" aria-current="page" href="mobile-leads-tz.html">ТЗ</a>
     </nav>
   </header>
 
-  <main>
+  <main id="main-content">
     <section class="hero">
       <p class="eyebrow">Этап MVP · каноническое ТЗ</p>
       <h1>Единая мобильная сводная и карточка туриста</h1>
       <p class="lead">MVP мобильной CRM проверяет веб-логику участника тура, индивидуальную логистику и независимые общие записи вокруг раздела «Туры». Рабочее приложение, API и база на этом этапе не меняются.</p>
-      <div class="meta"><span>Этап: MVP</span><span>Статус: прототип к проверке</span><span>3 августа 2026</span><span>Источник: mobile-leads-tz.md</span></div>
+      <div class="meta"><span>Этап: MVP</span><span>Статус: прототип к проверке</span><span>Обновлено: 4 августа 2026</span><span>Источник: mobile-leads-tz.md</span></div>
+      <div class="hero-facts" aria-label="Коротко о масштабе MVP">
+        <div class="hero-fact"><strong>10</strong><span>основных сценариев веб-сводной</span></div>
+        <div class="hero-fact"><strong>4</strong><span>роли с разными правами</span></div>
+        <div class="hero-fact"><strong>3</strong><span>операции в каждом городе</span></div>
+        <div class="hero-fact"><strong>2</strong><span>независимых уровня группировки</span></div>
+        <div class="hero-fact"><strong>1</strong><span>каноническая карточка туриста</span></div>
+      </div>
     </section>
 
+    <div class="story-layout">
+      <aside class="story-nav" aria-label="Оглавление визуального ТЗ">
+        <strong>Как читать ТЗ</strong>
+        <a href="#product-map">01 · Карта продукта</a>
+        <a href="#manager-path">02 · Путь менеджера</a>
+        <a href="#mobile-summary">03 · Мобильная сводная</a>
+        <a href="#grouping-logic">04 · Группы и конфликты</a>
+        <a href="#tourist-card">05 · Карточка туриста</a>
+        <a href="#roles-directory">06 · Роли и справочник</a>
+        <a href="#mvp-acceptance">07 · Границы и приёмка</a>
+        <a href="#requirements">138 требований</a>
+      </aside>
+
+      <div class="story-content">
+        <section class="chapter" id="product-map">
+          <span class="chapter-number">01 · КАРТА ПРОДУКТА</span>
+          <h2>Вместо широкой таблицы — понятный маршрут работы</h2>
+          <p class="chapter-intro">Веб-версия показывает сразу много строк и колонок. На телефоне менеджер идёт по тому же набору данных последовательно: выбирает тур, остановку маршрута и нужную операцию.</p>
+
+          <div class="path-map" role="img" aria-label="Путь от лида или тура к остановке маршрута и трём операциям">
+            <div class="path-node">
+              <strong>Лид или тур</strong>
+              <span>Два разных раздела, один набор туристов</span>
+            </div>
+            <div class="path-arrow" aria-hidden="true">›</div>
+            <div class="path-node blue">
+              <strong>Остановка маршрута</strong>
+              <span>Например, «Пекин · остановка 1». Повторный город остаётся отдельной позицией.</span>
+            </div>
+            <div class="path-arrow" aria-hidden="true">›</div>
+            <div class="path-node dark">
+              <strong>Рабочая операция</strong>
+              <span>Данные открываются без горизонтальной прокрутки</span>
+            </div>
+          </div>
+
+          <h3>Как веб-таблица превращается в мобильные карточки</h3>
+          <p class="diagram-caption">Это схема структуры, а не снимок данных CRM. Строка туриста и колонка операции не исчезают — мобильный интерфейс просто показывает их по одной выбранной остановке.</p>
+          <div class="web-mobile-bridge" role="img" aria-label="Сопоставление широкой веб-сводной и вертикальной мобильной сводной">
+            <div class="bridge-panel web-panel">
+              <span class="bridge-label">Веб · обзор всего тура</span>
+              <div class="mock-browser"><i></i><i></i><i></i><b>Сводная таблица</b></div>
+              <div class="mock-table" aria-hidden="true">
+                <div class="mock-head">Турист</div><div class="mock-head">Пекин · прибытие</div><div class="mock-head">Пекин · отель</div><div class="mock-head">Пекин · отъезд</div>
+                <div class="mock-person">Анна</div><div class="mock-cell filled">SU 204</div><div class="mock-cell shared">Regent</div><div class="mock-cell">—</div>
+                <div class="mock-person">Илья</div><div class="mock-cell filled">SU 204</div><div class="mock-cell shared">Regent</div><div class="mock-cell filled">G89</div>
+              </div>
+              <small>Строка = турист · колонка = операция в позиции маршрута</small>
+            </div>
+            <div class="bridge-arrow" aria-hidden="true"><span>те же данные</span>→</div>
+            <div class="bridge-panel mobile-panel">
+              <span class="bridge-label">Мобилка · одна рабочая задача</span>
+              <div class="mock-phone" aria-hidden="true">
+                <div class="mock-phone-head">Китай · сентябрь</div>
+                <div class="mock-city">Пекин <b>1 остановка</b></div>
+                <div class="mock-tabs"><b>Прибытие</b><span>Отель</span><span>Отъезд</span></div>
+                <div class="mock-record"><strong>SU 204 · общая запись</strong><span>Анна + Илья · 2 туриста</span></div>
+                <div class="mock-coverage"><span>Анна</span><i>✓</i><i>✓</i><i>+</i></div>
+              </div>
+              <small>Тур → остановка → операция; «Покрытие» возвращает обзор</small>
+            </div>
+          </div>
+
+          <div class="operation-triad" aria-label="Три независимые операции">
+            <div class="operation-chip arrival">Прибытие</div>
+            <div class="operation-chip hotel">Отель</div>
+            <div class="operation-chip departure">Отъезд</div>
+          </div>
+
+          <div class="key-message">
+            <b>!</b>
+            <span><strong>Главное правило</strong>Мобильная сводная не создаёт вторую версию данных. Она показывает те же индивидуальные записи туристов и те же общие связи, что веб-сводная.</span>
+          </div>
+
+          <h3>Что остаётся раздельным</h3>
+          <ul class="plain-list">
+            <li><strong>«Лиды»</strong> — работа с заявкой, контактом, сообщениями, документами и задачами.</li>
+            <li><strong>«Туры»</strong> — работа со всем составом тура, маршрутом, логистикой и фактическими статусами.</li>
+            <li><strong>«Туристы»</strong> — быстрый вход в единую карточку конкретного участника.</li>
+          </ul>
+        </section>
+
+        <section class="chapter" id="manager-path">
+          <span class="chapter-number">02 · ОСНОВНОЙ СЦЕНАРИЙ</span>
+          <h2>Как менеджер готовит тур с телефона</h2>
+          <p class="chapter-intro">Сценарий повторяет ежедневную работу в веб-сводной, но разбит на пять коротких решений. На каждом шаге видно, что пользователь делает и что система сохраняет.</p>
+
+          <div class="steps" aria-label="Пять шагов подготовки тура">
+            <div class="step"><b>1</b><strong>Открывает лид</strong><span>Проверяет заявку и состав туристов.</span></div>
+            <div class="step"><b>2</b><strong>Переходит в сводную</strong><span>Тур открывается с областью «Этот лид».</span></div>
+            <div class="step"><b>3</b><strong>Выбирает город</strong><span>Работает с одной позицией маршрута.</span></div>
+            <div class="step"><b>4</b><strong>Заполняет операции</strong><span>Прибытие, отель и отъезд независимы.</span></div>
+            <div class="step"><b>5</b><strong>Проверяет покрытие</strong><span>Видит пробелы по каждому туристу.</span></div>
+          </div>
+
+          <div class="screens-grid">
+            <article class="screen-story">
+              <h3>Из карточки лида</h3>
+              <figure class="annotated-shot" aria-describedby="lead-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/01-lead-to-summary.png" aria-label="Открыть полноразмерный скриншот карточки лида">
+                    <img src="assets/spec/01-lead-to-summary.png" width="780" height="1688" loading="lazy" alt="Карточка лида Соколовых, прокрученная до блока перехода в сводную тура">
+                  </a>
+                  <span class="marker" style="--x:17%;--y:74%">1</span>
+                  <span class="marker blue" style="--x:82%;--y:84%">2</span>
+                  <span class="marker" style="--x:16%;--y:93%">3</span>
+                </div>
+                <figcaption id="lead-shot-caption">Лид остаётся самостоятельной карточкой. Сводная открывается как рабочее пространство всего тура.</figcaption>
+              </figure>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Точка перехода</strong>Блок «Сводная по туру» находится в деталях заявки.</span></li>
+                <li><b>2</b><span><strong>Явное действие</strong>Кнопка открывает тур, связанный с лидом.</span></li>
+                <li><b>3</b><span><strong>Объяснение области</strong>Пользователь заранее понимает, что логистика хранится в туре.</span></li>
+              </ol>
+            </article>
+
+            <article class="screen-story">
+              <h3>В рабочей сводной тура</h3>
+              <figure class="annotated-shot" aria-describedby="summary-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/02-tour-summary.png" aria-label="Открыть полноразмерный скриншот мобильной сводной">
+                    <img src="assets/spec/02-tour-summary.png" width="780" height="1688" loading="lazy" alt="Мобильная сводная тура: Пекин, прибытие и карточка индивидуального рейса">
+                  </a>
+                  <span class="marker" style="--x:18%;--y:29%">1</span>
+                  <span class="marker blue" style="--x:20%;--y:39%">2</span>
+                  <span class="marker" style="--x:80%;--y:52%">3</span>
+                  <span class="marker blue" style="--x:72%;--y:65%">4</span>
+                  <span class="marker" style="--x:50%;--y:86%">5</span>
+                </div>
+                <figcaption id="summary-shot-caption">На экране одновременно видны выбранный город, операция и карточка записи. Это мобильный эквивалент выбранной ячейки веб-таблицы.</figcaption>
+              </figure>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Позиция маршрута</strong>У города есть номер остановки и свои даты.</span></li>
+                <li><b>2</b><span><strong>Три операции</strong>Прибытие, отель и отъезд переключаются независимо.</span></li>
+                <li><b>3</b><span><strong>Область работы</strong>«Весь тур» можно заменить конкретным лидом.</span></li>
+                <li><b>4</b><span><strong>Тип записи</strong>Сразу видно: индивидуальная или общая.</span></li>
+                <li><b>5</b><span><strong>Действия</strong>Изменить данные, создать общую запись или сменить статус.</span></li>
+              </ol>
+            </article>
+
+          </div>
+        </section>
+
+        <section class="chapter" id="mobile-summary">
+          <span class="chapter-number">03 · МОБИЛЬНАЯ СВОДНАЯ</span>
+          <h2>Два режима отвечают на два разных вопроса</h2>
+          <p class="chapter-intro"><strong>«По операциям»</strong> нужен для редактирования конкретной записи. <strong>«Покрытие»</strong> показывает, у кого и в каком городе не заполнено прибытие, размещение или отъезд.</p>
+
+          <div class="screens-grid">
+            <article class="screen-story">
+              <h3>Режим «По операциям»</h3>
+              <div class="key-message">
+                <b>1</b>
+                <span><strong>Пользователь делает</strong>Выбирает остановку и одну операцию, затем редактирует одну или несколько записей.</span>
+              </div>
+              <ul class="plain-list">
+                <li>Карточки группируются по фактической общей записи.</li>
+                <li>У каждой карточки виден состав, источник и заполненность.</li>
+                <li>Повторяющиеся города не смешиваются: у каждого свой <code>routeCityId</code>.</li>
+              </ul>
+            </article>
+
+            <article class="screen-story">
+              <h3>Режим «Покрытие»</h3>
+              <figure class="annotated-shot" aria-describedby="coverage-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/03-tour-coverage.png" aria-label="Открыть полноразмерный скриншот покрытия">
+                    <img src="assets/spec/03-tour-coverage.png" width="780" height="1688" loading="lazy" alt="Покрытие по туристам: матрица городов и трёх операций в мобильной карточке">
+                  </a>
+                  <span class="marker" style="--x:76%;--y:32%">1</span>
+                  <span class="marker blue" style="--x:22%;--y:46%">2</span>
+                  <span class="marker" style="--x:73%;--y:63%">3</span>
+                  <span class="marker blue" style="--x:73%;--y:85%">4</span>
+                </div>
+                <figcaption id="coverage-shot-caption">Компактная матрица сохраняет смысл веб-таблицы, но не требует горизонтальной прокрутки.</figcaption>
+              </figure>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Переключатель режима</strong>Редактирование и контроль полноты разделены.</span></li>
+                <li><b>2</b><span><strong>Сводные числа</strong>Количество мест, подтверждений и общих записей.</span></li>
+                <li><b>3</b><span><strong>Три колонки</strong>Рейс, отель и отъезд видны рядом только внутри карточки туриста.</span></li>
+                <li><b>4</b><span><strong>Пробелы</strong>«+» открывает форму нужного города и операции.</span></li>
+              </ol>
+            </article>
+          </div>
+
+          <div class="key-message">
+            <b>✓</b>
+            <span><strong>Система сохраняет</strong>Индивидуальные значения туристов, источник общей записи, независимые статусы и точную позицию маршрута. Смена режима ничего не записывает.</span>
+          </div>
+        </section>
+
+        <section class="chapter" id="grouping-logic">
+          <span class="chapter-number">04 · ГРУППЫ, КОНФЛИКТЫ, РАЗЪЕДИНЕНИЕ</span>
+          <h2>Группа туристов и общая запись — не одно и то же</h2>
+          <p class="chapter-intro">Группа тура отвечает на вопрос «кто путешествует вместе». Общая запись отвечает на вопрос «у кого совпадает конкретная операция в конкретном городе».</p>
+
+          <div class="grouping-diagram" role="img" aria-label="Четыре туриста одной группы имеют общий отель, два общих прибытия и четыре индивидуальных отъезда">
+            <div class="people-row">
+              <div class="person-node"><i>АС</i><strong>Анна</strong><span>лид 1042</span></div>
+              <div class="person-node"><i>ИС</i><strong>Илья</strong><span>лид 1042</span></div>
+              <div class="person-node"><i>МО</i><strong>Марина</strong><span>лид 1048</span></div>
+              <div class="person-node"><i>ДВ</i><strong>Денис</strong><span>лид 1048</span></div>
+            </div>
+            <div class="tour-group-bar">Одна группа туристов на уровне тура · groupId</div>
+            <div class="operation-lane">
+              <span class="lane-label">Отель</span>
+              <span class="lane-group hotel">Одна общая запись на 4</span>
+            </div>
+            <div class="operation-lane">
+              <span class="lane-label">Прибытие</span>
+              <span class="lane-group arrival-a">Рейс A · 2</span>
+              <span class="lane-group arrival-b">Рейс B · 2</span>
+            </div>
+            <div class="operation-lane">
+              <span class="lane-label">Отъезд</span>
+              <span class="lane-group departure">Своя</span>
+              <span class="lane-group departure">Своя</span>
+              <span class="lane-group departure">Своя</span>
+              <span class="lane-group departure">Своя</span>
+            </div>
+            <p class="diagram-note"><strong>Разъединение прибытия</strong> не меняет общий отель, отъезд или состав группы тура.</p>
+          </div>
+
+          <div class="screens-grid">
+            <article class="screen-story">
+              <h3>1. Выбор участников группы тура</h3>
+              <figure class="annotated-shot" aria-describedby="group-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/04-tourist-group-selection.png" aria-label="Открыть полноразмерный скриншот выбора туристов">
+                    <img src="assets/spec/04-tourist-group-selection.png" width="780" height="1688" loading="lazy" alt="Экран объединения туристов: два выбранных участника из разных лидов">
+                  </a>
+                  <span class="marker purple" style="--x:18%;--y:9%">1</span>
+                  <span class="marker" style="--x:80%;--y:14%">2</span>
+                  <span class="marker purple" style="--x:17%;--y:25%">3</span>
+                  <span class="marker" style="--x:14%;--y:46%">4</span>
+                  <span class="marker blue" style="--x:76%;--y:96%">5</span>
+                </div>
+                <figcaption id="group-shot-caption">Свободного туриста можно добавить в существующую группу. Две уже созданные группы не сливаются автоматически.</figcaption>
+              </figure>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Уровень тура</strong>Эта группа действует на всём маршруте.</span></li>
+                <li><b>2</b><span><strong>Счётчик</strong>Сразу виден выбранный состав.</span></li>
+                <li><b>3</b><span><strong>Правило безопасности</strong>Интерфейс объясняет запрет слияния двух групп.</span></li>
+                <li><b>4</b><span><strong>Контекст</strong>У каждого туриста видны текущая группа и исходный лид.</span></li>
+                <li><b>5</b><span><strong>Применение</strong>Действие доступно только после выбора минимум двоих.</span></li>
+              </ol>
+            </article>
+
+            <article class="screen-story">
+              <h3>2. Сверка конфликтующих записей</h3>
+              <figure class="annotated-shot" aria-describedby="conflict-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/05-conflict-review.png" aria-label="Открыть полноразмерный скриншот сверки данных">
+                    <img src="assets/spec/05-conflict-review.png" width="780" height="1688" loading="lazy" alt="Экран сверки двух разных рейсов перед созданием общей записи">
+                  </a>
+                  <span class="marker amber" style="--x:17%;--y:14%">1</span>
+                  <span class="marker" style="--x:80%;--y:27%">2</span>
+                  <span class="marker blue" style="--x:11%;--y:34%">3</span>
+                  <span class="marker amber" style="--x:83%;--y:48%">4</span>
+                  <span class="marker" style="--x:72%;--y:96%">5</span>
+                </div>
+                <figcaption id="conflict-shot-caption">До выбора источника общая запись не создаётся. Личные записи обоих туристов остаются сохранёнными.</figcaption>
+              </figure>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Причина остановки</strong>Система нашла разные значения.</span></li>
+                <li><b>2</b><span><strong>Обязательный выбор</strong>Источник нельзя назначить автоматически.</span></li>
+                <li><b>3</b><span><strong>Основная запись</strong>Менеджер выбирает, что будет отображаться группе.</span></li>
+                <li><b>4</b><span><strong>Сравнение</strong>Различающиеся поля показаны рядом.</span></li>
+                <li><b>5</b><span><strong>Защищённое применение</strong>Кнопка заблокирована, пока источник не выбран.</span></li>
+              </ol>
+            </article>
+
+            <article class="screen-story wide feature-shot">
+              <div class="feature-copy">
+                <span class="feature-kicker">3. Разъединение одной операции</span>
+                <h3>Менеджер выбирает, кого отделить</h3>
+                <p>Экран состава относится только к выбранной общей записи: например, к прибытию в первой остановке Пекина.</p>
+                <ol class="callouts">
+                  <li><b>1</b><span><strong>Точный контекст</strong>В заголовке указаны операция и позиция маршрута.</span></li>
+                  <li><b>2</b><span><strong>Источник</strong>Видно, чья запись сейчас отображается группе.</span></li>
+                  <li><b>3</b><span><strong>Состав</strong>Галочками выбираются только отделяемые участники.</span></li>
+                  <li><b>4</b><span><strong>Без побочных изменений</strong>Отель, отъезд и <code>groupId</code> остаются прежними.</span></li>
+                </ol>
+              </div>
+              <figure class="annotated-shot compact-shot" aria-describedby="split-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/08-split-operation.png" aria-label="Открыть полноразмерный скриншот разъединения операции">
+                    <img src="assets/spec/08-split-operation.png" width="780" height="1688" loading="lazy" alt="Экран состава общей записи прибытия с выбором туристов для отделения">
+                  </a>
+                  <span class="marker purple" style="--x:18%;--y:7%">1</span>
+                  <span class="marker blue" style="--x:76%;--y:18%">2</span>
+                  <span class="marker" style="--x:15%;--y:38%">3</span>
+                  <span class="marker amber" style="--x:73%;--y:96%">4</span>
+                </div>
+                <figcaption id="split-shot-caption">После подтверждения отделённый турист снова показывает собственные сохранённые данные этой операции.</figcaption>
+              </figure>
+            </article>
+          </div>
+
+          <div class="key-message">
+            <b>↺</b>
+            <span><strong>Что происходит при разъединении</strong>Турист снова видит свою сохранённую индивидуальную запись. Остальные операции и группа тура не меняются.</span>
+          </div>
+        </section>
+
+        <section class="chapter" id="tourist-card">
+          <span class="chapter-number">05 · ЕДИНАЯ КАРТОЧКА ТУРИСТА</span>
+          <h2>Один турист — одна карточка из любого раздела</h2>
+          <p class="chapter-intro">Открытие из лида, списка туристов, документа или операции ведёт к одному <code>touristId</code>. Возврат сохраняет тур, город, операцию, фильтр и положение списка.</p>
+
+          <div class="value-flow" aria-label="Логика личного и отображаемого значения">
+            <div class="value-node"><strong>ownValues</strong><span>Личная запись туриста. Не удаляется при объединении.</span></div>
+            <div class="value-arrow" aria-hidden="true">+</div>
+            <div class="value-node shared"><strong>sourceVisitId</strong><span>Источник общей записи, выбранный менеджером.</span></div>
+            <div class="value-arrow" aria-hidden="true">→</div>
+            <div class="value-node visible"><strong>effectiveValues</strong><span>То, что сейчас отображается в сводной.</span></div>
+          </div>
+
+          <div class="screens-grid">
+            <article class="screen-story">
+              <h3>Логистика внутри карточки</h3>
+              <figure class="annotated-shot" aria-describedby="tourist-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/06-tourist-logistics.png" aria-label="Открыть полноразмерный скриншот логистики туриста">
+                    <img src="assets/spec/06-tourist-logistics.png" width="780" height="1688" loading="lazy" alt="Карточка туриста с маршрутными остановками, личными и общими операциями">
+                  </a>
+                  <span class="marker" style="--x:16%;--y:6%">1</span>
+                  <span class="marker blue" style="--x:18%;--y:16%">2</span>
+                  <span class="marker purple" style="--x:72%;--y:27%">3</span>
+                  <span class="marker" style="--x:72%;--y:37%">4</span>
+                  <span class="marker blue" style="--x:72%;--y:56%">5</span>
+                </div>
+                <figcaption id="tourist-shot-caption">По каждой остановке рядом показаны данные операции и её источник: «Индивидуальная запись» или «Общая запись».</figcaption>
+              </figure>
+            </article>
+
+            <article class="screen-story">
+              <h3>Что находится на экране</h3>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Контекст туриста</strong>ФИО и исходный лид всегда остаются в заголовке.</span></li>
+                <li><b>2</b><span><strong>Остановка маршрута</strong>Город, даты и порядковый номер не смешиваются с повторным посещением.</span></li>
+                <li><b>3</b><span><strong>Источник данных</strong>Пользователь видит, индивидуальная запись или общая.</span></li>
+                <li><b>4</b><span><strong>Независимость операций</strong>Общий отъезд не делает прибытие или отель общими.</span></li>
+                <li><b>5</b><span><strong>Следующий город</strong>У каждой позиции маршрута собственные три операции.</span></li>
+              </ol>
+              <div class="key-message">
+                <b>i</b>
+                <span><strong>Редактирование личной записи</strong>Меняет только <code>ownValues</code>. Пока турист состоит в общей записи, сводная продолжает показывать выбранный источник.</span>
+              </div>
+              <h3>Другие разделы карточки</h3>
+              <ul class="plain-list">
+                <li>личные данные и контакты;</li>
+                <li>паспорт РФ, загранпаспорт, сканы и OCR;</li>
+                <li>связи с лидом и группой тура;</li>
+                <li>комментарий для гида и внутренняя заметка;</li>
+                <li>готовность профиля и документов.</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section class="chapter" id="roles-directory">
+          <span class="chapter-number">06 · РОЛИ И СПРАВОЧНИК</span>
+          <h2>Интерфейс показывает только разрешённую работу</h2>
+          <p class="chapter-intro">Права проверяются не только видимостью кнопки, но и перед каждой mock-записью. В offline-режиме данные доступны для чтения, изменения заблокированы.</p>
+
+          <div class="role-grid" aria-label="Роли MVP">
+            <div class="role-card admin"><b>Администратор</b><span>Все действия, удаление, управление турами и справочником.</span></div>
+            <div class="role-card manager"><b>Менеджер</b><span>Профиль, документы, логистика и группы назначенных лидов.</span></div>
+            <div class="role-card escort"><b>Сопровождающий</b><span>Разрешённые поля и операционные статусы всего назначенного тура.</span></div>
+            <div class="role-card guide"><b>Гид</b><span>Read-only профиль и статусы только назначенных городов.</span></div>
+          </div>
+
+          <div class="screens-grid">
+            <article class="screen-story">
+              <h3>Справочник городов и точек</h3>
+              <figure class="annotated-shot" aria-describedby="directory-shot-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/07-city-directory.png" aria-label="Открыть полноразмерный скриншот справочника">
+                    <img src="assets/spec/07-city-directory.png" width="780" height="1688" loading="lazy" alt="Административный справочник городов, аэропортов и вокзалов">
+                  </a>
+                  <span class="marker" style="--x:18%;--y:7%">1</span>
+                  <span class="marker blue" style="--x:18%;--y:15%">2</span>
+                  <span class="marker" style="--x:14%;--y:24%">3</span>
+                  <span class="marker blue" style="--x:78%;--y:35%">4</span>
+                  <span class="marker" style="--x:74%;--y:96%">5</span>
+                </div>
+                <figcaption id="directory-shot-caption">На этапе прототипа справочник сохраняется в этом браузере. В рабочей версии администрирование будет в веб-настройках CRM.</figcaption>
+              </figure>
+            </article>
+
+            <article class="screen-story">
+              <h3>Логика выбора точки</h3>
+              <ol class="callouts">
+                <li><b>1</b><span><strong>Отдельный экран</strong>Справочник находится в меню тура.</span></li>
+                <li><b>2</b><span><strong>Прозрачный режим</strong>Пользователь видит, где сохраняются mock-изменения.</span></li>
+                <li><b>3</b><span><strong>Поиск</strong>Город находится по названию, стране или альтернативному имени.</span></li>
+                <li><b>4</b><span><strong>Покрытие точками</strong>Карточка показывает количество аэропортов и вокзалов.</span></li>
+                <li><b>5</b><span><strong>Административное действие</strong>Добавление доступно только администратору.</span></li>
+              </ol>
+              <ul class="plain-list">
+                <li>Самолёт показывает только аэропорты выбранного города.</li>
+                <li>Поезд показывает ж/д вокзалы, автобус — автовокзалы.</li>
+                <li>Одна активная точка предзаполняется только в пустое поле.</li>
+                <li>Если точки нет, разрешён ручной ввод с явной отметкой.</li>
+                <li>Используемую точку можно архивировать, но нельзя удалить.</li>
+              </ul>
+              <figure class="annotated-shot compact-shot point-picker-shot" aria-describedby="point-picker-caption">
+                <div class="shot-frame">
+                  <a href="assets/spec/12-point-picker.png" aria-label="Открыть полноразмерный скриншот выбора аэропорта">
+                    <img src="assets/spec/12-point-picker.png" width="780" height="1688" loading="lazy" alt="Поисковый экран выбора аэропорта, отфильтрованного по выбранному городу Пекин">
+                  </a>
+                  <span class="marker blue" style="--x:20%;--y:12%">1</span>
+                  <span class="marker" style="--x:77%;--y:28%">2</span>
+                  <span class="marker amber" style="--x:62%;--y:93%">3</span>
+                </div>
+                <figcaption id="point-picker-caption"><strong>1 — поиск</strong>, <strong>2 — только точки Пекина</strong>, <strong>3 — ручное значение</strong>, если подходящей точки нет.</figcaption>
+              </figure>
+            </article>
+          </div>
+
+          <h3 class="section-kicker">Как меняется экран для полевой команды</h3>
+          <div class="state-gallery" aria-label="Ролевые и системные состояния мобильного прототипа">
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/09-guide-readonly.png" aria-label="Открыть экран туриста в роли гида">
+                  <img src="assets/spec/09-guide-readonly.png" width="780" height="1688" loading="lazy" alt="Карточка туриста в роли гида с доступными для чтения полями">
+                </a>
+                <span class="marker purple" style="--x:78%;--y:6%">1</span>
+                <span class="marker blue" style="--x:77%;--y:47%">2</span>
+              </div>
+              <figcaption><strong>Гид · read-only.</strong> 1 — роль всегда видна; 2 — персональные и логистические данные показаны без кнопок редактирования.</figcaption>
+            </figure>
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/10-work-status.png" aria-label="Открыть экран выбора рабочего статуса">
+                  <img src="assets/spec/10-work-status.png" width="780" height="1688" loading="lazy" alt="Экран работы по туру и явный выбор статуса встречи туриста">
+                </a>
+                <span class="marker blue" style="--x:23%;--y:17%">1</span>
+                <span class="marker" style="--x:77%;--y:75%">2</span>
+              </div>
+              <figcaption><strong>Факт выполнения.</strong> 1 — город и операция; 2 — статус выбирается явно, без циклического переключения.</figcaption>
+            </figure>
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/11-offline.png" aria-label="Открыть сводную в offline-режиме">
+                  <img src="assets/spec/11-offline.png" width="780" height="1688" loading="lazy" alt="Мобильная сводная без подключения с предупреждением и заблокированными изменениями">
+                </a>
+                <span class="marker amber" style="--x:50%;--y:13%">1</span>
+                <span class="marker" style="--x:78%;--y:62%">2</span>
+              </div>
+              <figcaption><strong>Offline.</strong> 1 — постоянное предупреждение; 2 — данные читаются, а изменяющие действия скрыты или заблокированы.</figcaption>
+            </figure>
+          </div>
+        </section>
+
+        <section class="chapter" id="mvp-acceptance">
+          <span class="chapter-number">07 · ГРАНИЦЫ MVP И ПРИЁМКА</span>
+          <h2>Что проверяем сейчас, а что оставляем следующему этапу</h2>
+          <p class="chapter-intro">MVP отвечает на продуктовый вопрос: сможет ли команда перенести ежедневную работу со сводной веб-таблицей на телефон без потери данных и контроля.</p>
+
+          <div class="scope-bands">
+            <div class="scope-band mvp">
+              <strong>Сейчас · MVP</strong>
+              <span>Кликабельный прототип</span>
+              <ul>
+                <li>единая сводная и карточка туриста;</li>
+                <li>индивидуальная и групповая логистика;</li>
+                <li>конфликты и разъединение;</li>
+                <li>роли, состояния и mock-справочник.</li>
+              </ul>
+            </div>
+            <div class="scope-band next">
+              <strong>Следующий этап</strong>
+              <span>Рабочая мобильная версия</span>
+              <ul>
+                <li>production API и транзакции;</li>
+                <li>серверные capabilities;</li>
+                <li>база городов и точек;</li>
+                <li>идемпотентные preview/apply/split.</li>
+              </ul>
+            </div>
+            <div class="scope-band backlog">
+              <strong>Бэклог</strong>
+              <span>Не входит в MVP</span>
+              <ul>
+                <li>виза, страховка, анкета;</li>
+                <li>центральный чат и внешние каналы;</li>
+                <li>единый CRM-канбан;</li>
+                <li>прочие административные модули.</li>
+              </ul>
+            </div>
+          </div>
+
+          <h3>Главный приёмочный маршрут</h3>
+          <div class="acceptance-route" aria-label="Сценарий приёмки группировки">
+            <span>4 туриста</span><i>›</i><span>2 лида</span><i>›</i><span>1 группа тура</span><i>›</i><span>отель на 4</span><i>›</i><span>прибытия 2 + 2</span><i>›</i><span>разные отъезды</span><i>›</i><span>отделить одного</span>
+          </div>
+          <ul class="plain-list">
+            <li>После отделения у туриста снова видны его личные данные.</li>
+            <li>Общий отель, другие прибытия и группа тура не меняются.</li>
+            <li>Конфликт не применяется без выбранного источника.</li>
+            <li>Повторный Пекин хранит отдельные операции.</li>
+            <li>На 375×812 и 390×844 нет горизонтальной прокрутки, действия не меньше 44×44 px.</li>
+            <li>Прототип не выполняет production или внешние запросы.</li>
+          </ul>
+
+          <h3 class="section-kicker">Состояния, которые входят в приёмку</h3>
+          <div class="state-gallery acceptance-gallery" aria-label="Ошибочное, пустое и адаптивное состояния прототипа">
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/13-error-state.png" aria-label="Открыть экран ошибки загрузки">
+                  <img src="assets/spec/13-error-state.png" width="780" height="1688" loading="lazy" alt="Экран ошибки загрузки сводной с объяснением и кнопкой повторной попытки">
+                </a>
+              </div>
+              <figcaption><strong>Ошибка.</strong> Объясняет проблему и предлагает одно понятное действие «Повторить».</figcaption>
+            </figure>
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/14-empty-state.png" aria-label="Открыть пустое состояние тура">
+                  <img src="assets/spec/14-empty-state.png" width="780" height="1688" loading="lazy" alt="Пустой тур без туристов с объяснением следующего действия">
+                </a>
+              </div>
+              <figcaption><strong>Пустой тур.</strong> Не выглядит как ошибка: объясняет, почему списка нет и что делать дальше.</figcaption>
+            </figure>
+            <figure class="mini-screen">
+              <div class="shot-frame">
+                <a href="assets/spec/15-summary-375.png" aria-label="Открыть сводную на ширине 375 пикселей">
+                  <img src="assets/spec/15-summary-375.png" width="750" height="1624" loading="lazy" alt="Мобильная сводная на экране 375 на 812 пикселей без горизонтальной прокрутки">
+                </a>
+              </div>
+              <figcaption><strong>375×812.</strong> Навигация, карточка операции и действия помещаются без горизонтальной прокрутки; кликабельные зоны — от 44 px.</figcaption>
+            </figure>
+          </div>
+
+          <div class="scenario-launcher">
+            <div>
+              <span class="feature-kicker">Проверить прототип самостоятельно</span>
+              <h3>Готовые точки входа</h3>
+              <p>Конфликты и разъединение запускаются из кнопки «Объединить» в сводной. Справочник и тестовые состояния находятся в меню тура.</p>
+            </div>
+            <div class="scenario-links">
+              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=operations">Сводная менеджера <span>→</span></a>
+              <a href="tour-operations.html?tourId=china&amp;role=guide&amp;view=tourists&amp;tourist=t1">Карточка для гида <span>→</span></a>
+              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=work">Рабочие статусы <span>→</span></a>
+              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=operations&amp;offline=1">Offline-сценарий <span>→</span></a>
+            </div>
+          </div>
+        </section>
+
+        <details class="requirements-drawer" id="requirements">
+          <summary>
+            <span><strong>Полный каталог требований</strong>138 проверяемых пунктов, будущий контракт, non-goals и способы проверки. Это нормативное приложение к визуальным сценариям.</span>
+            <b aria-hidden="true">+</b>
+          </summary>
+          <div class="requirements-catalog">
     <section class="section" id="scope">
       <h2>1. Цель и границы</h2>
       <p>Веб-сводная работает с участником конкретного тура. Мобильный прототип должен заменить несколько несовместимых карточек и логик одной канонической моделью.</p>
@@ -370,8 +894,12 @@
       </ol>
       <p>Файлы задачи: <code>tour-operations.*</code>, <code>mobile-leads.*</code>, <code>mobile-leads-tz.*</code>, <code>prototype-smoke-test.js</code> и workflow smoke-теста.</p>
     </section>
+          </div>
+        </details>
+      </div>
+    </div>
   </main>
 
-  <footer>UNIQUE · отдельное ТЗ текущей задачи · 3 августа 2026</footer>
+  <footer>UNIQUE · визуальное ТЗ MVP мобильной CRM · 4 августа 2026</footer>
 </body>
 </html>

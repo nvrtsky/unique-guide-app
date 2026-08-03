@@ -29,6 +29,23 @@ jobs:
         run: |
           test -f mobile-leads.html
           test -f mobile-leads-tz.html
+          test -s mobile-leads-tz.css
+          test -s mobile-leads-tz.md
+          test -s assets/spec/01-lead-to-summary.png
+          test -s assets/spec/02-tour-summary.png
+          test -s assets/spec/03-tour-coverage.png
+          test -s assets/spec/04-tourist-group-selection.png
+          test -s assets/spec/05-conflict-review.png
+          test -s assets/spec/06-tourist-logistics.png
+          test -s assets/spec/07-city-directory.png
+          test -s assets/spec/08-split-operation.png
+          test -s assets/spec/09-guide-readonly.png
+          test -s assets/spec/10-work-status.png
+          test -s assets/spec/11-offline.png
+          test -s assets/spec/12-point-picker.png
+          test -s assets/spec/13-error-state.png
+          test -s assets/spec/14-empty-state.png
+          test -s assets/spec/15-summary-375.png
           test -f index.html
           test -s tour-operations.html
           test -s tour-operations.css

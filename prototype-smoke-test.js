@@ -977,7 +977,7 @@ assert.match(dirtyOperation.root.innerHTML, /value="18:45"/);
 const activeFiles = [
   'mobile-leads.html', 'mobile-leads.css', 'mobile-leads.js',
   'tour-operations.html', 'tour-operations.css', 'tour-operations.js',
-  'mobile-leads-tz.html',
+  'mobile-leads-tz.html', 'mobile-leads-tz.css',
 ];
 const activeSource = activeFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
 const activeJs = fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
@@ -987,6 +987,29 @@ assert.doesNotMatch(fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync
 
 const specMarkdown = fs.readFileSync('mobile-leads-tz.md', 'utf8');
 const specHtml = fs.readFileSync('mobile-leads-tz.html', 'utf8');
+const specImages = [
+  '01-lead-to-summary.png',
+  '02-tour-summary.png',
+  '03-tour-coverage.png',
+  '04-tourist-group-selection.png',
+  '05-conflict-review.png',
+  '06-tourist-logistics.png',
+  '07-city-directory.png',
+  '08-split-operation.png',
+  '09-guide-readonly.png',
+  '10-work-status.png',
+  '11-offline.png',
+  '12-point-picker.png',
+  '13-error-state.png',
+  '14-empty-state.png',
+  '15-summary-375.png',
+];
+specImages.forEach((image) => {
+  const path = `assets/spec/${image}`;
+  assert.ok(fs.statSync(path).size > 10_000, `${path} must contain a real interface screenshot`);
+  assert.equal(specHtml.split(path).length - 1, 2, `${path} must be linked and rendered once in the visual spec`);
+  assert.match(specMarkdown, new RegExp(`\\(${escapeRegExp(path)}\\)`), `${path} must be documented in Markdown`);
+});
 const idPattern = /\b(?:SCOPE|MVP|FLOW|MODEL|IA|LEAD|TOUR|CARD|READY|STATUS|OPS|GROUP|LIST|DOC|ROLE|DIR|STATE|VIS|API|AC|NG|BL)-\d+\b/g;
 const markdownIds = [...new Set(specMarkdown.match(idPattern) || [])].sort();
 const htmlIds = [...new Set(specHtml.match(idPattern) || [])].sort();
