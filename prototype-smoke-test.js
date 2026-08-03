@@ -157,6 +157,12 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     (listeners[type] || []).forEach((handler) => handler({ target }));
   }
 
+  function inputId(id, value, type = 'input') {
+    assert.match(root.html, new RegExp(`\\sid="${escapeRegExp(id)}"`), `element #${id} must exist before interaction`);
+    const target = { id, dataset: {}, value, selectionStart: String(value).length };
+    (listeners[type] || []).forEach((handler) => handler({ target }));
+  }
+
   function field(name, value, type = 'input') {
     findTagByAttribute('name', name);
     const target = { name, value, dataset: {} };
@@ -174,6 +180,7 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     click,
     dispatch,
     input,
+    inputId,
     field,
     submit,
     storage: sharedStorage,
@@ -279,6 +286,38 @@ assert.equal(restoredLeadUrl.searchParams.get('tourId'), 'china');
 assert.equal(restoredLeadUrl.searchParams.get('role'), 'guide');
 assert.equal(restoredLeadUrl.searchParams.get('offline'), '1');
 
+// The real Lead → Summary CTA preserves list state and returns from the bottom navigation.
+const summaryContextStorage = new Map();
+const summaryLead = loadPrototype('mobile-leads.js', '#app', '?role=manager', summaryContextStorage);
+summaryLead.inputId('lead-search', 'Анна');
+summaryLead.click({ quickStatus: 'confirmed' });
+summaryLead.click({ listMode: 'board' });
+summaryLead.click({ openLead: 'lead-1042' });
+summaryLead.setScrollTop(275);
+summaryLead.click({ action: 'open-tour-summary' });
+const summaryTourUrl = new URL(summaryLead.window.location.href, 'https://prototype.test/');
+assert.equal(summaryTourUrl.searchParams.get('lead'), 'lead-1042');
+assert.equal(summaryTourUrl.searchParams.get('returnLead'), 'lead-1042');
+assert.equal(summaryTourUrl.searchParams.get('returnTab'), 'overview');
+const savedSummaryContext = JSON.parse(summaryContextStorage.get('unique-guide-mobile-leads-return-v1'));
+assert.equal(savedSummaryContext.query, 'Анна');
+assert.deepEqual(savedSummaryContext.filters.statuses, ['confirmed']);
+assert.equal(savedSummaryContext.listMode, 'board');
+assert.equal(savedSummaryContext.scrollTop, 275);
+const summaryTour = loadPrototype('tour-operations.js', '#app', summaryTourUrl.search, summaryContextStorage);
+assert.equal(summaryTour.snapshot().scopeLead, 'lead-1042');
+summaryTour.click({ action: 'open-leads' });
+const summaryReturnUrl = new URL(summaryTour.window.location.href, 'https://prototype.test/');
+assert.equal(summaryReturnUrl.searchParams.get('lead'), 'lead-1042');
+assert.equal(summaryReturnUrl.searchParams.get('tab'), 'overview');
+const restoredSummaryLead = loadPrototype('mobile-leads.js', '#app', summaryReturnUrl.search, summaryContextStorage);
+assert.equal(restoredSummaryLead.snapshot().activeLeadId, 'lead-1042');
+assert.equal(restoredSummaryLead.snapshot().detailTab, 'overview');
+assert.equal(restoredSummaryLead.snapshot().query, 'Анна');
+assert.deepEqual(restoredSummaryLead.snapshot().filters.statuses, ['confirmed']);
+assert.equal(restoredSummaryLead.snapshot().listMode, 'board');
+assert.equal(restoredSummaryLead.getScrollTop(), 275);
+
 const reverseNavigation = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=escort&offline=1');
 reverseNavigation.click({ action: 'open-leads' });
 const reverseLeadUrl = new URL(reverseNavigation.window.location.href, 'https://prototype.test/');
@@ -306,6 +345,15 @@ guideTourUi.click({ action: 'close-overlay' });
 guideTourUi.click({ action: 'open-tours' });
 assert.match(guideTourUi.root.innerHTML, /Список туров · просмотр/);
 assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="new-tour"/);
+assert.match(guideTourUi.root.innerHTML, /Гранд-тур по Китаю/);
+guideTourUi.click({ action: 'tour-filter', filter: 'draft' });
+assert.doesNotMatch(guideTourUi.root.innerHTML, /Япония: сезон момидзи|Токио → Киото → Осака|Юки Танака/);
+guideTourUi.dispatch({ action: 'select-tour', id: 'japan' });
+assert.equal(guideTourUi.snapshot().selectedTourId, 'china');
+guideTourUi.dispatch({ action: 'tour-card-menu', id: 'japan' });
+assert.doesNotMatch(guideTourUi.root.innerHTML, /Япония: сезон момидзи|Токио → Киото → Осака|Юки Танака/);
+guideTourUi.click({ action: 'tour-filter', filter: 'archive' });
+assert.doesNotMatch(guideTourUi.root.innerHTML, /Италия для своих|Рим → Флоренция → Венеция|Марко Росси/);
 guideTourUi.click({ action: 'close-overlay' });
 guideTourUi.click({ action: 'workspace', view: 'program' });
 assert.match(guideTourUi.root.innerHTML, /Изменять программу могут менеджер и администратор тура/);
@@ -320,11 +368,12 @@ const japanLead = loadPrototype('mobile-leads.js', '#app', '?role=admin');
 japanLead.click({ action: 'new-lead' });
 japanLead.submit('lead-form', {
   firstName: 'Акира', lastName: 'Сато', middleName: '', phone: '+81 90 1234 5678', email: 'akira@example.jp', telegram: '',
-  source: 'Сайт', category: 'Индивидуальный', tour: 'Япония: сакура', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
+  source: 'Сайт', category: 'Индивидуальный', tour: 'Япония: сезон момидзи', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
   color: '#2f6bd8', hotel: '', room: '', note: '', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
 });
 const createdJapanLead = japanLead.snapshot().leads.find((lead) => lead.firstName === 'Акира');
 assert.equal(createdJapanLead.eventId, 'japan');
+assert.equal(createdJapanLead.tour, 'Япония: сезон момидзи');
 const createdJapanTourist = japanLead.snapshot().tourists.find((tourist) => tourist.leadId === createdJapanLead.id);
 assert.equal(createdJapanTourist.tourId, 'japan');
 assert.match(japanLead.root.innerHTML, new RegExp(`tour-operations\\.html\\?lead=${escapeRegExp(createdJapanLead.id)}&tourId=japan`));
@@ -341,6 +390,27 @@ const japanRecordsBefore = deepClone(japanFallback.snapshot().records);
 japanFallback.dispatch({ action: 'add-stage' });
 japanFallback.dispatch({ action: 'start-tourist-group' });
 assert.deepEqual(japanFallback.snapshot().records, japanRecordsBefore);
+
+const assignedJapanManagerParams = new URLSearchParams(japanProfileUrl.search);
+assignedJapanManagerParams.set('role', 'manager');
+const assignedJapanManager = loadPrototype('tour-operations.js', '#app', `?${assignedJapanManagerParams.toString()}`, japanLead.storage);
+assert.match(assignedJapanManager.root.innerHTML, /Сводная тура ещё не подготовлена в MVP/);
+assert.match(assignedJapanManager.root.innerHTML, /Сато Акира/);
+assert.match(assignedJapanManager.root.innerHTML, /Япония: сезон момидзи/);
+assignedJapanManager.click({ action: 'toggle-profile-section', section: 'personal' });
+assert.match(assignedJapanManager.root.innerHTML, /akira@example\.jp/);
+assert.match(assignedJapanManager.root.innerHTML, /data-action="edit-profile-section"/);
+
+for (const restrictedRole of ['guide', 'escort']) {
+  const restrictedParams = new URLSearchParams(japanProfileUrl.search);
+  restrictedParams.set('role', restrictedRole);
+  const restrictedJapan = loadPrototype('tour-operations.js', '#app', `?${restrictedParams.toString()}`, japanLead.storage);
+  assert.match(restrictedJapan.root.innerHTML, /Тур не назначен текущей роли/);
+  assert.doesNotMatch(restrictedJapan.root.innerHTML, /Сато Акира|Загранпаспорт|data-action="tourist-detail"/);
+  restrictedJapan.dispatch({ action: 'tourist-detail', id: createdJapanTourist.id });
+  assert.doesNotMatch(restrictedJapan.root.innerHTML, /Сато Акира|Загранпаспорт/);
+}
+
 japanFallback.click({ action: 'close-overlay' });
 const returnedJapanLeadUrl = new URL(japanFallback.window.location.href, 'https://prototype.test/');
 const returnedJapanLead = loadPrototype('mobile-leads.js', '#app', returnedJapanLeadUrl.search, japanLead.storage);
@@ -348,13 +418,41 @@ assert.equal(returnedJapanLead.snapshot().activeLeadId, createdJapanLead.id);
 assert.equal(returnedJapanLead.snapshot().leads.find((lead) => lead.id === createdJapanLead.id).eventId, 'japan');
 assert.equal(returnedJapanLead.snapshot().tourists.find((tourist) => tourist.id === createdJapanTourist.id).tourId, 'japan');
 
+// Generated lead IDs, codes and tourist IDs remain unique after a full reload.
+const identityStorage = new Map();
+const identityFirst = loadPrototype('mobile-leads.js', '#app', '?role=admin', identityStorage);
+identityFirst.click({ action: 'new-lead' });
+identityFirst.submit('lead-form', {
+  firstName: 'Первый', lastName: 'Тестовый', middleName: 'Лид', phone: '+7 900 000-00-61', email: 'first-identity@example.test', telegram: '',
+  source: 'Сайт', category: 'Семья', tour: 'Гранд-тур по Китаю', manager: 'Елена Воронова', routeCities: 'Пекин, Сиань',
+  color: '#2f6bd8', hotel: '', room: '', note: '', companionLast1: 'Первый', companionFirst1: 'Попутчик', companionLast2: 'Второй', companionFirst2: 'Попутчик',
+});
+const firstGeneratedLead = identityFirst.snapshot().leads.find((lead) => lead.email === 'first-identity@example.test');
+const identityReload = loadPrototype('mobile-leads.js', '#app', '?role=admin', identityStorage);
+identityReload.click({ action: 'new-lead' });
+identityReload.submit('lead-form', {
+  firstName: 'Второй', lastName: 'Тестовый', middleName: 'Лид', phone: '+7 900 000-00-62', email: 'second-identity@example.test', telegram: '',
+  source: 'Рекомендация', category: 'Индивидуальный', tour: 'Гранд-тур по Китаю', manager: 'Елена Воронова', routeCities: 'Пекин',
+  color: '#7a5af0', hotel: '', room: '', note: '', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
+});
+const identitySnapshot = identityReload.snapshot();
+const secondGeneratedLead = identitySnapshot.leads.find((lead) => lead.email === 'second-identity@example.test');
+assert.notEqual(firstGeneratedLead.id, secondGeneratedLead.id);
+assert.notEqual(firstGeneratedLead.code, secondGeneratedLead.code);
+assert.equal(new Set(identitySnapshot.leads.map((lead) => lead.id)).size, identitySnapshot.leads.length);
+assert.equal(new Set(identitySnapshot.leads.map((lead) => lead.code)).size, identitySnapshot.leads.length);
+assert.equal(new Set(identitySnapshot.tourists.map((tourist) => tourist.id)).size, identitySnapshot.tourists.length);
+const identityDeepLink = loadPrototype('mobile-leads.js', '#app', `?lead=${encodeURIComponent(secondGeneratedLead.id)}&role=admin`, identityStorage);
+assert.equal(identityDeepLink.snapshot().activeLeadId, secondGeneratedLead.id);
+assert.match(identityDeepLink.root.innerHTML, /Тестовый Второй Лид/);
+
 // Editing a seeded lead to another tour persists across a full reload and cannot be reverted by seed hydration.
 const editedTourStorage = new Map();
 const editedTourLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=admin', editedTourStorage);
 editedTourLead.click({ action: 'edit-lead' });
 editedTourLead.submit('lead-form', {
   firstName: 'Анна', lastName: 'Соколова', middleName: 'Игоревна', phone: '+7 916 441-22-18', email: 'anna@example.ru', telegram: '@anna_sokolova',
-  source: 'Рекомендация', category: 'VIP', tour: 'Япония: сакура', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
+  source: 'Рекомендация', category: 'VIP', tour: 'Япония: сезон момидзи', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
   color: '#2f6bd8', hotel: 'Tokyo Garden', room: 'Double', note: 'Перенесено в тур по Японии', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
 }, { editing: 'lead-1042' });
 const editedTourReload = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=admin', editedTourStorage);
@@ -486,6 +584,23 @@ assert.doesNotMatch(unassignedProfile.root.innerHTML, /private-denis@example\.ru
 unassignedProfile.click({ action: 'toggle-profile-section', section: 'comments' });
 assert.doesNotMatch(unassignedProfile.root.innerHTML, /Скрытая внутренняя заметка/);
 
+// Persisted manager assignments are authoritative for both grant and revoke.
+const revokedLeadStorage = new Map([['unique-guide-leads-v1', JSON.stringify([
+  { id: 'lead-1042', eventId: 'china', manager: 'Игорь Лебедев' },
+  { id: 'lead-1048', eventId: 'china', manager: 'Елена Воронова' },
+])]]);
+const revokedLeadProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1&tourId=china&role=manager', revokedLeadStorage);
+assert.match(revokedLeadProfile.root.innerHTML, /Режим просмотра/);
+revokedLeadProfile.click({ action: 'toggle-profile-section', section: 'personal' });
+assert.doesNotMatch(revokedLeadProfile.root.innerHTML, /anna\.sokolova@example\.com|data-action="edit-profile-section"/);
+const fullyRevokedStorage = new Map([['unique-guide-leads-v1', JSON.stringify([
+  { id: 'lead-1042', eventId: 'china', manager: 'Игорь Лебедев' },
+  { id: 'lead-1048', eventId: 'china', manager: 'Игорь Лебедев' },
+])]]);
+const fullyRevokedTour = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1&tourId=china&role=manager', fullyRevokedStorage);
+assert.match(fullyRevokedTour.root.innerHTML, /Тур не назначен текущей роли/);
+assert.doesNotMatch(fullyRevokedTour.root.innerHTML, /Соколова Анна|Загранпаспорт|Паспорт РФ/);
+
 // Capabilities also block forged clicks, and guides edit statuses only in assigned cities.
 const forgedGuide = loadPrototype('tour-operations.js', '#app');
 selectRole(forgedGuide, 'guide');
@@ -516,9 +631,16 @@ assert.deepEqual(outOfRouteStatus.snapshot().tourists.find((tourist) => tourist.
 
 const foreignTourStorage = new Map([['unique-guide-tourists-v2', JSON.stringify([{
   id: 'japan-forged', tourId: 'japan', leadId: 'lead-japan', lead: 'Лид Япония', leadStatus: 'Подтверждён',
-  firstName: 'Юки', lastName: 'Танака', route: ['route-beijing-1'], type: 'Взрослый', scans: [], statusByCity: {},
+  firstName: 'Юки', lastName: 'Танака', phone: '+81 90 9999 0000', email: 'private-yuki@example.jp', passport: 'JP-PRIVATE-77',
+  internalNote: 'Скрытая заметка Японии', route: ['route-beijing-1'], type: 'Взрослый', scans: [{ id: 'scan-private', name: 'japan-private-passport.jpg' }], statusByCity: {},
 }])]]);
 const foreignTourStatus = loadPrototype('tour-operations.js', '#app', '?tourist=japan-forged&tourId=china', foreignTourStorage);
+assert.match(foreignTourStatus.root.innerHTML, /Карточка недоступна/);
+assert.doesNotMatch(foreignTourStatus.root.innerHTML, /Танака Юки|JP-PRIVATE-77|private-yuki|japan-private-passport|\+81 90/);
+foreignTourStatus.dispatch({ action: 'tourist-detail', id: 'japan-forged' });
+foreignTourStatus.dispatch({ action: 'call-tourist', id: 'japan-forged' });
+foreignTourStatus.dispatch({ action: 'view-scan', id: 'japan-forged', scan: 'scan-private' });
+assert.doesNotMatch(foreignTourStatus.root.innerHTML, /Танака Юки|JP-PRIVATE-77|private-yuki|japan-private-passport|\+81 90/);
 selectRole(foreignTourStatus, 'guide');
 const foreignStatusBefore = deepClone(foreignTourStatus.snapshot().tourists.find((tourist) => tourist.id === 'japan-forged').statusByCity);
 foreignTourStatus.dispatch({ action: 'status-bulk', members: 'japan-forged', stage: 'arrival' });

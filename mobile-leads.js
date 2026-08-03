@@ -15,7 +15,7 @@
   const managerAssignedLeadIds = new Set(["lead-1042", "lead-1048"]);
   const tourIdsByTitle = {
     "Гранд-тур по Китаю": "china",
-    "Япония: сакура": "japan",
+    "Япония: сезон момидзи": "japan",
     "Не выбран": null,
   };
   const icons = {
@@ -227,6 +227,23 @@
 
   loadStoredLeads();
 
+  function restorePrototypeSequence() {
+    const values = [];
+    leads.forEach(lead => {
+      const idMatch = String(lead.id || "").match(/^lead-proto-(\d+)$/);
+      const codeMatch = String(lead.code || "").match(/^L-10(\d+)$/);
+      if (idMatch) values.push(Number(idMatch[1]));
+      if (codeMatch) values.push(Number(codeMatch[1]));
+    });
+    canonicalTourists.forEach(tourist => {
+      const touristMatch = String(tourist.id || "").match(/^tourist-proto-(\d+)-/);
+      if (touristMatch) values.push(Number(touristMatch[1]));
+    });
+    sequence = Math.max(sequence, ...values.filter(Number.isFinite));
+  }
+
+  restorePrototypeSequence();
+
   function leadTourists(lead) {
     return canonicalTourists.filter(tourist => tourist.leadId === lead.id);
   }
@@ -393,6 +410,21 @@
     window.location.href = "./tour-operations.html?" + params.toString();
   }
 
+  function openTourSummary(lead, detailTab = "overview") {
+    if (!lead || !lead.eventId) return;
+    rememberReturnContext(lead.id, detailTab);
+    const params = new URLSearchParams({
+      lead: lead.id,
+      tourId: lead.eventId,
+      returnLead: lead.id,
+      returnTab: detailTab,
+      origin: "mobile-leads",
+      role: state.role,
+      offline: state.offline ? "1" : "0",
+    });
+    window.location.href = "./tour-operations.html?" + params.toString();
+  }
+
   function createCanonicalTouristForLead(lead, values = {}) {
     sequence += 1;
     const id = values.id || "tourist-proto-" + sequence + "-" + Date.now();
@@ -514,7 +546,7 @@
     const capability = capabilitiesForLead(lead);
     const outcome = lead.stage === "lost" && capability.canSeePrivate ? '<div class="notice warning"><strong>' + (lead.outcome === "postponed" ? "Отложен" : "Не состоялся") + '</strong><span>' + esc(lead.outcomeReason || "Причина не указана") + (lead.outcomeDate ? " · " + lead.outcomeDate : "") + "</span></div>" : "";
     const summaryAction = lead.eventId
-      ? '<a class="primary blue wide button-link" href="./tour-operations.html?lead=' + encodeURIComponent(lead.id) + '&tourId=' + encodeURIComponent(lead.eventId) + '&role=' + encodeURIComponent(state.role) + '&offline=' + (state.offline ? "1" : "0") + '">Открыть сводную тура</a><p class="helper">Откроется весь тур с фильтром по этому лиду. Логистика хранится в сводной, а не внутри карточки заявки.</p>'
+      ? '<a class="primary blue wide button-link" data-action="open-tour-summary" href="./tour-operations.html?lead=' + encodeURIComponent(lead.id) + '&tourId=' + encodeURIComponent(lead.eventId) + '&returnLead=' + encodeURIComponent(lead.id) + '&returnTab=' + encodeURIComponent(state.detailTab) + '&origin=mobile-leads&role=' + encodeURIComponent(state.role) + '&offline=' + (state.offline ? "1" : "0") + '">Открыть сводную тура</a><p class="helper">Откроется весь тур с фильтром по этому лиду. Логистика хранится в сводной, а не внутри карточки заявки.</p>'
       : '<div class="notice"><strong>Тур не выбран</strong><span>Назначьте тур, чтобы туристы появились в сводной.</span></div>';
     const editAction = capability.canEdit ? '<button data-action="edit-lead">Изменить</button>' : "";
     const privateContact = capability.canSeePrivate ? info("Email", lead.email) + info("Telegram", lead.telegram || "Не указан") : "";
@@ -588,7 +620,7 @@
     return chrome('<section class="sheet"><form id="lead-form" class="sheet" data-editing="' + (editing ? lead.id : "") + '">' +
       '<div class="sheet-head"><button type="button" class="back-btn" data-action="' + (editing ? "back-detail" : "back-list") + '" aria-label="Закрыть">×</button><div class="sheet-title"><h2>' + (editing ? "Изменить лид" : "Новый лид") + '</h2><p>Поля веб-карточки в мобильной форме</p></div></div><div class="sheet-scroll form-scroll">' +
       '<section class="block"><h3>КОНТАКТ</h3><div class="two">' + field("Фамилия *", "lastName", item.lastName, true) + field("Имя *", "firstName", item.firstName, true) + '</div>' + field("Отчество", "middleName", item.middleName) + '<div class="two">' + field("Телефон *", "phone", item.phone, true, "tel") + field("Email", "email", item.email, false, "email") + '</div>' + field("Telegram", "telegram", item.telegram, false, "text", "@username") + "</section>" +
-      '<section class="block"><h3>ЗАЯВКА</h3><div class="two"><label class="field"><span>Источник</span><select name="source">' + optionList(["Сайт", "Рекомендация", "Telegram", "Повторный клиент"], item.source) + '</select></label><label class="field"><span>Категория</span><select name="category">' + optionList(["Индивидуальный", "Пара", "Семья", "VIP"], item.category) + '</select></label></div><label class="field"><span>Тур</span><select name="tour">' + optionList(["Гранд-тур по Китаю", "Япония: сакура", "Не выбран"], item.tour) + '</select></label><label class="field"><span>Менеджер</span><select name="manager">' + optionList(["Елена Воронова", "Игорь Лебедев"], item.manager) + '</select></label><label class="field"><span>Города маршрута</span><input name="routeCities" value="' + esc(item.routeCities.join(", ")) + '"></label>' + field("Цвет", "color", item.color, false, "color") + "</section>" +
+      '<section class="block"><h3>ЗАЯВКА</h3><div class="two"><label class="field"><span>Источник</span><select name="source">' + optionList(["Сайт", "Рекомендация", "Telegram", "Повторный клиент"], item.source) + '</select></label><label class="field"><span>Категория</span><select name="category">' + optionList(["Индивидуальный", "Пара", "Семья", "VIP"], item.category) + '</select></label></div><label class="field"><span>Тур</span><select name="tour">' + optionList(["Гранд-тур по Китаю", "Япония: сезон момидзи", "Не выбран"], item.tour) + '</select></label><label class="field"><span>Менеджер</span><select name="manager">' + optionList(["Елена Воронова", "Игорь Лебедев"], item.manager) + '</select></label><label class="field"><span>Города маршрута</span><input name="routeCities" value="' + esc(item.routeCities.join(", ")) + '"></label>' + field("Цвет", "color", item.color, false, "color") + "</section>" +
       '<section class="block"><h3>РАЗМЕЩЕНИЕ</h3><div class="two">' + field("Отель", "hotel", item.accommodation.hotel) + field("Номер", "room", item.accommodation.room) + "</div></section>" +
       '<section class="block"><h3>ПРИМЕЧАНИЕ</h3><label class="field"><textarea name="note" placeholder="Пожелания клиента">' + esc(item.note) + "</textarea></label></section>" +
       (!editing ? '<section class="block"><h3>ТУРИСТЫ</h3><p class="helper top-helper">Основной турист создаётся из контакта. Добавьте попутчиков сразу или позже.</p><div class="two">' + field("Фамилия попутчика", "companionLast1", "") + field("Имя попутчика", "companionFirst1", "") + '</div><div class="two">' + field("Фамилия попутчика", "companionLast2", "") + field("Имя попутчика", "companionFirst2", "") + '</div></section>' : "") +
@@ -861,6 +893,10 @@
       openCanonicalTourist(target.dataset.tourist, state.activeLeadId || "", state.detailTab);
       return;
     }
+    if (action === "open-tour-summary") {
+      openTourSummary(activeLead(), state.detailTab);
+      return;
+    }
     if (action === "new-lead") {
       if (!requireCreateCapability()) return;
       state.activeLeadId = null;
@@ -986,6 +1022,11 @@
         offline: state.offline,
         activeLeadId: state.activeLeadId,
         screen: state.screen,
+        detailTab: state.detailTab,
+        listMode: state.listMode,
+        query: state.query,
+        filters: state.filters,
+        showArchive: state.showArchive,
         assignedLeadIds: Array.from(managerAssignedLeadIds),
         capabilities: lead ? capabilitiesForLead(lead) : globalCapabilities(),
       }));

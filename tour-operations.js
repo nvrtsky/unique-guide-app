@@ -110,6 +110,29 @@
   var escortTourIds = ['china'];
   var guideTourIds = ['china'];
   var guideCityIds = ['route-beijing-1', 'route-xian-1'];
+  var LEAD_STORAGE_KEY = 'unique-guide-leads-v1';
+
+  function hydrateManagerAssignments() {
+    try {
+      var rawStoredLeads = window.localStorage && window.localStorage.getItem(LEAD_STORAGE_KEY);
+      if (rawStoredLeads == null) return;
+      managerLeadIds = [];
+      managerTourIds = [];
+      var storedLeads = JSON.parse(rawStoredLeads);
+      if (!Array.isArray(storedLeads)) return;
+      storedLeads.forEach(function (lead) {
+        if (!lead || lead.manager !== 'Елена Воронова') return;
+        if (lead.id && managerLeadIds.indexOf(lead.id) === -1) managerLeadIds.push(lead.id);
+        if (lead.eventId && managerTourIds.indexOf(lead.eventId) === -1) managerTourIds.push(lead.eventId);
+      });
+    } catch (error) {
+      managerLeadIds = [];
+      managerTourIds = [];
+      console.warn('Lead assignments are unavailable', error);
+    }
+  }
+
+  hydrateManagerAssignments();
   var documentExpiryWarningDate = '2027-03-01';
   var statusLabels = {
     arrival: { expected: 'Ожидается', arrived: 'Прибыл' },
@@ -472,6 +495,7 @@
   }
 
   function canViewRouteCity(routeCityId) {
+    if (!canViewSelectedTour()) return false;
     if (state.role !== 'guide') return true;
     return guideTourIds.indexOf(state.selectedTourId) !== -1 && guideCityIds.indexOf(routeCityId) !== -1;
   }
@@ -507,6 +531,17 @@
       guides: '',
       site: ''
     };
+  }
+
+  function canViewTourId(tourId) {
+    if (state.role === 'admin') return true;
+    if (state.role === 'manager') return managerTourIds.indexOf(tourId) !== -1;
+    if (state.role === 'escort') return escortTourIds.indexOf(tourId) !== -1;
+    return state.role === 'guide' && guideTourIds.indexOf(tourId) !== -1;
+  }
+
+  function canViewSelectedTour() {
+    return canViewTourId(state.selectedTourId);
   }
 
   function tourHasOperationalModel(tourId) {
@@ -564,6 +599,10 @@
 
   function touristById(id) {
     return tourists.find(function (tourist) { return tourist.id === id; });
+  }
+
+  function canViewTouristForSelectedTour(tourist) {
+    return Boolean(tourist) && canViewSelectedTour() && tourist.tourId === state.selectedTourId;
   }
 
   function newGroupId(prefix) {
@@ -758,17 +797,17 @@
   }
 
   function canEditProfileFor(tourist) {
-    if (!tourist || !capabilities().canEditProfile) return false;
+    if (!canViewTouristForSelectedTour(tourist) || !capabilities().canEditProfile) return false;
     return state.role === 'admin' || managerLeadIds.indexOf(tourist.leadId) !== -1;
   }
 
   function canSeePrivateFor(tourist) {
-    if (!tourist || tourist.tourId !== state.selectedTourId) return false;
+    if (!canViewTouristForSelectedTour(tourist)) return false;
     return state.role === 'admin' || (state.role === 'manager' && managerTourIds.indexOf(tourist.tourId) !== -1 && managerLeadIds.indexOf(tourist.leadId) !== -1);
   }
 
   function canManageDocumentsFor(tourist) {
-    if (!tourist || !capabilities().canManageDocuments) return false;
+    if (!canViewTouristForSelectedTour(tourist) || !capabilities().canManageDocuments) return false;
     return state.role === 'admin' || managerLeadIds.indexOf(tourist.leadId) !== -1;
   }
 
@@ -1059,8 +1098,9 @@
     var filled = available.length - grouped.free.length;
     var cards = grouped.groups.map(operationCard).join('');
     if (!cards) {
+      var emptyOperationHint = capabilities().canEditLogistics && !state.offline ? 'Выберите туристов и заполните общую запись.' : 'Для выбранной операции пока нет данных. Доступен режим просмотра.';
       cards = '<div class="empty-state">' + icon(state.stage === 'hotel' ? 'hotel' : 'plane') + '<strong>' + stageMeta[state.stage].empty +
-        '</strong><span>Выберите туристов и заполните общую запись.</span></div>';
+        '</strong><span>' + h(emptyOperationHint) + '</span></div>';
     }
     var free = '';
     if (grouped.free.length) {
@@ -1267,6 +1307,12 @@
       '<main class="scroll"><div class="empty-state">' + icon('alert') + '<strong>Сводная тура ещё не подготовлена в MVP</strong><span>Маршрут и операции этого тура не загружены. Китайские mock-данные не используются и изменения недоступны.</span><button type="button" class="secondary-button empty-state-action" data-action="open-tours">Вернуться к списку туров</button></div>' + memberSection + '</main>';
   }
 
+  function unauthorizedTourView() {
+    return statusBar() + '<div class="app-top"><div class="user-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + h(roleLabels[state.role]) + '</button></div>' +
+      '<div class="tour-row"><span class="tour-mark"></span><div class="tour-title"><strong>Недоступный тур</strong><span>Доступ к туру ограничен</span></div></div></div>' +
+      '<main class="scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Тур не назначен текущей роли</strong><span>Персональные данные и операции скрыты. Выберите доступный тур или смените роль в mock-сценарии.</span><button type="button" class="secondary-button empty-state-action" data-action="open-tours">Выбрать доступный тур</button></div></main>';
+  }
+
   function bottomNav() {
     var items = [
       { id: 'operations', label: 'Туры', icon: 'tours' },
@@ -1394,6 +1440,7 @@
     var directoryNote = state.offline ? 'Нет подключения. Справочник доступен только для просмотра, изменения не сохраняются.' :
       (canManageDirectory ? 'Изменения сохраняются только в этом браузере и сразу доступны в мобильной сводной.' : 'Режим просмотра. Изменение справочника доступно только администратору.');
     var query = state.directoryQuery.trim().toLowerCase();
+    var emptyDirectoryHint = canManageDirectory ? 'Измените поиск или добавьте город.' : 'Измените строку поиска. Добавление городов доступно администратору.';
     var cityCards = directory.cities.filter(function (city) {
       return !query || [city.name, city.country, city.aliases].join(' ').toLowerCase().indexOf(query) !== -1;
     }).map(function (city) {
@@ -1408,7 +1455,7 @@
     return '<section class="screen">' + screenHeader('Города и точки', 'Настройки CRM · mock-справочник') + '<div class="screen-scroll"><div class="form-note">' +
       directoryNote + '</div>' +
       '<label class="search-box directory-search">' + icon('search') + '<input data-directory-search value="' + h(state.directoryQuery) + '" placeholder="Найти город"></label>' +
-      (cityCards || '<div class="empty-state">' + icon('pin') + '<strong>Города не найдены</strong><span>Измените поиск или добавьте город.</span></div>') +
+      (cityCards || '<div class="empty-state">' + icon('pin') + '<strong>Города не найдены</strong><span>' + h(emptyDirectoryHint) + '</span></div>') +
       '</div>' + (canManageDirectory ? '<footer class="screen-actions single"><button type="button" class="primary-button blue" data-action="new-directory-city">' + icon('plus') + 'Добавить город</button></footer>' : '') + '</section>';
   }
 
@@ -1581,20 +1628,22 @@
   function toursScreen(overlay) {
     var labels = { active: 'Активные', draft: 'Черновики', archive: 'Архив' };
     var query = state.tourQuery.trim().toLowerCase();
-    var filtered = tours.filter(function (tour) { return tour.status === state.tourFilter && (!query || [tour.name, tour.route, tour.guides].join(' ').toLowerCase().indexOf(query) !== -1); });
+    var filtered = tours.filter(function (tour) { return canViewTourId(tour.id) && tour.status === state.tourFilter && (!query || [tour.name, tour.route, tour.guides].join(' ').toLowerCase().indexOf(query) !== -1); });
     var cards = filtered.map(function (tour) {
       return '<article class="tour-list-card" style="--tour-color:' + h(tour.color) + '"><button type="button" data-action="select-tour" data-id="' + tour.id + '"><span class="tour-list-state">' + h(labels[tour.status]) + '</span><strong>' + h(tour.name) + '</strong><small>' + h(tour.dates + ' · ' + tour.route) + '</small><div><span>' + tour.tourists + ' / ' + tour.capacity + ' мест</span><span>' + h(tour.guides || 'Гид не назначен') + '</span></div></button><button type="button" class="card-more" data-action="tour-card-menu" data-id="' + tour.id + '">' + icon('more') + '</button></article>';
     }).join('');
+    var emptyToursHint = capabilities().canManageTour && !state.offline ? 'Измените фильтр или создайте новый тур.' : 'Измените фильтр. Создание тура недоступно в текущем режиме.';
     var createAction = capabilities().canManageTour && !state.offline ? '<footer class="screen-actions single"><button type="button" class="primary-button" data-action="new-tour">' + icon('plus') + 'Создать тур</button></footer>' : '';
     var readOnlyNote = state.offline ? '<div class="form-note">Нет подключения. Список туров доступен без создания и изменений.</div>' :
       (capabilities().canManageTour ? '' : '<div class="form-note">Режим просмотра. Создание и управление турами недоступно для роли «' + h(roleLabels[state.role]) + '».</div>');
     return '<section class="screen">' + screenHeader('Туры', capabilities().canManageTour ? 'Список, создание и архив' : 'Список туров · просмотр') + '<div class="screen-scroll">' + readOnlyNote + '<div class="filter-tabs">' + Object.keys(labels).map(function (status) {
       return '<button type="button" class="' + (state.tourFilter === status ? 'active' : '') + '" data-action="tour-filter" data-filter="' + status + '">' + labels[status] + '</button>';
-    }).join('') + '</div><label class="search-box">' + icon('search') + '<input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.tourists; }, 0) + '</strong></div><div><span>Свободно</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.capacity - tour.tourists; }, 0) + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>Измените фильтр или создайте новый.</span></div>') + '</div>' + createAction + '</section>';
+    }).join('') + '</div><label class="search-box">' + icon('search') + '<input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.tourists; }, 0) + '</strong></div><div><span>Свободно</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.capacity - tour.tourists; }, 0) + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>' + h(emptyToursHint) + '</span></div>') + '</div>' + createAction + '</section>';
   }
 
   function tourMenuScreen(overlay) {
     var tourId = overlay.tourId || state.selectedTourId;
+    if (!canViewTourId(tourId)) return '<section class="screen">' + screenHeader('Тур недоступен', 'Доступ ограничен') + '<div class="screen-scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Нет доступа к этому туру</strong><span>Метаданные и действия скрыты для текущей роли.</span></div></div></section>';
     var tour = tours.find(function (item) { return item.id === tourId; }) || (tourId === state.selectedTourId ? selectedTour() : null);
     var title = tour ? tour.name : 'Выбранный тур';
     var viewActions = '<button data-action="view-tour-info"><span>' + icon('tours') + '</span><div><strong>О туре</strong><small>Маршрут, команда и параметры</small></div><b>›</b></button>' +
@@ -1602,13 +1651,17 @@
     var manageActions = canManageTourId(tourId) && tour && !state.offline ? '<button data-action="edit-tour"><span>' + icon('settings') + '</span><div><strong>Изменить тур</strong><small>Маршрут, даты и команда</small></div><b>›</b></button><button data-action="copy-tour"><span>' + icon('tours') + '</span><div><strong>Копировать</strong><small>Создать тур с теми же настройками</small></div><b>›</b></button><button class="danger-row" data-action="archive-tour"><span>' + icon('archive') + '</span><div><strong>Архивировать</strong><small>Скрыть из активных туров</small></div><b>›</b></button><button class="danger-row" data-action="cancel-tour"><span>' + icon('close') + '</span><div><strong>Отменить тур</strong><small>Сохранить данные и указать причину</small></div><b>›</b></button>' : '';
     var directoryAction = '<button data-action="open-directory"><span>' + icon('pin') + '</span><div><strong>Города и точки</strong><small>' +
       (capabilities().canManageDirectory && !state.offline ? 'Аэропорты, ж/д и автовокзалы' : 'Просмотр справочника') + '</small></div><b>›</b></button>';
-    var readOnlyNote = manageActions ? '' : '<div class="form-note">Режим просмотра. Управляющие действия для этого тура недоступны.</div>';
+    var readOnlyNote = manageActions ? '' : '<div class="form-note">' + (state.offline ? 'Нет подключения. Управляющие действия временно недоступны.' : 'Режим просмотра. Управляющие действия для этого тура недоступны.') + '</div>';
     return '<section class="screen">' + screenHeader('Действия с туром', title) + '<div class="screen-scroll">' + readOnlyNote + '<div class="action-menu">' + viewActions + manageActions + directoryAction + '</div></div></section>';
+  }
+
+  function unavailableTouristScreen() {
+    return '<section class="screen">' + screenHeader('Карточка недоступна', 'Доступ ограничен') + '<div class="screen-scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Не удалось открыть туриста</strong><span>Турист не относится к выбранному доступному туру. Персональные данные скрыты.</span></div></div></section>';
   }
 
   function touristDetailScreen(overlay) {
     var tourist = touristById(overlay.touristId);
-    if (!tourist) return '<section class="screen">' + screenHeader('Турист не найден', 'Данные могли измениться') + '<div class="screen-scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Не удалось открыть карточку</strong><span>Вернитесь к сводной и повторите.</span></div></div></section>';
+    if (!canViewTouristForSelectedTour(tourist)) return unavailableTouristScreen();
     var personal = personalReadiness(tourist);
     var documents = documentReadiness(tourist);
     var domestic = documents.domestic;
@@ -1666,6 +1719,7 @@
 
   function profileEditScreen(overlay) {
     var tourist = touristById(overlay.touristId);
+    if (!canEditProfileFor(tourist)) return unavailableTouristScreen();
     var section = overlay.section;
     var title = { personal: 'Личные данные', domestic: 'Паспорт РФ', foreign: 'Загранпаспорт', links: 'Связи и группы', comments: 'Комментарии' }[section] || 'Данные туриста';
     var fieldErrors = overlay.fieldErrors || {};
@@ -1701,6 +1755,7 @@
 
   function ocrReviewScreen(overlay) {
     var tourist = touristById(overlay.touristId);
+    if (!canManageDocumentsFor(tourist)) return unavailableTouristScreen();
     var recognized = { latinName: 'ANNA SOKOLOVA', passport: '72 4567890', passportExpiry: '2031-05-21' };
     var labels = { latinName: 'ФИО латиницей', passport: 'Номер', passportExpiry: 'Годен до' };
     var rows = Object.keys(recognized).map(function (key) {
@@ -1712,6 +1767,7 @@
 
   function documentPreviewScreen(overlay) {
     var tourist = touristById(overlay.touristId);
+    if (!canViewTouristForSelectedTour(tourist)) return unavailableTouristScreen();
     var scan = (tourist.scans || []).find(function (item) { return item.id === overlay.scanId; });
     return '<section class="screen">' + screenHeader(scan ? scan.name : 'Скан паспорта', tourist.name) + '<div class="screen-scroll"><div class="document-preview">' + icon('document') + '<strong>Предпросмотр mock-файла</strong><span>В прототипе файл не отправляется на сервер.</span></div>' + (canManageDocumentsFor(tourist) && !state.offline ? '<button type="button" class="danger-button full-button" data-action="delete-scan" data-id="' + tourist.id + '" data-scan="' + h(overlay.scanId) + '">Удалить скан</button>' : '') + '</div></section>';
   }
@@ -1722,6 +1778,7 @@
 
   function deleteTouristScreen(overlay) {
     var tourist = touristById(overlay.touristId);
+    if (!canViewTouristForSelectedTour(tourist)) return unavailableTouristScreen();
     return '<section class="screen">' + screenHeader('Удалить туриста?', tourist ? tourist.name : 'Турист') + '<div class="screen-scroll"><div class="conflict-summary"><strong>Карточка будет удалена из mock-тура</strong><span>Операционные связи этого туриста будут сняты. Действие доступно только администратору.</span></div></div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="button" class="danger-button" data-action="confirm-delete-tourist" data-id="' + h(overlay.touristId) + '">Удалить</button></footer></section>';
   }
 
@@ -1768,7 +1825,8 @@
     var rows = Object.keys(roleLabels).map(function (role) {
       return '<button type="button" class="source-card ' + (state.role === role ? 'active' : '') + '" data-action="select-role" data-role="' + role + '"><span class="radio"></span><span class="member-copy"><strong>' + h(roleLabels[role]) + '</strong><span>' + h(role === 'admin' ? 'Все действия и удаление' : role === 'manager' ? 'Профиль, логистика и группы' : role === 'escort' ? 'Read-only профиль, статусы всего тура' : 'Read-only профиль, статусы назначенных городов') + '</span></span></button>';
     }).join('');
-    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay" aria-label="Закрыть"></button><section class="sheet"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>Роль просмотра</strong><span>Mock capability-сценарий</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll">' + rows + '<div class="system-tools"><button type="button" data-action="toggle-offline">' + icon('wifiOff') + '<span><strong>' + (state.offline ? 'Вернуть подключение' : 'Показать offline') + '</strong><small>Проверить запрет записи</small></span></button><button type="button" data-action="open-ui-states">' + icon('alert') + '<span><strong>Состояния экрана</strong><small>Loading, error и empty</small></span></button></div></div></section></div>';
+    var uiStatesAction = tourHasOperationalModel(state.selectedTourId) ? '<button type="button" data-action="open-ui-states">' + icon('alert') + '<span><strong>Состояния экрана</strong><small>Loading, error и empty</small></span></button>' : '';
+    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay" aria-label="Закрыть"></button><section class="sheet"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>Роль просмотра</strong><span>Mock capability-сценарий</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll">' + rows + '<div class="system-tools"><button type="button" data-action="toggle-offline">' + icon('wifiOff') + '<span><strong>' + (state.offline ? 'Вернуть подключение' : 'Показать offline') + '</strong><small>Проверить запрет записи</small></span></button>' + uiStatesAction + '</div></div></section></div>';
   }
 
   function touristFiltersScreen() {
@@ -1868,9 +1926,11 @@
       'tour-info': tourInfoView,
       'tour-tasks': tourTasksView
     };
-    var view = tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || operationsView) : (state.view === 'tour-info' ? tourInfoView : unsupportedTourView);
+    var tourVisible = canViewSelectedTour();
+    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || operationsView) : (state.view === 'tour-info' ? tourInfoView : unsupportedTourView));
+    var overlaySafeWithoutTour = state.overlay && ['role-menu', 'tours'].indexOf(state.overlay.kind) !== -1;
     root.innerHTML = '<div class="app">' + view() +
-      bottomNav() + renderOverlay() + (state.toast ? '<div class="toast ' + h(state.toastKind) + '" role="status" aria-live="polite">' + icon(state.toastKind === 'error' ? 'alert' : 'success') + '<span>' + h(state.toast) + '</span></div>' : '') + '</div>';
+      bottomNav() + (tourVisible || overlaySafeWithoutTour ? renderOverlay() : '') + (state.toast ? '<div class="toast ' + h(state.toastKind) + '" role="status" aria-live="polite">' + icon(state.toastKind === 'error' ? 'alert' : 'success') + '<span>' + h(state.toast) + '</span></div>' : '') + '</div>';
     if (state.pendingScrollTop != null && root.querySelector) {
       var scroller = root.querySelector('.scroll');
       if (scroller) scroller.scrollTop = state.pendingScrollTop;
@@ -2378,6 +2438,11 @@
       return;
     }
     if (action === 'open-tourist-documents') {
+      var documentTourist = touristById(button.dataset.id);
+      if (!canViewTouristForSelectedTour(documentTourist)) {
+        showToast('Карточка туриста недоступна в выбранном туре', 'error');
+        return;
+      }
       state.returnContext = captureTourContext();
       state.overlay = { kind: 'tourist-detail', touristId: button.dataset.id, expanded: new Set(['foreign']) };
       render();
@@ -2404,6 +2469,10 @@
     }
     if (action === 'call-tourist' || action === 'message-tourist' || action === 'copy-tourist-contact') {
       var contactTourist = touristById(button.dataset.id);
+      if (!canViewTouristForSelectedTour(contactTourist)) {
+        showToast('Контакт туриста недоступен в выбранном туре', 'error');
+        return;
+      }
       var contactValue = contactTourist && contactTourist.phone ? contactTourist.phone : 'номер не заполнен';
       showToast(action === 'call-tourist' ? 'Звонок: ' + contactValue : action === 'message-tourist' ? ((contactTourist && contactTourist.preferredChannel) || 'Чат') + ': ' + contactValue : 'Контакт скопирован: ' + contactValue);
       return;
@@ -2446,6 +2515,11 @@
       return;
     }
     if (action === 'view-scan') {
+      var previewTourist = touristById(button.dataset.id);
+      if (!canViewTouristForSelectedTour(previewTourist)) {
+        showToast('Скан туриста недоступен в выбранном туре', 'error');
+        return;
+      }
       state.overlay = { kind: 'document-preview', touristId: button.dataset.id, scanId: button.dataset.scan, previous: state.overlay };
       render();
       return;
@@ -2664,6 +2738,10 @@
       return;
     }
     if (action === 'select-tour') {
+      if (!canViewTourId(button.dataset.id)) {
+        showToast('Тур не назначен текущей роли', 'error');
+        return;
+      }
       state.selectedTourId = button.dataset.id;
       state.overlay = null;
       state.view = button.dataset.id === 'china' ? 'operations' : 'tour-info';
@@ -2671,6 +2749,10 @@
       return;
     }
     if (action === 'tour-card-menu') {
+      if (!canViewTourId(button.dataset.id)) {
+        showToast('Тур не назначен текущей роли', 'error');
+        return;
+      }
       state.overlay = { kind: 'tour-menu', tourId: button.dataset.id };
       render();
       return;
@@ -2682,14 +2764,24 @@
       return;
     }
     if (action === 'view-tour-info') {
-      if (state.overlay && state.overlay.tourId) state.selectedTourId = state.overlay.tourId;
+      var infoTourId = state.overlay && state.overlay.tourId ? state.overlay.tourId : state.selectedTourId;
+      if (!canViewTourId(infoTourId)) {
+        showToast('Тур не назначен текущей роли', 'error');
+        return;
+      }
+      state.selectedTourId = infoTourId;
       state.overlay = null;
       state.view = 'tour-info';
       render();
       return;
     }
     if (action === 'view-tour-tasks') {
-      if (state.overlay && state.overlay.tourId) state.selectedTourId = state.overlay.tourId;
+      var taskTourId = state.overlay && state.overlay.tourId ? state.overlay.tourId : state.selectedTourId;
+      if (!canViewTourId(taskTourId)) {
+        showToast('Тур не назначен текущей роли', 'error');
+        return;
+      }
+      state.selectedTourId = taskTourId;
       if (!tourHasOperationalModel(state.selectedTourId)) {
         state.overlay = null;
         showToast('Задачи этого тура ещё не подготовлены в MVP');
@@ -2701,6 +2793,11 @@
       return;
     }
     if (action === 'tourist-detail') {
+      var detailTourist = touristById(button.dataset.id);
+      if (!canViewTouristForSelectedTour(detailTourist)) {
+        showToast('Карточка туриста недоступна в выбранном туре', 'error');
+        return;
+      }
       state.returnContext = captureTourContext();
       state.overlay = { kind: 'tourist-detail', touristId: button.dataset.id };
       render();
@@ -2789,7 +2886,7 @@
       return;
     }
     if (action === 'open-leads') {
-      window.location.href = mobileLeadsHref();
+      window.location.href = mobileLeadsHref(state.returnLead, state.returnLead ? state.returnTab : null);
       return;
     }
     if (action === 'export-summary') {
@@ -2822,6 +2919,10 @@
     if (action === 'delete-tourist') {
       if (mutationBlocked(capabilities().canDelete, 'Удаление доступно только администратору')) return;
       var deleteCandidate = touristById(button.dataset.id);
+      if (!canViewTouristForSelectedTour(deleteCandidate)) {
+        showToast('Турист не относится к выбранному туру', 'error');
+        return;
+      }
       var leadTouristCount = tourists.filter(function (tourist) { return deleteCandidate && tourist.leadId === deleteCandidate.leadId; }).length;
       if (leadTouristCount < 2) {
         showToast('Последнего туриста лида удалить нельзя');
@@ -2833,6 +2934,10 @@
     }
     if (action === 'confirm-delete-tourist') {
       if (mutationBlocked(capabilities().canDelete, 'Удаление доступно только администратору')) return;
+      if (!canViewTouristForSelectedTour(touristById(button.dataset.id))) {
+        showToast('Турист не относится к выбранному туру', 'error');
+        return;
+      }
       removeTouristFromModel(button.dataset.id);
       state.overlay = null;
       state.view = 'tourists';
