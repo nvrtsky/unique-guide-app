@@ -6,17 +6,17 @@
   var toastTimer = null;
 
   var cities = [
-    { id: 'beijing', name: 'Пекин', dates: '14–17 сен', arrival: '2026-09-14', departure: '2026-09-17' },
-    { id: 'xian', name: 'Сиань', dates: '17–20 сен', arrival: '2026-09-17', departure: '2026-09-20' },
-    { id: 'shanghai', name: 'Шанхай', dates: '20–24 сен', arrival: '2026-09-20', departure: '2026-09-24' },
-    { id: 'beijing-return', name: 'Пекин', label: 'Пекин (2)', dates: '24–25 сен', arrival: '2026-09-24', departure: '2026-09-25' }
+    { id: 'route-beijing-1', catalogCityId: 'city-beijing', name: 'Пекин', dates: '14–17 сен', arrival: '2026-09-14', departure: '2026-09-17' },
+    { id: 'route-xian-1', catalogCityId: 'city-xian', name: 'Сиань', dates: '17–20 сен', arrival: '2026-09-17', departure: '2026-09-20' },
+    { id: 'route-shanghai-1', catalogCityId: 'city-shanghai', name: 'Шанхай', dates: '20–24 сен', arrival: '2026-09-20', departure: '2026-09-24' },
+    { id: 'route-beijing-2', catalogCityId: 'city-beijing', name: 'Пекин', label: 'Пекин · остановка 2', dates: '24–25 сен', arrival: '2026-09-24', departure: '2026-09-25' }
   ];
 
   var tourists = [
-    { id: 't1', name: 'Анна Соколова', initials: 'АС', lead: 'Лид Соколовы', leadId: 'lead-1042', groupId: 'family-sokolov', route: ['beijing', 'xian', 'shanghai'], type: 'Взрослый', passport: '72 3456789', balance: 2600 },
-    { id: 't2', name: 'Илья Соколов', initials: 'ИС', lead: 'Лид Соколовы', leadId: 'lead-1042', groupId: 'family-sokolov', route: ['beijing', 'xian', 'shanghai'], type: 'Взрослый', passport: '72 1122334', balance: 2600 },
-    { id: 't3', name: 'Марина Орлова', initials: 'МО', lead: 'Лид Орлова', leadId: 'lead-1048', groupId: null, route: ['beijing', 'xian', 'shanghai', 'beijing-return'], type: 'Взрослый', passport: '72 9988776', balance: 4100 },
-    { id: 't4', name: 'Денис Волков', initials: 'ДВ', lead: 'Лид Волков', leadId: 'lead-1051', groupId: null, route: ['beijing', 'shanghai'], type: 'Взрослый', passport: 'Не заполнен', balance: 3900 }
+    { id: 't1', name: 'Анна Соколова', initials: 'АС', lead: 'Лид Соколовы', leadId: 'lead-1042', groupId: 'family-sokolov', route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1'], type: 'Взрослый', passport: '72 3456789', balance: 2600 },
+    { id: 't2', name: 'Илья Соколов', initials: 'ИС', lead: 'Лид Соколовы', leadId: 'lead-1042', groupId: 'family-sokolov', route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1'], type: 'Взрослый', passport: '72 1122334', balance: 2600 },
+    { id: 't3', name: 'Марина Орлова', initials: 'МО', lead: 'Лид Орлова', leadId: 'lead-1048', groupId: null, route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1', 'route-beijing-2'], type: 'Взрослый', passport: '72 9988776', balance: 4100 },
+    { id: 't4', name: 'Денис Волков', initials: 'ДВ', lead: 'Лид Орлова', leadId: 'lead-1048', groupId: null, route: ['route-beijing-1', 'route-shanghai-1'], type: 'Взрослый', passport: 'Не заполнен', balance: 3900 }
   ];
 
   var groupNames = {
@@ -24,11 +24,11 @@
   };
 
   var records = {
-    beijing: {
+    'route-beijing-1': {
       arrival: {
-        t1: { date: '2026-09-14', time: '07:25', transport: 'plane', number: 'CZ 342', point: 'Дасин', transfer: 'Минивэн', groupId: 'arr-a' },
-        t2: { date: '2026-09-14', time: '10:10', transport: 'plane', number: 'SU 204', point: 'Шоуду', transfer: 'Автобус', groupId: 'arr-b' },
-        t3: { date: '2026-09-14', time: '10:10', transport: 'plane', number: 'SU 204', point: 'Шоуду', transfer: 'Автобус', groupId: 'arr-c' }
+        t1: { date: '2026-09-14', time: '07:25', transport: 'plane', number: 'CZ 342', point: 'Дасин (PKX)', pointId: 'point-pkx', transfer: 'Минивэн', groupId: 'arr-a' },
+        t2: { date: '2026-09-14', time: '10:10', transport: 'plane', number: 'SU 204', point: 'Шоуду (PEK)', pointId: 'point-pek', transfer: 'Автобус', groupId: 'arr-b' },
+        t3: { date: '2026-09-14', time: '10:10', transport: 'plane', number: 'SU 204', point: 'Шоуду (PEK)', pointId: 'point-pek', transfer: 'Автобус', groupId: 'arr-c' }
       },
       hotel: {
         t1: { name: 'Beijing Palace', room: 'Double', groupId: 'hotel-a' },
@@ -36,16 +36,17 @@
         t3: { name: 'Hutong Garden', room: 'Single', groupId: 'hotel-c' }
       },
       departure: {
-        t1: { date: '2026-09-17', time: '08:40', transport: 'train', number: 'G89', point: 'Beijing West', transfer: 'Минивэн', groupId: 'dep-a' },
-        t2: { date: '2026-09-17', time: '08:40', transport: 'train', number: 'G89', point: 'Beijing West', transfer: 'Минивэн', groupId: 'dep-a' },
-        t3: { date: '2026-09-17', time: '08:40', transport: 'train', number: 'G89', point: 'Beijing West', transfer: 'Минивэн', groupId: 'dep-c' }
+        t1: { date: '2026-09-17', time: '08:40', transport: 'train', number: 'G89', point: 'Пекин Западный', pointId: 'point-beijing-west', transfer: 'Минивэн', groupId: 'dep-a' },
+        t2: { date: '2026-09-17', time: '09:15', transport: 'train', number: 'G91', point: 'Пекин Южный', pointManual: true, transfer: 'Такси', groupId: 'dep-a' },
+        t3: { date: '2026-09-17', time: '11:00', transport: 'car', number: '', point: 'Лобби Hutong Garden', pointManual: true, transfer: 'Такси', groupId: 'dep-c' },
+        t4: { date: '2026-09-17', time: '12:30', transport: 'bus', number: 'K12', point: 'Люличао', pointId: 'point-beijing-bus', transfer: 'Самостоятельно', groupId: 'dep-d' }
       }
     },
-    xian: {
+    'route-xian-1': {
       arrival: {
-        t1: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Xi’an North', transfer: 'Автобус', groupId: 'arr-x1' },
-        t2: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Xi’an North', transfer: 'Автобус', groupId: 'arr-x1' },
-        t3: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Xi’an North', transfer: 'Автобус', groupId: 'arr-x2' }
+        t1: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Сиань Северный', pointId: 'point-xian-north', transfer: 'Автобус', groupId: 'arr-x1' },
+        t2: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Сиань Северный', pointId: 'point-xian-north', transfer: 'Автобус', groupId: 'arr-x1' },
+        t3: { date: '2026-09-17', time: '13:06', transport: 'train', number: 'G89', point: 'Сиань Северный', pointId: 'point-xian-north', transfer: 'Автобус', groupId: 'arr-x2' }
       },
       hotel: {
         t1: { name: 'Grand Noble Xi’an', room: 'Double', groupId: 'hotel-x1' },
@@ -54,12 +55,12 @@
       },
       departure: {}
     },
-    shanghai: {
+    'route-shanghai-1': {
       arrival: {},
       hotel: {},
       departure: {}
     },
-    'beijing-return': {
+    'route-beijing-2': {
       arrival: {},
       hotel: {},
       departure: {}
@@ -84,8 +85,10 @@
         if (group.members.length < 2) {
           delete operationGroups[cityId][stage][groupId];
         } else {
-          group.record = Object.assign({}, records[cityId][stage][group.masterId]);
           group.sourceId = group.masterId;
+          group.touristGroupId = (tourists.find(function (tourist) { return tourist.id === group.masterId; }) || {}).groupId || null;
+          group.routeCityId = cityId;
+          group.stage = stage;
         }
       });
     });
@@ -121,7 +124,7 @@
       { key: 'time', label: 'Время', type: 'time' },
       { key: 'transport', label: 'Транспорт', type: 'select' },
       { key: 'number', label: 'Номер рейса / поезда', type: 'text', placeholder: 'Например, SU 204' },
-      { key: 'point', label: 'Аэропорт / вокзал', type: 'text', placeholder: 'Место прибытия' },
+      { key: 'point', label: 'Транспортная точка', type: 'point', placeholder: 'Место прибытия' },
       { key: 'transfer', label: 'Трансфер', type: 'text', placeholder: 'Машина, автобус или встреча' }
     ],
     hotel: [
@@ -133,7 +136,7 @@
       { key: 'time', label: 'Время', type: 'time' },
       { key: 'transport', label: 'Транспорт', type: 'select' },
       { key: 'number', label: 'Номер рейса / поезда', type: 'text', placeholder: 'Например, G89' },
-      { key: 'point', label: 'Аэропорт / вокзал', type: 'text', placeholder: 'Место отправления' },
+      { key: 'point', label: 'Транспортная точка', type: 'point', placeholder: 'Место отправления' },
       { key: 'transfer', label: 'Трансфер', type: 'text', placeholder: 'Машина, автобус или проводы' }
     ]
   };
@@ -150,11 +153,57 @@
     { date: '16 сен', city: 'Пекин', title: 'Великая Китайская стена', text: 'Участок Мутяньюй, обед и свободный вечер.' }
   ];
 
-  var expenses = [
-    { id: 'e1', category: 'Транспорт', title: 'Минивэн из аэропорта', city: 'Пекин', amount: 240, currency: 'USD', scope: 'Общий' },
-    { id: 'e2', category: 'Программа', title: 'Билеты в Запретный город', city: 'Пекин', amount: 960, currency: 'CNY', scope: '4 туриста' },
-    { id: 'e3', category: 'Отель', title: 'Grand Noble Xi’an', city: 'Сиань', amount: 1380, currency: 'USD', scope: 'Общий' }
-  ];
+  var DIRECTORY_STORAGE_KEY = 'unique-guide-directory-v1';
+  var defaultDirectory = {
+    cities: [
+      { id: 'city-beijing', name: 'Пекин', country: 'Китай', aliases: 'Beijing, 北京', active: true },
+      { id: 'city-xian', name: 'Сиань', country: 'Китай', aliases: "Xi'an, 西安", active: true },
+      { id: 'city-shanghai', name: 'Шанхай', country: 'Китай', aliases: 'Shanghai, 上海', active: true },
+      { id: 'city-demo-empty', name: 'Демо без точек', country: 'Китай', aliases: '', active: true }
+    ],
+    points: [
+      { id: 'point-pkx', cityId: 'city-beijing', type: 'airport', name: 'Дасин', code: 'PKX', active: true },
+      { id: 'point-pek', cityId: 'city-beijing', type: 'airport', name: 'Шоуду', code: 'PEK', active: true },
+      { id: 'point-beijing-west', cityId: 'city-beijing', type: 'railway_station', name: 'Пекин Западный', code: '', active: true },
+      { id: 'point-beijing-bus', cityId: 'city-beijing', type: 'bus_station', name: 'Люличао', code: '', active: true },
+      { id: 'point-beijing-bus-east', cityId: 'city-beijing', type: 'bus_station', name: 'Восточный автовокзал', code: '', active: true },
+      { id: 'point-xiy', cityId: 'city-xian', type: 'airport', name: 'Сяньян', code: 'XIY', active: true },
+      { id: 'point-xian-north', cityId: 'city-xian', type: 'railway_station', name: 'Сиань Северный', code: '', active: true },
+      { id: 'point-xian-bus', cityId: 'city-xian', type: 'bus_station', name: 'Саньфувань', code: '', active: true },
+      { id: 'point-pvg', cityId: 'city-shanghai', type: 'airport', name: 'Пудун', code: 'PVG', active: true },
+      { id: 'point-sha', cityId: 'city-shanghai', type: 'airport', name: 'Хунцяо', code: 'SHA', active: true },
+      { id: 'point-shanghai-rail', cityId: 'city-shanghai', type: 'railway_station', name: 'Шанхай Хунцяо', code: '', active: true }
+    ]
+  };
+
+  function clone(value) {
+    return JSON.parse(JSON.stringify(value));
+  }
+
+  function loadDirectory() {
+    try {
+      if (window.localStorage) {
+        var saved = window.localStorage.getItem(DIRECTORY_STORAGE_KEY);
+        if (saved) {
+          var parsed = JSON.parse(saved);
+          if (parsed && Array.isArray(parsed.cities) && Array.isArray(parsed.points)) return parsed;
+        }
+      }
+    } catch (error) {
+      console.warn('Directory storage is unavailable', error);
+    }
+    return clone(defaultDirectory);
+  }
+
+  var directory = loadDirectory();
+
+  function saveDirectory() {
+    try {
+      if (window.localStorage) window.localStorage.setItem(DIRECTORY_STORAGE_KEY, JSON.stringify(directory));
+    } catch (error) {
+      console.warn('Directory changes remain in memory', error);
+    }
+  }
 
   var tourTasks = [
     { id: 'task1', title: 'Подтвердить минивэн в Пекине', date: '12 сен', done: false },
@@ -163,7 +212,7 @@
   ];
 
   var state = {
-    view: 'operations',
+    view: new URLSearchParams(window.location.search).get('view') === 'tourists' ? 'tourists' : 'operations',
     summaryMode: 'groups',
     cityIndex: 0,
     stage: 'arrival',
@@ -173,9 +222,10 @@
     scopeLead: new URLSearchParams(window.location.search).get('lead') || null,
     tourFilter: 'active',
     tourQuery: '',
-    expenseFilter: 'all',
+    directoryQuery: '',
     ocrDraft: null,
-    selectedTourId: 'china'
+    selectedTourId: 'china',
+    pointPickerReturn: null
   };
 
   function h(value) {
@@ -200,7 +250,11 @@
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
       leads: '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
       tours: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
-      wallet: '<path d="M20 7V5a2 2 0 0 0-2-2H5a3 3 0 0 0 0 6h15v12H5a3 3 0 0 1-3-3V6M16 13h2"/>',
+      settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3v-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15.06 4.6a1.7 1.7 0 0 0 1.88-.34L17 4.2 19.83 7l-.06.06A1.7 1.7 0 0 0 19.4 9c.13.6.6 1.04 1.2 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z"/>',
+      pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
+      archive: '<path d="M3 6h18M5 6v14h14V6M9 10h6M4 3h16v3H4z"/>',
+      trash: '<path d="M3 6h18M8 6V4h8v2m-9 0 1 14h8l1-14M10 10v6m4-6v6"/>',
+      search: '<circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/>',
       chat: '<path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/>',
       more: '<circle cx="5" cy="12" r="1"/><circle cx="12" cy="12" r="1"/><circle cx="19" cy="12" r="1"/>',
       unlink: '<path d="m18 13 3 3-5 5-3-3M11 15l4-4M6 11l-3-3 5-5 3 3M13 9 9 13"/>',
@@ -214,7 +268,9 @@
   }
 
   function cityLabel(city) {
-    return city.label || city.name;
+    var duplicates = cities.filter(function (candidate) { return candidate.catalogCityId === city.catalogCityId; });
+    if (duplicates.length < 2) return city.name;
+    return city.name + ' · остановка ' + (duplicates.indexOf(city) + 1);
   }
 
   function selectedTour() {
@@ -253,7 +309,7 @@
 
   function effectiveRecordAt(cityId, stage, touristId) {
     var group = operationGroupForAt(cityId, stage, touristId);
-    return group ? group.record : records[cityId][stage][touristId];
+    return group ? records[cityId][stage][group.sourceId || group.masterId] : records[cityId][stage][touristId];
   }
 
   function touristById(id) {
@@ -278,7 +334,104 @@
     fields[stage].forEach(function (field) {
       clean[field.key] = record && record[field.key] ? String(record[field.key]) : '';
     });
+    if (stage !== 'hotel') {
+      clean.pointId = record && record.pointId ? String(record.pointId) : '';
+      clean.pointManual = Boolean(record && record.pointManual);
+    }
     return clean;
+  }
+
+  function pointTypeForTransport(transport) {
+    return { plane: 'airport', train: 'railway_station', bus: 'bus_station' }[transport] || null;
+  }
+
+  function pointTypeLabel(type, plural) {
+    var labels = {
+      airport: plural ? 'аэропорты' : 'Аэропорт',
+      railway_station: plural ? 'ж/д вокзалы' : 'Ж/д вокзал',
+      bus_station: plural ? 'автовокзалы' : 'Автовокзал'
+    };
+    return labels[type] || (plural ? 'точки' : 'Точка');
+  }
+
+  function touristCount(value) {
+    var mod10 = value % 10;
+    var mod100 = value % 100;
+    var noun = mod10 === 1 && mod100 !== 11 ? 'турист' : (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? 'туриста' : 'туристов');
+    return value + ' ' + noun;
+  }
+
+  function pointCountLabel(value, type) {
+    var forms = {
+      airport: ['аэропорт', 'аэропорта', 'аэропортов'],
+      railway_station: ['ж/д вокзал', 'ж/д вокзала', 'ж/д вокзалов'],
+      bus_station: ['автовокзал', 'автовокзала', 'автовокзалов']
+    }[type] || ['точка', 'точки', 'точек'];
+    var mod10 = value % 10;
+    var mod100 = value % 100;
+    var form = mod10 === 1 && mod100 !== 11 ? forms[0] : (mod10 >= 2 && mod10 <= 4 && (mod100 < 10 || mod100 >= 20) ? forms[1] : forms[2]);
+    return value + ' ' + form;
+  }
+
+  function pointDisplay(point) {
+    return point.name + (point.code ? ' (' + point.code + ')' : '');
+  }
+
+  function directoryCityById(id) {
+    return directory.cities.find(function (city) { return city.id === id; });
+  }
+
+  function directoryPointById(id) {
+    return directory.points.find(function (point) { return point.id === id; });
+  }
+
+  function activePointsFor(city, transport) {
+    var type = pointTypeForTransport(transport);
+    if (!type || !city) return [];
+    var catalogCity = directoryCityById(city.catalogCityId);
+    if (!catalogCity || !catalogCity.active) return [];
+    return directory.points.filter(function (point) {
+      return point.active && point.cityId === city.catalogCityId && point.type === type;
+    }).sort(function (left, right) {
+      return pointDisplay(left).localeCompare(pointDisplay(right), 'ru');
+    });
+  }
+
+  function syncDraftPoint(previousTransport) {
+    if (!state.draft) return;
+    var type = pointTypeForTransport(state.draft.transport);
+    var selectedPoint = directoryPointById(state.draft.pointId);
+    var compatible = selectedPoint && selectedPoint.cityId === currentCity().catalogCityId && selectedPoint.type === type;
+
+    if (selectedPoint && !compatible) {
+      state.draft.pointId = '';
+      state.draft.point = '';
+      state.draft.pointManual = false;
+    } else if (previousTransport && previousTransport !== state.draft.transport && state.draft.pointManual) {
+      state.draft.point = '';
+      state.draft.pointManual = false;
+    }
+
+    var options = activePointsFor(currentCity(), state.draft.transport);
+    if (!state.draft.point && !state.draft.pointId && options.length === 1) {
+      state.draft.pointId = options[0].id;
+      state.draft.point = pointDisplay(options[0]);
+      state.draft.pointManual = false;
+      state.draft.pointAutofilled = true;
+    } else if (!type) {
+      state.draft.pointId = '';
+      state.draft.pointAutofilled = false;
+    }
+  }
+
+  function pointIsUsed(pointId) {
+    return Object.keys(records).some(function (cityId) {
+      return ['arrival', 'departure'].some(function (stage) {
+        return Object.keys(records[cityId][stage]).some(function (touristId) {
+          return records[cityId][stage][touristId].pointId === pointId;
+        });
+      });
+    });
   }
 
   function hasData(record, stage) {
@@ -296,7 +449,7 @@
     ids.forEach(function (id) {
       var group = operationGroupFor(stage, id);
       var sourceId = group ? group.sourceId : id;
-      var record = group ? group.record : stageRecords(stage)[id];
+      var record = group ? effectiveRecord(stage, id) : stageRecords(stage)[id];
       if (!hasData(record, stage)) return;
       var key = recordKey(record, stage);
       if (!seen[key]) {
@@ -372,7 +525,7 @@
 
   function memberRow(tourist, note) {
     return '<div class="member member-link" role="button" tabindex="0" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><div class="member-copy"><strong>' + h(tourist.name) +
-      '</strong><span>' + h(note || tourist.lead) + '</span></div><span class="lead-pill">' + h(globalGroupLabel(tourist)) + '</span></div>';
+      '</strong><span>' + h(note || tourist.lead) + '</span></div><span class="lead-pill">Тур · ' + h(globalGroupLabel(tourist)) + '</span></div>';
   }
 
   function groupStageRecords(stage) {
@@ -401,7 +554,8 @@
     var leftSub = isHotel ? (record.room || 'Номер') : shortDate(record.date);
     var primary = isHotel ? (record.name || 'Отель') : (record.number || transportLabel(record.transport));
     var secondary = isHotel ? 'Размещение · ' + (record.room || 'тип номера не указан') :
-      [transportLabel(record.transport), record.point, record.transfer].filter(Boolean).join(' · ');
+      [transportLabel(record.transport), record.point, record.pointManual ? 'Не из справочника' : '', record.transfer].filter(Boolean).join(' · ');
+    var operationLevel = stageMeta[stage].tab + ' · ' + (group.shared ? 'общая запись' : 'индивидуально');
     var members = group.members.map(function (tourist) {
       return memberRow(tourist, tourist.lead);
     }).join('');
@@ -409,10 +563,10 @@
     var manageLabel = group.shared ? 'Состав · ' + group.members.length : 'Объединить';
     return '<article class="operation-card" style="--group-color:' + ['#2f6bd8', '#6f52d9', '#1f8a50', '#a46c13'][index % 4] + '">' +
       '<div class="card-head"><div class="time-block"><strong>' + h(leftMain) + '</strong><span>' + h(leftSub) + '</span></div>' +
-      '<div class="operation-main"><strong>' + icon(iconName) + h(primary) + '</strong><span>' + h(secondary || 'Детали не указаны') + '</span></div>' +
-      '<span class="count-pill">' + group.members.length + '</span></div><div class="divider"></div>' + members +
+      '<div class="operation-main"><strong>' + icon(iconName) + h(primary) + '</strong><span class="operation-level">' + h(operationLevel) + '</span><span>' + h(secondary || 'Детали не указаны') + '</span></div>' +
+      '<span class="count-pill">' + touristCount(group.members.length) + '</span></div><div class="divider"></div>' + members +
       '<div class="card-actions"><button type="button" class="secondary-button" data-action="edit-operation" data-members="' + ids + '" data-group="' + h(group.id) + '">Изменить</button>' +
-      '<button type="button" class="secondary-button" data-action="manage-operation" data-members="' + ids + '" data-group="' + h(group.id) + '">' + manageLabel + '</button></div></article>';
+      '<button type="button" class="secondary-button" data-action="manage-operation" data-members="' + ids + '" data-group="' + h(group.id) + '">' + (group.shared ? manageLabel : 'Общая запись') + '</button></div></article>';
   }
 
   function operationsView() {
@@ -439,9 +593,10 @@
   }
 
   function summaryTools() {
-    var scopeName = state.scopeLead ? (tourists.find(function (tourist) { return tourist.leadId === state.scopeLead; }) || {}).lead : 'Фильтр по лиду';
-    return '<div class="summary-tools"><div class="mini-switch"><button class="' + (state.summaryMode === 'groups' ? 'active' : '') + '" data-action="summary-mode" data-mode="groups">Общие записи</button><button class="' + (state.summaryMode === 'matrix' ? 'active' : '') + '" data-action="summary-mode" data-mode="matrix">Все туристы</button></div>' +
-      '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName || 'Этот лид') + '</button></div>';
+    var selectedScope = state.scopeLead ? (tourists.find(function (tourist) { return tourist.leadId === state.scopeLead; }) || {}).lead : null;
+    var scopeName = selectedScope ? selectedScope.replace(/^Лид\s+/, 'Лид: ') : 'Весь тур';
+    return '<div class="summary-tools"><div class="mini-switch"><button class="' + (state.summaryMode === 'groups' ? 'active' : '') + '" data-action="summary-mode" data-mode="groups">По операциям</button><button class="' + (state.summaryMode === 'matrix' ? 'active' : '') + '" data-action="summary-mode" data-mode="matrix">По туристам</button></div>' +
+      '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button></div>';
   }
 
   function coverageCell(tourist, city, cityIndex, stage) {
@@ -461,7 +616,7 @@
       return '<article class="coverage-card"><button type="button" class="coverage-person" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(tourist.lead + ' · ' + globalGroupLabel(tourist)) + '</small></span><b>›</b></button><div class="coverage-head"><span>Город</span><div><i>Рейс</i><i>Отель</i><i>Отъезд</i></div></div>' + cityRows + '</article>';
     }).join('');
     return statusBar() + topBar('Гранд-тур по Китаю', '14–25 сентября · 4 туриста') + workspaceTabs() +
-      '<main class="scroll">' + summaryTools() + '<div class="tour-stats"><div><span>Мест</span><strong>4 / 12</strong></div><div><span>Подтверждено</span><strong>2</strong></div><div><span>Выручка</span><strong>16 300 $</strong></div></div><div class="section-row"><div class="section-copy"><strong>Сводная по туристам</strong><span>Три операции для каждого города</span></div><button type="button" class="text-button" data-action="export-summary">Excel</button></div>' + rows + '</main>';
+      '<main class="scroll">' + summaryTools() + '<div class="tour-stats"><div><span>Мест</span><strong>4 / 12</strong></div><div><span>Подтверждено</span><strong>2</strong></div><div><span>Групп</span><strong>' + Object.keys(touristGroups().groups).length + '</strong></div></div><div class="section-row"><div class="section-copy"><strong>Сводная по туристам</strong><span>Три операции для каждого города</span></div><button type="button" class="text-button" data-action="export-summary">Excel</button></div>' + rows + '</main>';
   }
 
   function touristGroups() {
@@ -484,12 +639,12 @@
       var members = model.groups[groupId];
       return '<article class="tourist-group" style="--group-color:' + ['#6f52d9', '#2f6bd8', '#1f8a50'][index % 3] + '">' +
         '<div class="tourist-group-head"><span class="group-stripe"></span><div><strong>' + h(groupNames[groupId] || 'Группа туристов') +
-        '</strong><span>' + members.length + ' туриста · общие ячейки доступны в туре</span></div>' +
+        '</strong><span>' + touristCount(members.length) + ' · общие ячейки доступны в туре</span></div>' +
         '<button type="button" class="inline-action" data-action="split-tourist-group" data-group="' + h(groupId) + '">Разъединить</button></div>' +
         '<div class="divider"></div>' + members.map(function (tourist) { return memberRow(tourist, tourist.lead); }).join('') + '</article>';
     }).join('');
     var freeCard = '<section class="tourist-group"><div class="tourist-group-head"><span class="group-stripe" style="--group-color:#aab1ba"></span>' +
-      '<div><strong>Без группы</strong><span>' + model.free.length + ' туриста</span></div></div><div class="divider"></div>' +
+      '<div><strong>Без группы</strong><span>' + touristCount(model.free.length) + '</span></div></div><div class="divider"></div>' +
       (model.free.length ? model.free.map(function (tourist) { return memberRow(tourist, tourist.lead); }).join('') :
         '<div class="empty-state"><strong>Все туристы объединены</strong></div>') + '</section>';
     return statusBar() + topBar('Гранд-тур по Китаю', 'Туристы · 4 человека') + workspaceTabs() +
@@ -504,23 +659,6 @@
     }).join('');
     return statusBar() + topBar('Гранд-тур по Китаю', 'Программа · ' + programDays.length + ' дня заполнено') + workspaceTabs() +
       '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>По дням и городам маршрута</span></div><button type="button" class="add-button" data-action="add-program">' + icon('plus') + 'День</button></div><div class="tool-grid"><button data-action="generate-program"><strong>Сформировать</strong><span>Из шаблона маршрута</span></button><button data-action="regenerate-program"><strong>Обновить</strong><span>Сохранить ручные правки</span></button><button class="danger-tool" data-action="clear-program"><strong>Очистить</strong><span>Все дни программы</span></button></div>' + days + '</main>';
-  }
-
-  function financeView() {
-    var participantRows = tourists.map(function (tourist) {
-      return '<button type="button" class="finance-person" data-action="tourist-finance" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>Стоимость 4 100 USD · аванс ' + (4100 - tourist.balance) + ' USD</small></span><b>' + tourist.balance.toLocaleString('ru-RU') + ' $</b></button>';
-    }).join('');
-    var filteredExpenses = expenses.filter(function (expense) {
-      if (state.expenseFilter === 'common') return expense.scope === 'Общий';
-      if (state.expenseFilter === 'participant') return expense.scope.indexOf('турист') !== -1;
-      if (state.expenseFilter === 'city') return expense.city && expense.scope !== 'Общий';
-      return true;
-    });
-    var expenseRows = filteredExpenses.map(function (expense) {
-      return '<button type="button" class="expense-row" data-action="edit-expense" data-id="' + expense.id + '"><span class="expense-icon">' + h(expense.category.slice(0, 1)) + '</span><span><strong>' + h(expense.title) + '</strong><small>' + h(expense.city + ' · ' + expense.scope) + '</small></span><b>' + h(expense.amount + ' ' + expense.currency) + '</b></button>';
-    }).join('');
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Финансы · USD / CNY') + workspaceTabs() +
-      '<main class="scroll"><div class="finance-hero"><span>Плановая прибыль</span><strong>8 940 USD</strong><div><span>Выручка <b>16 300</b></span><span>Расходы <b>7 360</b></span></div></div><div class="section-row"><div class="section-copy"><strong>Оплаты туристов</strong><span>Стоимость, аванс и остаток</span></div></div><section class="info-card finance-list">' + participantRows + '</section><div class="section-row"><div class="section-copy"><strong>Расходы тура</strong><span>Общие, по городу и участнику</span></div><button type="button" class="add-button" data-action="add-expense">' + icon('plus') + 'Расход</button></div><div class="expense-filters">' + [['all','Все'],['city','По городу'],['common','Общие'],['participant','Участник']].map(function (item) { return '<button class="' + (state.expenseFilter === item[0] ? 'active' : '') + '" data-action="expense-filter" data-filter="' + item[0] + '">' + item[1] + '</button>'; }).join('') + '</div><section class="info-card finance-list">' + (expenseRows || '<div class="empty-state"><strong>Расходов нет</strong><span>Измените фильтр.</span></div>') + '</section></main>';
   }
 
   function tourInfoView() {
@@ -541,9 +679,8 @@
 
   function bottomNav() {
     var items = [
-      { id: 'operations', label: 'Задачи', icon: 'tours' },
+      { id: 'operations', label: 'Туры', icon: 'tours' },
       { id: 'tourists', label: 'Туристы', icon: 'users' },
-      { id: 'finance', label: 'Финансы', icon: 'wallet' },
       { id: 'leads', label: 'Лиды', icon: 'leads' }
     ];
     return '<nav class="bottom-nav" aria-label="Основная навигация">' + items.map(function (item) {
@@ -614,6 +751,122 @@
       buttonLabel + '</button></footer></section>';
   }
 
+  function splitSourceScreen(overlay) {
+    var candidates = overlay.remaining.filter(function (id) { return hasData(stageRecords(overlay.stage)[id], overlay.stage); });
+    var rows = candidates.map(function (id) {
+      var tourist = touristById(id);
+      var active = overlay.sourceId === id;
+      return '<button type="button" class="source-card ' + (active ? 'active' : '') + '" data-action="pick-split-source" data-id="' + h(id) + '"><span class="radio"></span><span class="avatar">' + h(tourist.initials) +
+        '</span><span class="member-copy"><strong>' + h(tourist.name) + '</strong><span>' + h(recordSummary(stageRecords(overlay.stage)[id], overlay.stage)) + '</span></span></button>';
+    }).join('');
+    return '<section class="screen">' + screenHeader('Основная запись после отделения', cityLabel(currentCity()) + ' · ' + stageMeta[overlay.stage].tab) + '<div class="screen-scroll"><div class="warning">Отделяемый турист был источником общей записи. Выберите, чьи индивидуальные данные будут показываться оставшимся участникам.</div>' +
+      rows + '</div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="back-to-operation-split">Назад</button><button type="button" class="primary-button blue" data-action="confirm-operation-split" ' + (overlay.sourceId ? '' : 'disabled') + '>Отделить</button></footer></section>';
+  }
+
+  function pointPickerScreen(overlay) {
+    var query = String(overlay.query || '').trim().toLowerCase();
+    var type = pointTypeForTransport(state.draft && state.draft.transport);
+    var options = activePointsFor(currentCity(), state.draft && state.draft.transport).filter(function (point) {
+      return !query || [point.name, point.code].join(' ').toLowerCase().indexOf(query) !== -1;
+    });
+    var rows = options.map(function (point) {
+      var selected = state.draft && state.draft.pointId === point.id;
+      return '<button type="button" class="directory-option ' + (selected ? 'selected' : '') + '" data-action="select-point" data-id="' + h(point.id) + '">' +
+        '<span class="directory-option-icon">' + icon('pin') + '</span><span><strong>' + h(point.name) + '</strong><small>' +
+        h(pointTypeLabel(point.type, false) + ' · ' + currentCity().name) + '</small></span><b>' + h(point.code || '›') + '</b></button>';
+    }).join('');
+    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay" aria-label="Закрыть выбор точки"></button><section class="sheet" aria-label="Выбор транспортной точки"><span class="sheet-handle"></span>' +
+      '<header class="sheet-head"><div class="screen-title"><strong>Транспортная точка</strong><span>' + h(cityLabel(currentCity()) + ' · ' + pointTypeLabel(type, true)) + '</span></div>' +
+      '<button type="button" class="close-button" data-action="close-overlay" aria-label="Закрыть">' + icon('close') + '</button></header><div class="sheet-scroll">' +
+      '<label class="search-box directory-search">' + icon('search') + '<input data-point-search value="' + h(overlay.query || '') + '" placeholder="Название или код"></label>' +
+      (rows || '<div class="empty-state">' + icon('pin') + '<strong>Ничего не найдено</strong><span>Измените запрос или укажите значение вручную.</span><button type="button" class="secondary-button empty-state-action" data-action="use-manual-point">Указать вручную</button></div>') + '</div></section></div>';
+  }
+
+  function directoryScreen() {
+    var query = state.directoryQuery.trim().toLowerCase();
+    var cityCards = directory.cities.filter(function (city) {
+      return !query || [city.name, city.country, city.aliases].join(' ').toLowerCase().indexOf(query) !== -1;
+    }).map(function (city) {
+      var points = directory.points.filter(function (point) { return point.cityId === city.id && point.active; });
+      var airports = points.filter(function (point) { return point.type === 'airport'; }).length;
+      var rail = points.filter(function (point) { return point.type === 'railway_station'; }).length;
+      var bus = points.filter(function (point) { return point.type === 'bus_station'; }).length;
+      return '<button type="button" class="directory-city-card ' + (city.active ? '' : 'inactive') + '" data-action="open-directory-city" data-id="' + h(city.id) + '"><span class="directory-option-icon">' +
+        icon('pin') + '</span><span><strong>' + h(city.name) + '</strong><small>' + h(city.country + ' · ' + pointCountLabel(airports, 'airport') + ' · ' + pointCountLabel(rail, 'railway_station') + ' · ' + pointCountLabel(bus, 'bus_station')) +
+        '</small></span><b>' + (city.active ? '›' : 'Архив') + '</b></button>';
+    }).join('');
+    return '<section class="screen">' + screenHeader('Города и точки', 'Настройки CRM · mock-справочник') + '<div class="screen-scroll"><div class="form-note">Изменения сохраняются только в этом браузере и сразу доступны в мобильной сводной.</div>' +
+      '<label class="search-box directory-search">' + icon('search') + '<input data-directory-search value="' + h(state.directoryQuery) + '" placeholder="Найти город"></label>' +
+      (cityCards || '<div class="empty-state">' + icon('pin') + '<strong>Города не найдены</strong><span>Измените поиск или добавьте город.</span></div>') +
+      '</div><footer class="screen-actions single"><button type="button" class="primary-button blue" data-action="new-directory-city">' + icon('plus') + 'Добавить город</button></footer></section>';
+  }
+
+  function directoryCityScreen(overlay) {
+    var city = directoryCityById(overlay.cityId);
+    if (!city) return directoryScreen();
+    var points = directory.points.filter(function (point) { return point.cityId === city.id; }).sort(function (left, right) {
+      return pointDisplay(left).localeCompare(pointDisplay(right), 'ru');
+    });
+    var rows = points.map(function (point) {
+      var used = pointIsUsed(point.id);
+      return '<article class="directory-point-card ' + (point.active ? '' : 'inactive') + '"><button type="button" data-action="edit-directory-point" data-id="' + h(point.id) + '"><span class="directory-option-icon">' +
+        icon('pin') + '</span><span><strong>' + h(point.name) + '</strong><small>' + h(pointTypeLabel(point.type, false) + (used ? ' · используется' : '') + (point.active ? '' : ' · архив')) +
+        '</small></span><b>' + h(point.code || '›') + '</b></button><div><button type="button" class="inline-action" data-action="toggle-directory-point" data-id="' + h(point.id) + '">' +
+        (point.active ? 'Архивировать' : 'Восстановить') + '</button>' + (used ? '' : '<button type="button" class="inline-action danger-text" data-action="delete-directory-point" data-id="' + h(point.id) + '">Удалить</button>') + '</div></article>';
+    }).join('');
+    var linkedToRoute = cities.some(function (routeCity) { return routeCity.catalogCityId === city.id; });
+    var hasPoints = directory.points.some(function (point) { return point.cityId === city.id; });
+    var cityActions = '<div class="directory-city-actions"><button type="button" class="secondary-button" data-action="toggle-directory-city" data-id="' + h(city.id) + '">' +
+      (city.active ? 'Архивировать город' : 'Восстановить город') + '</button>' + ((!linkedToRoute && !hasPoints) ? '<button type="button" class="danger-button" data-action="delete-directory-city" data-id="' + h(city.id) + '">Удалить город</button>' : '') + '</div>';
+    return '<section class="screen">' + screenHeader(city.name, city.country + (city.active ? '' : ' · архив')) + '<div class="screen-scroll"><section class="info-card details-card"><div><span>Альтернативные названия</span><strong>' +
+      h(city.aliases || 'Не указаны') + '</strong></div><div><span>Статус</span><strong>' + (city.active ? 'Активен' : 'В архиве') + '</strong></div></section><div class="directory-toolbar"><button type="button" class="secondary-button" data-action="edit-directory-city" data-id="' +
+      h(city.id) + '">Изменить город</button><button type="button" class="primary-button blue" data-action="new-directory-point" data-city="' + h(city.id) + '">' + icon('plus') + 'Добавить точку</button></div>' + cityActions +
+      '<div class="section-row"><div class="section-copy"><strong>Транспортные точки</strong><span>Аэропорты, ж/д и автовокзалы</span></div></div>' +
+      (rows || '<div class="empty-state">' + icon('pin') + '<strong>Точек пока нет</strong><span>В мобильной форме будет доступен ручной ввод.</span></div>') +
+      '</div></section>';
+  }
+
+  function directoryCityFormScreen(overlay) {
+    var city = overlay.cityId ? directoryCityById(overlay.cityId) : null;
+    var item = city || { name: '', country: '', aliases: '', active: true };
+    return '<section class="screen"><form id="directory-city-form" class="screen-form" data-id="' + h(city ? city.id : '') + '">' +
+      screenHeader(city ? 'Изменить город' : 'Новый город', 'Справочник UNIQUE') + '<div class="screen-scroll">' +
+      simpleField('Название *', 'name', item.name, 'text', 'Например, Пекин') + simpleField('Страна *', 'country', item.country, 'text', 'Китай') +
+      simpleField('Альтернативные названия', 'aliases', item.aliases, 'text', 'Beijing, 北京') + '<label class="field"><span>Статус</span><select name="active"><option value="true" ' +
+      (item.active ? 'selected' : '') + '>Активен</option><option value="false" ' + (!item.active ? 'selected' : '') + '>Архив</option></select></label></div>' +
+      '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></section>';
+  }
+
+  function directoryPointFormScreen(overlay) {
+    var point = overlay.pointId ? directoryPointById(overlay.pointId) : null;
+    var cityId = point ? point.cityId : overlay.cityId;
+    var item = point || { name: '', code: '', type: 'airport', active: true };
+    var city = directoryCityById(cityId);
+    return '<section class="screen"><form id="directory-point-form" class="screen-form" data-id="' + h(point ? point.id : '') + '" data-city="' + h(cityId) + '">' +
+      screenHeader(point ? 'Изменить точку' : 'Новая точка', city ? city.name : 'Город') + '<div class="screen-scroll"><label class="field"><span>Тип *</span><select name="type">' +
+      [['airport','Аэропорт'],['railway_station','Ж/д вокзал'],['bus_station','Автовокзал']].map(function (option) { return '<option value="' + option[0] + '" ' + (item.type === option[0] ? 'selected' : '') + '>' + option[1] + '</option>'; }).join('') +
+      '</select></label>' + simpleField('Название *', 'name', item.name, 'text', 'Название точки') + simpleField('Код', 'code', item.code, 'text', 'Например, PEK') +
+      '<label class="field"><span>Статус</span><select name="active"><option value="true" ' + (item.active ? 'selected' : '') + '>Активна</option><option value="false" ' + (!item.active ? 'selected' : '') + '>Архив</option></select></label></div>' +
+      '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></section>';
+  }
+
+  function deleteDirectoryPointScreen(overlay) {
+    var point = directoryPointById(overlay.pointId);
+    return '<section class="screen">' + screenHeader('Удалить точку', point ? point.name : 'Транспортная точка') + '<div class="screen-scroll"><div class="conflict-summary"><strong>Удалить без возможности восстановления?</strong><span>Удаление доступно только для неиспользуемой точки. Исторические записи не изменятся.</span></div></div>' +
+      '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="button" class="danger-button" data-action="confirm-delete-directory-point" data-id="' + h(overlay.pointId) + '">Удалить</button></footer></section>';
+  }
+
+  function deleteDirectoryCityScreen(overlay) {
+    var city = directoryCityById(overlay.cityId);
+    return '<section class="screen">' + screenHeader('Удалить город', city ? city.name : 'Город') + '<div class="screen-scroll"><div class="conflict-summary"><strong>Удалить город без возможности восстановления?</strong><span>Действие доступно только для города без маршрутов и транспортных точек.</span></div></div>' +
+      '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="button" class="danger-button" data-action="confirm-delete-directory-city" data-id="' + h(overlay.cityId) + '">Удалить</button></footer></section>';
+  }
+
+  function discardFormScreen(overlay) {
+    return '<section class="screen"><header class="screen-header"><button type="button" class="back-button" data-action="continue-editing" aria-label="Вернуться к форме">' + icon('back') + '</button><div class="screen-title"><strong>Закрыть без сохранения?</strong><span>Черновик общей записи изменён</span></div></header>' +
+      '<div class="screen-scroll"><div class="conflict-summary"><strong>Внесённые изменения будут потеряны</strong><span>Вернитесь к форме или подтвердите выход без сохранения.</span></div></div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="continue-editing">Продолжить</button><button type="button" class="danger-button" data-action="discard-form">Не сохранять</button></footer></section>';
+  }
+
   function fieldControl(field, value) {
     if (field.type === 'select') {
       return '<label class="field"><span>' + h(field.label) + '</span><select data-field="' + field.key + '">' +
@@ -622,11 +875,29 @@
           return '<option value="' + valueOption + '" ' + (value === valueOption ? 'selected' : '') + '>' + transportLabel(valueOption) + '</option>';
         }).join('') + '</select></label>';
     }
+    if (field.type === 'point') {
+      var type = pointTypeForTransport(state.draft.transport);
+      var options = activePointsFor(currentCity(), state.draft.transport);
+      var selectedPoint = directoryPointById(state.draft.pointId);
+      var helper = '';
+      if (!type) {
+        return '<label class="field"><span>' + h(field.label) + '</span><input data-field="point" type="text" value="' + h(value) + '" placeholder="Укажите место вручную"><small class="field-help">Для автомобиля используется ручной ввод.</small></label>';
+      }
+      if (options.length === 0 || state.draft.pointManual) {
+        helper = '<small class="field-help warning-help">Не из справочника · нет подходящей точки типа «' + h(pointTypeLabel(type, false)) + '». Значение не будет добавлено автоматически.</small>';
+        return '<label class="field"><span>' + h(field.label) + '</span><input data-field="point" data-manual-point="true" type="text" value="' + h(value) + '" placeholder="Указать вручную">' + helper + '</label>';
+      }
+      if (state.draft.pointAutofilled && selectedPoint) helper = '<small class="field-help success-help">Подставлено из справочника · можно изменить</small>';
+      else helper = '<small class="field-help">Доступно в городе: ' + options.length + ' · ' + h(pointTypeLabel(type, false)) + '</small>';
+      return '<div class="field"><span>' + h(field.label) + '</span><button type="button" class="point-selector ' + (selectedPoint ? 'selected' : '') + '" data-action="open-point-picker"><span>' + icon('pin') + '</span><span><strong>' +
+        h(selectedPoint ? pointDisplay(selectedPoint) : 'Выбрать точку') + '</strong><small>' + h(selectedPoint ? pointTypeLabel(selectedPoint.type, false) + ' · ' + currentCity().name : 'Только для выбранного города') + '</small></span><b>›</b></button>' + helper + '</div>';
+    }
     return '<label class="field"><span>' + h(field.label) + '</span><input data-field="' + field.key + '" type="' + field.type +
       '" value="' + h(value) + '" placeholder="' + h(field.placeholder || '') + '"></label>';
   }
 
   function formSheet(overlay) {
+    syncDraftPoint();
     var sourceIds = distinctSources(overlay.members, overlay.stage);
     var sources = '';
     if (!overlay.editing && sourceIds.length) {
@@ -648,7 +919,7 @@
     var warning = sourceIds.length > 1 ? '<div class="warning">У выбранных туристов разные данные. Перед сохранением покажем экран сверки.</div>' : '';
     return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay" aria-label="Закрыть форму"></button>' +
       '<section class="sheet" aria-label="' + h(title) + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>' +
-      h(title) + '</strong><span>' + overlay.members.length + ' туриста · ' + h(cityLabel(currentCity())) + '</span></div>' +
+      h(title) + '</strong><span>' + touristCount(overlay.members.length) + ' · ' + h(cityLabel(currentCity())) + '</span></div>' +
       '<button type="button" class="close-button" data-action="close-overlay" aria-label="Закрыть">' + icon('close') + '</button></header>' +
       '<div class="sheet-scroll"><div class="form-note">Изменения применятся только к разделу «' + stageMeta[overlay.stage].tab +
       '» выбранного города.</div>' + warning + sources + '<div class="selection-head"><strong>Данные записи</strong></div>' + controls + '</div>' +
@@ -681,11 +952,11 @@
       }).join('') + '</div>';
     }).join('');
     return '<section class="screen">' + screenHeader('Сверка данных', cityLabel(currentCity()) + ' · ' + stageMeta[overlay.stage].tab) +
-      '<div class="screen-scroll"><div class="conflict-summary"><strong>Найдены разные записи</strong><span>Выберите туриста, чьи данные станут основными для всей новой группы.</span></div>' +
+      '<div class="screen-scroll"><div class="conflict-summary"><strong>Найдены разные записи</strong><span>Выберите индивидуальную запись, которую будет показывать новая общая запись. Исходные данные остальных туристов сохранятся.</span></div>' +
       '<div class="selection-head"><strong>Основная запись</strong><span>обязательно</span></div>' + sourceCards +
       '<div class="selection-head"><strong>Что отличается</strong><span>' + differing.length + ' поля</span></div>' + comparisons + '</div>' +
       '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="back-to-form">Назад</button>' +
-      '<button type="button" class="primary-button blue" data-action="apply-conflict" ' + (overlay.sourceId ? '' : 'disabled') + '>Применить ко всем</button></footer></section>';
+      '<button type="button" class="primary-button blue" data-action="apply-conflict" ' + (overlay.sourceId ? '' : 'disabled') + '>Создать общую запись</button></footer></section>';
   }
 
   function toursScreen(overlay) {
@@ -697,12 +968,12 @@
     }).join('');
     return '<section class="screen">' + screenHeader('Туры', 'Список, создание и архив') + '<div class="screen-scroll"><div class="filter-tabs">' + Object.keys(labels).map(function (status) {
       return '<button type="button" class="' + (state.tourFilter === status ? 'active' : '') + '" data-action="tour-filter" data-filter="' + status + '">' + labels[status] + '</button>';
-    }).join('') + '</div><label class="search-box"><span>⌕</span><input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.tourists; }, 0) + '</strong></div><div><span>Свободно</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.capacity - tour.tourists; }, 0) + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>Измените фильтр или создайте новый.</span></div>') + '</div><footer class="screen-actions single"><button type="button" class="primary-button" data-action="new-tour">+ Создать тур</button></footer></section>';
+    }).join('') + '</div><label class="search-box">' + icon('search') + '<input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.tourists; }, 0) + '</strong></div><div><span>Свободно</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.capacity - tour.tourists; }, 0) + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>Измените фильтр или создайте новый.</span></div>') + '</div><footer class="screen-actions single"><button type="button" class="primary-button" data-action="new-tour">' + icon('plus') + 'Создать тур</button></footer></section>';
   }
 
   function tourMenuScreen(overlay) {
     var tour = tours.find(function (item) { return item.id === (overlay.tourId || state.selectedTourId); }) || tours[0];
-    return '<section class="screen">' + screenHeader('Действия с туром', tour.name) + '<div class="screen-scroll"><div class="action-menu"><button data-action="edit-tour"><span>✎</span><div><strong>Изменить тур</strong><small>Маршрут, даты, команда и цена</small></div><b>›</b></button><button data-action="copy-tour"><span>⧉</span><div><strong>Копировать</strong><small>Создать тур с теми же настройками</small></div><b>›</b></button><button data-action="archive-tour"><span>□</span><div><strong>Архивировать</strong><small>Скрыть из активных туров</small></div><b>›</b></button><button class="danger-row" data-action="cancel-tour"><span>×</span><div><strong>Отменить тур</strong><small>Сохранить данные и указать причину</small></div><b>›</b></button></div></div></section>';
+    return '<section class="screen">' + screenHeader('Действия с туром', tour.name) + '<div class="screen-scroll"><div class="action-menu"><button data-action="edit-tour"><span>' + icon('settings') + '</span><div><strong>Изменить тур</strong><small>Маршрут, даты, команда и цена</small></div><b>›</b></button><button data-action="copy-tour"><span>' + icon('tours') + '</span><div><strong>Копировать</strong><small>Создать тур с теми же настройками</small></div><b>›</b></button><button data-action="open-directory"><span>' + icon('pin') + '</span><div><strong>Города и точки</strong><small>Аэропорты, ж/д и автовокзалы</small></div><b>›</b></button><button data-action="archive-tour"><span>' + icon('archive') + '</span><div><strong>Архивировать</strong><small>Скрыть из активных туров</small></div><b>›</b></button><button class="danger-row" data-action="cancel-tour"><span>' + icon('close') + '</span><div><strong>Отменить тур</strong><small>Сохранить данные и указать причину</small></div><b>›</b></button></div></div></section>';
   }
 
   function touristDetailScreen(overlay) {
@@ -726,7 +997,7 @@
       return true;
     }).map(function (tourist) {
       var count = tourists.filter(function (item) { return item.leadId === tourist.leadId; }).length;
-      return '<button type="button" class="source-card" data-action="select-scope" data-id="' + tourist.leadId + '"><span class="avatar">' + h(tourist.initials) + '</span><span class="member-copy"><strong>' + h(tourist.lead) + '</strong><span>' + count + ' туриста в туре</span></span><b>›</b></button>';
+      return '<button type="button" class="source-card" data-action="select-scope" data-id="' + tourist.leadId + '"><span class="avatar">' + h(tourist.initials) + '</span><span class="member-copy"><strong>' + h(tourist.lead) + '</strong><span>' + touristCount(count) + ' в туре</span></span><b>›</b></button>';
     }).join('');
     return '<section class="screen">' + screenHeader('Фильтр по лиду', 'Сводная останется общей для тура') + '<div class="screen-scroll"><div class="form-note">Выберите лид, участников которого нужно показать. Кнопка «Весь тур» вернёт полный состав.</div>' + options + '</div></section>';
   }
@@ -749,11 +1020,6 @@
     return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><form id="program-form" class="sheet" data-index="' + (overlay.index == null ? '' : overlay.index) + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>' + (overlay.index == null ? 'Новый день' : 'Изменить день') + '</strong><span>Программа тура</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><div class="field-grid">' + simpleField('Дата', 'date', day.date) + simpleField('Город', 'city', day.city) + '</div>' + simpleField('Название', 'title', day.title, 'text', 'Событие дня') + '<label class="field"><span>Описание</span><textarea name="text" rows="5">' + h(day.text) + '</textarea></label></div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></div>';
   }
 
-  function expenseFormScreen(overlay) {
-    var expense = expenses.find(function (item) { return item.id === overlay.expenseId; }) || { category: 'Транспорт', title: '', city: cityLabel(currentCity()), amount: '', currency: 'USD', scope: 'Общий' };
-    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><form id="expense-form" class="sheet" data-id="' + h(expense.id || '') + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>' + (expense.id ? 'Изменить расход' : 'Новый расход') + '</strong><span>Общий, по городу или участнику</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><label class="field"><span>Категория</span><select name="category"><option>Транспорт</option><option>Отель</option><option>Программа</option><option>Другое</option></select></label>' + simpleField('Название', 'title', expense.title, 'text', 'Описание расхода') + '<div class="field-grid">' + simpleField('Город', 'city', expense.city) + simpleField('Область', 'scope', expense.scope) + '</div><div class="field-grid">' + simpleField('Сумма', 'amount', expense.amount, 'number') + simpleField('Валюта', 'currency', expense.currency) + '</div>' + simpleField('Комментарий', 'comment', expense.comment || '') + '</div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></div>';
-  }
-
   function tourFormScreen(overlay) {
     var tour = overlay.tourId ? tours.find(function (item) { return item.id === overlay.tourId; }) : null;
     var item = tour || { name: '', dates: '', route: '', guides: '', capacity: 12, price: '', color: '#2f6bd8', site: '' };
@@ -774,6 +1040,7 @@
     if (overlay.kind === 'operation-select') return operationSelectionScreen(overlay);
     if (overlay.kind === 'tourist-group-select') return touristGroupSelectionScreen(overlay);
     if (overlay.kind === 'operation-split') return splitSelectionScreen(overlay, false);
+    if (overlay.kind === 'split-source') return splitSourceScreen(overlay);
     if (overlay.kind === 'global-split') return splitSelectionScreen(overlay, true);
     if (overlay.kind === 'form') return formSheet(overlay);
     if (overlay.kind === 'conflict') return conflictScreen(overlay);
@@ -785,9 +1052,16 @@
     if (overlay.kind === 'clear-program') return clearProgramScreen();
     if (overlay.kind === 'cancel-tour') return cancelTourScreen(overlay);
     if (overlay.kind === 'program-form') return programFormScreen(overlay);
-    if (overlay.kind === 'expense-form') return expenseFormScreen(overlay);
     if (overlay.kind === 'tour-form') return tourFormScreen(overlay);
     if (overlay.kind === 'tourist-form') return touristFormScreen(overlay);
+    if (overlay.kind === 'point-picker') return pointPickerScreen(overlay);
+    if (overlay.kind === 'directory') return directoryScreen();
+    if (overlay.kind === 'directory-city') return directoryCityScreen(overlay);
+    if (overlay.kind === 'directory-city-form') return directoryCityFormScreen(overlay);
+    if (overlay.kind === 'directory-point-form') return directoryPointFormScreen(overlay);
+    if (overlay.kind === 'directory-point-delete') return deleteDirectoryPointScreen(overlay);
+    if (overlay.kind === 'directory-city-delete') return deleteDirectoryCityScreen(overlay);
+    if (overlay.kind === 'discard-form') return discardFormScreen(overlay);
     return '';
   }
 
@@ -796,7 +1070,6 @@
       operations: operationsView,
       tourists: touristsView,
       program: programView,
-      finance: financeView,
       'tour-info': tourInfoView,
       'tour-tasks': tourTasksView
     };
@@ -835,7 +1108,8 @@
       members: memberIds.slice(),
       editing: Boolean(editing),
       groupId: groupId || null,
-      sourceId: sourceId
+      sourceId: sourceId,
+      dirtyFields: new Set()
     };
     render();
   }
@@ -847,8 +1121,9 @@
       group.members = group.members.filter(function (id) { return memberIds.indexOf(id) === -1; });
       if (group.members.length < 2) {
         delete groups[groupId];
-      } else if (group.members.indexOf(group.masterId) === -1) {
-        group.masterId = group.members[0];
+      } else if (group.members.indexOf(group.sourceId) === -1) {
+        group.sourceId = group.members[0];
+        group.masterId = group.sourceId;
       }
     });
   }
@@ -861,7 +1136,10 @@
           var group = groups[groupId];
           group.members = group.members.filter(function (id) { return memberIds.indexOf(id) === -1; });
           if (group.members.length < 2) delete groups[groupId];
-          else if (group.members.indexOf(group.masterId) === -1) group.masterId = group.members[0];
+          else if (group.members.indexOf(group.sourceId) === -1) {
+            group.sourceId = group.members[0];
+            group.masterId = group.sourceId;
+          }
         });
       });
     });
@@ -871,10 +1149,11 @@
     var target = stageRecords(stage);
     var groups = stageGroups(stage);
     var existingGroup = existingGroupId ? groups[existingGroupId] : null;
-    var appliedMembers = memberIds.slice();
     if (existingGroup) {
-      existingGroup.record = cleanRecord(values, stage);
-      appliedMembers = existingGroup.members.slice();
+      var existingSourceId = existingGroup.members.indexOf(requestedMasterId) !== -1 ? requestedMasterId : existingGroup.sourceId;
+      existingGroup.sourceId = existingSourceId;
+      existingGroup.masterId = existingSourceId;
+      target[existingSourceId] = cleanRecord(values, stage);
     } else if (memberIds.length === 1) {
       detachMembersFromStage(stage, memberIds);
       target[memberIds[0]] = cleanRecord(values, stage);
@@ -882,21 +1161,9 @@
       detachMembersFromStage(stage, memberIds);
       var masterId = memberIds.indexOf(requestedMasterId) !== -1 ? requestedMasterId : memberIds[0];
       var groupId = newGroupId(stage);
-      groups[groupId] = { id: groupId, masterId: masterId, sourceId: masterId, members: memberIds.slice(), record: cleanRecord(values, stage) };
-    }
-    state.autofilledNext = false;
-    if (stage === 'departure' && state.cityIndex < cities.length - 1) {
-      var nextCity = cities[state.cityIndex + 1];
-      appliedMembers.forEach(function (id) {
-        var tourist = touristById(id);
-        if (tourist.route.indexOf(nextCity.id) === -1) return;
-        var arrival = records[nextCity.id].arrival[id] || {};
-        ['date', 'time', 'transport', 'number', 'point', 'transfer'].forEach(function (key) {
-          if (!arrival[key] && values[key]) arrival[key] = values[key];
-        });
-        records[nextCity.id].arrival[id] = arrival;
-        state.autofilledNext = true;
-      });
+      var parentGroupId = (touristById(masterId) || {}).groupId || null;
+      target[masterId] = cleanRecord(values, stage);
+      groups[groupId] = { id: groupId, masterId: masterId, sourceId: masterId, touristGroupId: parentGroupId, routeCityId: currentCity().id, stage: stage, members: memberIds.slice() };
     }
   }
 
@@ -933,13 +1200,42 @@
       if (search) { search.focus(); search.setSelectionRange(state.tourQuery.length, state.tourQuery.length); }
       return;
     }
+    if (event.target.dataset.directorySearch !== undefined) {
+      state.directoryQuery = event.target.value;
+      render();
+      var directorySearch = root.querySelector('[data-directory-search]');
+      if (directorySearch) { directorySearch.focus(); directorySearch.setSelectionRange(state.directoryQuery.length, state.directoryQuery.length); }
+      return;
+    }
+    if (event.target.dataset.pointSearch !== undefined && state.overlay && state.overlay.kind === 'point-picker') {
+      state.overlay.query = event.target.value;
+      render();
+      var pointSearch = root.querySelector('[data-point-search]');
+      if (pointSearch) { pointSearch.focus(); pointSearch.setSelectionRange(state.overlay.query.length, state.overlay.query.length); }
+      return;
+    }
     if (!state.overlay || state.overlay.kind !== 'form' || !event.target.dataset.field) return;
     state.draft[event.target.dataset.field] = event.target.value;
+    state.overlay.dirtyFields.add(event.target.dataset.field);
+    if (event.target.dataset.manualPoint !== undefined) {
+      state.draft.pointId = '';
+      state.draft.pointManual = true;
+      state.draft.pointAutofilled = false;
+      state.overlay.dirtyFields.add('pointId');
+    }
   });
 
   root.addEventListener('change', function (event) {
     if (!state.overlay || state.overlay.kind !== 'form' || !event.target.dataset.field) return;
+    var previousTransport = state.draft.transport;
     state.draft[event.target.dataset.field] = event.target.value;
+    state.overlay.dirtyFields.add(event.target.dataset.field);
+    if (event.target.dataset.field === 'transport') {
+      state.overlay.dirtyFields.add('point');
+      state.overlay.dirtyFields.add('pointId');
+      syncDraftPoint(previousTransport);
+      render();
+    }
   });
 
   root.addEventListener('submit', function (event) {
@@ -953,13 +1249,38 @@
       showToast('День программы сохранён');
       return;
     }
-    if (form.id === 'expense-form') {
-      var existing = expenses.find(function (item) { return item.id === form.dataset.id; });
-      var values = { category: data.category, title: data.title || 'Новый расход', city: data.city, scope: data.scope, amount: Number(data.amount || 0), currency: data.currency || 'USD', comment: data.comment };
-      if (existing) Object.assign(existing, values); else expenses.push(Object.assign({ id: 'expense-' + Date.now() }, values));
-      state.overlay = null;
-      state.view = 'finance';
-      showToast('Расход сохранён');
+    if (form.id === 'directory-city-form') {
+      if (!String(data.name || '').trim() || !String(data.country || '').trim()) {
+        showToast('Заполните название и страну');
+        return;
+      }
+      var directoryCity = form.dataset.id ? directoryCityById(form.dataset.id) : null;
+      var cityValues = { name: String(data.name).trim(), country: String(data.country).trim(), aliases: String(data.aliases || '').trim(), active: data.active === 'true' };
+      if (directoryCity) Object.assign(directoryCity, cityValues);
+      else {
+        directoryCity = Object.assign({ id: 'city-' + Date.now() }, cityValues);
+        directory.cities.push(directoryCity);
+      }
+      saveDirectory();
+      state.overlay = { kind: 'directory-city', cityId: directoryCity.id, previous: { kind: 'directory' } };
+      showToast(form.dataset.id ? 'Город обновлён' : 'Город добавлен');
+      return;
+    }
+    if (form.id === 'directory-point-form') {
+      if (!String(data.name || '').trim()) {
+        showToast('Заполните название точки');
+        return;
+      }
+      var directoryPoint = form.dataset.id ? directoryPointById(form.dataset.id) : null;
+      var pointValues = { cityId: form.dataset.city, type: data.type, name: String(data.name).trim(), code: String(data.code || '').trim().toUpperCase(), active: data.active === 'true' };
+      if (directoryPoint) Object.assign(directoryPoint, pointValues);
+      else {
+        directoryPoint = Object.assign({ id: 'point-' + Date.now() }, pointValues);
+        directory.points.push(directoryPoint);
+      }
+      saveDirectory();
+      state.overlay = { kind: 'directory-city', cityId: form.dataset.city, previous: { kind: 'directory' } };
+      showToast(form.dataset.id ? 'Точка обновлена' : 'Точка добавлена');
       return;
     }
     if (form.id === 'cancel-tour-form') {
@@ -1002,6 +1323,91 @@
       state.view = button.dataset.view;
       state.overlay = null;
       render();
+      return;
+    }
+    if (action === 'open-directory') {
+      state.overlay = { kind: 'directory' };
+      state.directoryQuery = '';
+      render();
+      return;
+    }
+    if (action === 'open-directory-city') {
+      state.overlay = { kind: 'directory-city', cityId: button.dataset.id, previous: { kind: 'directory' } };
+      render();
+      return;
+    }
+    if (action === 'new-directory-city' || action === 'edit-directory-city') {
+      var returnCityId = button.dataset.id || null;
+      state.overlay = { kind: 'directory-city-form', cityId: returnCityId, previous: returnCityId ? { kind: 'directory-city', cityId: returnCityId, previous: { kind: 'directory' } } : { kind: 'directory' } };
+      render();
+      return;
+    }
+    if (action === 'new-directory-point' || action === 'edit-directory-point') {
+      var editedPoint = button.dataset.id ? directoryPointById(button.dataset.id) : null;
+      var pointCityId = editedPoint ? editedPoint.cityId : button.dataset.city;
+      state.overlay = { kind: 'directory-point-form', cityId: pointCityId, pointId: editedPoint ? editedPoint.id : null, previous: { kind: 'directory-city', cityId: pointCityId, previous: { kind: 'directory' } } };
+      render();
+      return;
+    }
+    if (action === 'toggle-directory-point') {
+      var toggledPoint = directoryPointById(button.dataset.id);
+      if (toggledPoint) {
+        toggledPoint.active = !toggledPoint.active;
+        saveDirectory();
+        showToast(toggledPoint.active ? 'Точка восстановлена' : 'Точка перемещена в архив');
+      }
+      return;
+    }
+    if (action === 'delete-directory-point') {
+      var deletedPoint = directoryPointById(button.dataset.id);
+      if (!deletedPoint) return;
+      if (pointIsUsed(deletedPoint.id)) {
+        deletedPoint.active = false;
+        saveDirectory();
+        showToast('Используемая точка архивирована, история сохранена');
+      } else {
+        state.overlay = { kind: 'directory-point-delete', pointId: deletedPoint.id, previous: { kind: 'directory-city', cityId: deletedPoint.cityId, previous: { kind: 'directory' } } };
+        render();
+      }
+      return;
+    }
+    if (action === 'confirm-delete-directory-point') {
+      var pointToDelete = directoryPointById(button.dataset.id);
+      if (!pointToDelete) return;
+      directory.points = directory.points.filter(function (point) { return point.id !== pointToDelete.id; });
+      saveDirectory();
+      state.overlay = { kind: 'directory-city', cityId: pointToDelete.cityId, previous: { kind: 'directory' } };
+      showToast('Точка удалена');
+      return;
+    }
+    if (action === 'delete-directory-city') {
+      var cityToDelete = directoryCityById(button.dataset.id);
+      if (!cityToDelete) return;
+      var linkedToRoute = cities.some(function (city) { return city.catalogCityId === cityToDelete.id; });
+      var hasPoints = directory.points.some(function (point) { return point.cityId === cityToDelete.id; });
+      if (linkedToRoute || hasPoints) {
+        showToast('Сначала удалите точки; город маршрута можно только архивировать');
+        return;
+      }
+      state.overlay = { kind: 'directory-city-delete', cityId: cityToDelete.id, previous: { kind: 'directory-city', cityId: cityToDelete.id, previous: { kind: 'directory' } } };
+      render();
+      return;
+    }
+    if (action === 'confirm-delete-directory-city') {
+      var confirmedCity = directoryCityById(button.dataset.id);
+      if (!confirmedCity) return;
+      directory.cities = directory.cities.filter(function (city) { return city.id !== confirmedCity.id; });
+      saveDirectory();
+      state.overlay = { kind: 'directory' };
+      showToast('Город удалён');
+      return;
+    }
+    if (action === 'toggle-directory-city') {
+      var toggledCity = directoryCityById(button.dataset.id);
+      if (!toggledCity) return;
+      toggledCity.active = !toggledCity.active;
+      saveDirectory();
+      showToast(toggledCity.active ? 'Город восстановлен' : 'Город перемещён в архив');
       return;
     }
     if (action === 'summary-mode') {
@@ -1114,21 +1520,6 @@
       programDays.splice(0, programDays.length);
       state.overlay = null;
       showToast('Программа очищена');
-      return;
-    }
-    if (action === 'add-expense' || action === 'edit-expense') {
-      state.overlay = { kind: 'expense-form', expenseId: button.dataset.id || null };
-      render();
-      return;
-    }
-    if (action === 'expense-filter') {
-      state.expenseFilter = button.dataset.filter;
-      render();
-      return;
-    }
-    if (action === 'tourist-finance') {
-      state.overlay = { kind: 'tourist-detail', touristId: button.dataset.id };
-      render();
       return;
     }
     if (action === 'edit-tour') {
@@ -1244,9 +1635,75 @@
       openOperationSelection([]);
       return;
     }
-    if (action === 'close-overlay') {
+    if (action === 'continue-editing') {
+      state.overlay = state.overlay.previousForm;
+      render();
+      return;
+    }
+    if (action === 'discard-form') {
       state.overlay = null;
       state.draft = null;
+      render();
+      return;
+    }
+    if (action === 'close-overlay') {
+      if (state.overlay && state.overlay.kind === 'form' && state.overlay.dirtyFields && state.overlay.dirtyFields.size) {
+        state.overlay = { kind: 'discard-form', previousForm: state.overlay };
+        render();
+        return;
+      }
+      if (state.overlay && state.overlay.kind === 'point-picker' && state.pointPickerReturn) {
+        state.overlay = state.pointPickerReturn;
+        state.pointPickerReturn = null;
+        render();
+        return;
+      }
+      if (state.overlay && state.overlay.previous) {
+        state.overlay = state.overlay.previous;
+        render();
+        return;
+      }
+      state.overlay = null;
+      state.draft = null;
+      render();
+      return;
+    }
+    if (action === 'open-point-picker') {
+      state.pointPickerReturn = state.overlay;
+      state.overlay = { kind: 'point-picker', query: '' };
+      render();
+      return;
+    }
+    if (action === 'select-point') {
+      var selectedPoint = directoryPointById(button.dataset.id);
+      if (selectedPoint && state.draft) {
+        state.draft.pointId = selectedPoint.id;
+        state.draft.point = pointDisplay(selectedPoint);
+        state.draft.pointManual = false;
+        state.draft.pointAutofilled = false;
+        if (state.pointPickerReturn && state.pointPickerReturn.dirtyFields) {
+          state.pointPickerReturn.dirtyFields.add('point');
+          state.pointPickerReturn.dirtyFields.add('pointId');
+        }
+      }
+      state.overlay = state.pointPickerReturn;
+      state.pointPickerReturn = null;
+      render();
+      return;
+    }
+    if (action === 'use-manual-point') {
+      if (state.draft) {
+        state.draft.pointId = '';
+        state.draft.point = '';
+        state.draft.pointManual = true;
+        state.draft.pointAutofilled = false;
+        if (state.pointPickerReturn && state.pointPickerReturn.dirtyFields) {
+          state.pointPickerReturn.dirtyFields.add('point');
+          state.pointPickerReturn.dirtyFields.add('pointId');
+        }
+      }
+      state.overlay = state.pointPickerReturn;
+      state.pointPickerReturn = null;
       render();
       return;
     }
@@ -1279,6 +1736,8 @@
       state.overlay.sourceId = button.dataset.id;
       state.draft = button.dataset.id === 'blank' ? blankRecord(state.overlay.stage) :
         cleanRecord(effectiveRecord(state.overlay.stage, button.dataset.id), state.overlay.stage);
+      state.overlay.dirtyFields = new Set();
+      syncDraftPoint();
       render();
       return;
     }
@@ -1287,7 +1746,7 @@
       if (formOverlay.editing) {
         applyStageRecord(formOverlay.members, formOverlay.stage, state.draft, formOverlay.groupId, formOverlay.sourceId);
         state.overlay = null;
-        showToast('Общая запись обновлена' + (state.autofilledNext ? '. Прибытие следующего города дополнено' : ''));
+        showToast('Общая запись обновлена');
         return;
       }
       var sources = distinctSources(formOverlay.members, formOverlay.stage);
@@ -1298,14 +1757,15 @@
           members: formOverlay.members.slice(),
           sources: sources,
           sourceId: formOverlay.sourceId !== 'blank' ? formOverlay.sourceId : null,
-          previousDraft: Object.assign({}, state.draft)
+          previousDraft: Object.assign({}, state.draft),
+          dirtyFields: new Set(formOverlay.dirtyFields || [])
         };
         render();
         return;
       }
       applyStageRecord(formOverlay.members, formOverlay.stage, state.draft, null, formOverlay.sourceId);
       state.overlay = null;
-      showToast(stageMeta[formOverlay.stage].saved + (state.autofilledNext ? '. Прибытие следующего города дополнено' : ''));
+      showToast(stageMeta[formOverlay.stage].saved);
       return;
     }
     if (action === 'pick-conflict-source') {
@@ -1322,7 +1782,8 @@
         members: conflict.members.slice(),
         editing: false,
         groupId: null,
-        sourceId: conflict.sourceId || 'blank'
+        sourceId: conflict.sourceId || 'blank',
+        dirtyFields: new Set(conflict.dirtyFields || [])
       };
       render();
       return;
@@ -1331,12 +1792,12 @@
       var conflictOverlay = state.overlay;
       var source = effectiveRecord(conflictOverlay.stage, conflictOverlay.sourceId);
       var mergedValues = Object.assign({}, cleanRecord(source, conflictOverlay.stage));
-      Object.keys(conflictOverlay.previousDraft || {}).forEach(function (key) {
-        if (String(conflictOverlay.previousDraft[key] || '').trim()) mergedValues[key] = conflictOverlay.previousDraft[key];
+      Array.from(conflictOverlay.dirtyFields || []).forEach(function (key) {
+        mergedValues[key] = conflictOverlay.previousDraft[key];
       });
       applyStageRecord(conflictOverlay.members, conflictOverlay.stage, mergedValues, null, conflictOverlay.sourceId);
       state.overlay = null;
-      showToast('Основная запись применена ко всем туристам' + (state.autofilledNext ? '. Следующий город дополнен' : ''));
+      showToast('Общая запись создана без изменения индивидуальных данных');
       return;
     }
     if (action === 'edit-operation') {
@@ -1362,9 +1823,47 @@
     if (action === 'apply-operation-split') {
       var splitOverlay = state.overlay;
       var splitAll = splitOverlay.selected.size === splitOverlay.members.length;
-      detachMembersFromStage(splitOverlay.stage, Array.from(splitOverlay.selected));
+      var detachedForSplit = Array.from(splitOverlay.selected);
+      var splitGroup = stageGroups(splitOverlay.stage)[splitOverlay.groupId];
+      var remainingAfterSplit = splitOverlay.members.filter(function (id) { return detachedForSplit.indexOf(id) === -1; });
+      if (!splitAll && splitGroup && detachedForSplit.indexOf(splitGroup.sourceId) !== -1 && remainingAfterSplit.length >= 2) {
+        state.overlay = {
+          kind: 'split-source',
+          stage: splitOverlay.stage,
+          groupId: splitOverlay.groupId,
+          detached: detachedForSplit,
+          remaining: remainingAfterSplit,
+          sourceId: null,
+          previousSplit: splitOverlay
+        };
+        render();
+        return;
+      }
+      detachMembersFromStage(splitOverlay.stage, detachedForSplit);
       state.overlay = null;
       showToast(splitAll ? 'Общая запись расформирована, индивидуальные данные восстановлены' : 'Туристы отделены, индивидуальные данные восстановлены');
+      return;
+    }
+    if (action === 'pick-split-source') {
+      state.overlay.sourceId = button.dataset.id;
+      render();
+      return;
+    }
+    if (action === 'back-to-operation-split') {
+      state.overlay = state.overlay.previousSplit;
+      render();
+      return;
+    }
+    if (action === 'confirm-operation-split') {
+      var splitSourceOverlay = state.overlay;
+      var groupAfterChoice = stageGroups(splitSourceOverlay.stage)[splitSourceOverlay.groupId];
+      if (groupAfterChoice) {
+        groupAfterChoice.sourceId = splitSourceOverlay.sourceId;
+        groupAfterChoice.masterId = splitSourceOverlay.sourceId;
+      }
+      detachMembersFromStage(splitSourceOverlay.stage, splitSourceOverlay.detached);
+      state.overlay = null;
+      showToast('Туристы отделены, основная запись выбрана явно');
       return;
     }
     if (action === 'start-tourist-group') {
