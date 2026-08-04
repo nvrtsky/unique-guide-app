@@ -2,6 +2,8 @@
   "use strict";
 
   const app = document.querySelector("#app");
+  const embeddedInTourShell = document.currentScript?.dataset.embeddedLeads === "true";
+  let workspaceActive = !embeddedInTourShell;
   const pageParams = new URLSearchParams(window.location.search);
   const stages = {
     new: ["Новый", "new"],
@@ -39,6 +41,7 @@
   const icons = {
     tours: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/></svg>',
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
+    finance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.7-1.8-1.1-3.1-1.1-1.8 0-3 .8-3 2 0 3.2 6.2 1.2 6.2 4.4 0 1.2-1.2 2.1-3.2 2.1-1.5 0-2.8-.5-3.7-1.4M12 5.5v13"/></svg>',
     leads: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>',
   };
 
@@ -224,7 +227,10 @@
     }
   }
 
-  const canonicalTourists = loadCanonicalTourists();
+  const sharedCanonicalTourists = embeddedInTourShell && Array.isArray(window.UNIQUE_PROTOTYPE_STORE?.tourists)
+    ? window.UNIQUE_PROTOTYPE_STORE.tourists
+    : null;
+  const canonicalTourists = sharedCanonicalTourists || loadCanonicalTourists();
 
   function saveCanonicalTourists() {
     try {
@@ -558,6 +564,10 @@
       offline: state.offline ? "1" : "0",
     });
     if (tourId) params.set("tourId", tourId);
+    if (embeddedInTourShell && window.UNIQUE_TOUR_HOST?.openTouristFromLeads) {
+      window.UNIQUE_TOUR_HOST.openTouristFromLeads({ touristId, leadId, detailTab, tourId });
+      return;
+    }
     window.location.href = "./tour-operations.html?" + params.toString();
   }
 
@@ -570,12 +580,17 @@
     const params = new URLSearchParams({
       lead: lead.id,
       tourId: lead.eventId,
+      tourSection: "summary",
       returnLead: lead.id,
       returnTab: detailTab,
       origin: "mobile-leads",
       role: state.role,
       offline: state.offline ? "1" : "0",
     });
+    if (embeddedInTourShell && window.UNIQUE_TOUR_HOST?.openSummaryFromLeads) {
+      window.UNIQUE_TOUR_HOST.openSummaryFromLeads({ leadId: lead.id, detailTab, tourId: lead.eventId });
+      return;
+    }
     window.location.href = "./tour-operations.html?" + params.toString();
   }
 
@@ -615,16 +630,20 @@
   }
 
   function statusBar() {
-    return '<div class="status-bar"><span>9:41</span><span>● ● ▰</span></div>';
+    return '<div class="status-bar"><span>9:41</span><span class="status-icons">' +
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 12h2V9H2zm4 0h2V6H6zm4 0h2V3h-2z" fill="currentColor"/></svg>' +
+      '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6.5a9 9 0 0 1 12 0M4.5 9a5.3 5.3 0 0 1 7 0M7 11.5a1.5 1.5 0 0 1 2 0" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>' +
+      '<svg viewBox="0 0 20 10" aria-hidden="true"><rect x=".7" y=".7" width="16" height="8.6" rx="2" fill="none" stroke="currentColor" stroke-width="1.4"/><rect x="2.5" y="2.5" width="11" height="5" rx="1" fill="currentColor"/><path d="M18 3.2v3.6" stroke="currentColor" stroke-width="1.5"/></svg>' +
+      '</span></div>';
   }
 
   function bottomNav() {
     const leadAccess = isLeadRole();
     const items = leadAccess
-      ? [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people], ["leads", "Лиды", icons.leads]]
+      ? [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people], ["finance", "Финансы", icons.finance], ["leads", "Лиды", icons.leads]]
       : [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people]];
-    return '<nav class="bottom-nav nav-count-' + items.length + (leadAccess ? "" : " restricted-nav") + '" aria-label="Основная навигация">' + items.map(([id, label, icon]) =>
-      '<button class="nav-item ' + (leadAccess && id === "leads" ? "active" : "") + '" data-action="nav-placeholder" data-nav="' + id + '">' + icon + '<span>' + label + "</span></button>"
+    return '<nav class="bottom-nav' + (leadAccess ? "" : " restricted-nav") + '" aria-label="Основная навигация">' + items.map(([id, label, icon]) =>
+      '<button type="button" class="nav-item ' + (leadAccess && id === "leads" ? "active" : "") + '" data-action="nav" data-view="' + id + '">' + icon + '<span>' + label + "</span></button>"
     ).join("") + "</nav>";
   }
 
@@ -634,8 +653,8 @@
   }
 
   function appHeader(title, subtitle, trailing = "") {
-    return '<header class="app-top"><div class="top-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="open-access">' + esc(roleLabels[state.role]) + (state.offline ? " · Offline" : "") + '</button></div>' +
-      '<div class="section-head"><div><h2>' + esc(title) + '</h2><small>' + esc(subtitle) + '</small></div>' + trailing + "</div></header>";
+    return '<header class="app-top"><div class="user-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + esc(roleLabels[state.role]) + '</button></div>' +
+      '<div class="tour-row"><span class="tour-mark"></span><div class="tour-title"><strong>' + esc(title) + '</strong><span>' + esc(subtitle) + '</span></div>' + trailing + "</div></header>";
   }
 
   function filterCount() {
@@ -695,7 +714,8 @@
 
   function detailHeader(lead, subtitle) {
     const actions = capabilitiesForLead(lead).canEdit ? '<button class="icon-btn" data-action="lead-menu" aria-label="Действия">•••</button>' : "";
-    return '<div class="sheet-head"><button class="back-btn" data-action="back-list" aria-label="Назад">‹</button><span class="avatar dark">' + initials(lead) + '</span><div class="sheet-title"><h2>' + esc(fullName(lead)) + '</h2><p>' + esc(subtitle || lead.code + " · " + lead.tour) + '</p></div><button type="button" class="role-badge" data-action="open-access">' + esc(roleLabels[state.role]) + '</button>' + actions + '</div>';
+    return '<header class="app-top lead-detail-top"><div class="user-row"><button type="button" class="lead-back" data-action="back-list" aria-label="Вернуться к списку лидов">‹ <span>Лиды</span></button><button type="button" class="role-badge" data-action="role-menu">' + esc(roleLabels[state.role]) + '</button></div>' +
+      '<div class="tour-row"><span class="avatar dark">' + initials(lead) + '</span><div class="tour-title"><strong>' + esc(fullName(lead)) + '</strong><span>' + esc(subtitle || lead.code + " · " + lead.tour) + '</span></div>' + actions + '</div></header>';
   }
 
   function paymentStatusLabel(value) {
@@ -727,7 +747,7 @@
     let action;
     if (!lead.eventId) action = '<div class="notice"><strong>Тур не выбран</strong><span>Выберите тур, чтобы открыть сводную.</span></div>';
     else if (lead.stage !== "converted") action = '<div class="notice warning"><strong>Логистика пока недоступна</strong><span>Сводная рейсов, отелей и отъездов откроется после подтверждения лида.</span></div>';
-    else action = '<a class="primary blue wide button-link" data-action="open-tour-summary" href="./tour-operations.html?lead=' + encodeURIComponent(lead.id) + '&tourId=' + encodeURIComponent(lead.eventId) + '&returnLead=' + encodeURIComponent(lead.id) + '&returnTab=details&origin=mobile-leads&role=' + encodeURIComponent(state.role) + '&offline=' + (state.offline ? "1" : "0") + '">Открыть сводную тура</a><p class="helper">Откроется весь тур с фильтром по этому лиду.</p>';
+    else action = '<a class="primary blue wide button-link" data-action="open-tour-summary" href="./tour-operations.html?view=operations&tourSection=summary&lead=' + encodeURIComponent(lead.id) + '&tourId=' + encodeURIComponent(lead.eventId) + '&returnLead=' + encodeURIComponent(lead.id) + '&returnTab=details&origin=mobile-leads&role=' + encodeURIComponent(state.role) + '&offline=' + (state.offline ? "1" : "0") + '">Открыть сводную тура</a><p class="helper">Откроется весь тур с фильтром по этому лиду.</p>';
     return '<section class="block summary-card"><div class="summary-head"><span class="summary-icon">▦</span><div><strong>Сводная по туру</strong><span>' + lead.tourists.length + ' туриста · рейсы, отели и отъезды</span></div></div>' + action + '</section>';
   }
 
@@ -749,7 +769,7 @@
   function leadOverview(lead) {
     const capability = capabilitiesForLead(lead);
     const reconcile = (state.role === "admin" || state.role === "manager") && lead.eventId
-      ? '<section class="block dashed-block"><h3>ПРОВЕРИТЬ СВЯЗИ ЛИД-ТУР</h3><p class="helper top-helper">Проверяет цепочку contact → deal → city visits для каждого туриста.</p>' + (state.reconcileReport ? '<div class="notice"><strong>Все связи корректны</strong><span>Контакты: 0 · Связи: 0 · Сделки: 0 · Визиты: 0</span></div>' : "") + '<button type="button" class="secondary wide" data-action="reconcile">Проверить связи</button></section>'
+      ? '<section class="block dashed-block"><h3>ПРОВЕРИТЬ СВЯЗИ ЛИД-ТУР</h3><p class="helper top-helper">Проверяет, что лид, туристы и выбранный тур связаны правильно.</p>' + (state.reconcileReport ? '<div class="notice"><strong>Все связи корректны</strong><span>Контакты: 0 · Связи: 0 · Сделки: 0 · Визиты: 0</span></div>' : "") + '<button type="button" class="secondary wide" data-action="reconcile">Проверить связи</button></section>'
       : "";
     const merge = capability.canMerge
       ? '<section class="block dashed-block"><h3>РУЧНОЕ ОБЪЕДИНЕНИЕ ЛИДОВ</h3><label class="field"><span>Поиск по имени, телефону, email или Telegram username</span><input id="merge-inline-search" value="' + esc(state.mergeSearch) + '" placeholder="Найдите лид для объединения"></label>' + inlineMergeCandidates(lead) + '<button type="button" class="secondary wide" data-action="confirm-merge" ' + (state.mergeTargetId ? "" : "disabled") + '>Объединить текущий лид</button></section>'
@@ -855,7 +875,7 @@
     if (visibleTab === "chat") body = chatTab(lead);
     if (visibleTab === "documents") body = docsTab(lead);
     if (visibleTab === "tasks") body = tasksTab(lead);
-    return chrome('<section class="sheet">' + detailHeader(lead) + '<div class="detail-tabs lead-exact-tabs">' + tabs.map(([id, label]) => '<button class="' + (visibleTab === id ? "active" : "") + '" data-detail-tab="' + id + '">' + label + "</button>").join("") + '</div><div class="sheet-scroll detail-scroll">' + accessBanner(lead) + body + "</div></section>", { nav: false });
+    return chrome('<div class="detail-tabs lead-exact-tabs">' + tabs.map(([id, label]) => '<button class="' + (visibleTab === id ? "active" : "") + '" data-detail-tab="' + id + '">' + label + "</button>").join("") + '</div><div class="scroll detail-scroll lead-detail-scroll">' + accessBanner(lead) + body + "</div>", { header: detailHeader(lead) });
   }
 
   function optionList(values, selected) {
@@ -904,12 +924,16 @@
   }
 
   function accessScreen() {
-    return chrome('<section class="sheet"><div class="sheet-head"><button type="button" class="back-btn" data-action="close-access" aria-label="Назад">‹</button><div class="sheet-title"><h2>Роль и доступ</h2><p>Роль получена из серверной сессии</p></div></div><div class="sheet-scroll"><div class="notice"><strong>Текущая роль: ' + esc(roleLabels[state.role]) + '</strong><span>' + (state.offline ? "Offline: любые записи запрещены." : "Права повторно проверяются перед каждой записью.") + '</span></div><section class="block"><h3>ДОСТУП</h3><p class="body-copy">Роль нельзя изменить из мобильного интерфейса. Менеджер видит только назначенные ему лиды; администратор — все лиды.</p></section><section class="block"><button type="button" class="action-row" data-action="toggle-offline"><span class="action-icon">' + (state.offline ? "✓" : "○") + '</span><span><strong>Offline</strong><small>Показывать сохранённые разрешённые данные без возможности записи</small></span><b>›</b></button></section></div></section>', { nav: false });
+    const roles = [["manager", "Менеджер", "Назначенные лиды и туры"], ["admin", "Администратор", "Все данные и настройки"], ["viewer", "Гид", "Задачи назначенных городов"], ["escort", "Сопровождающий", "Операционная работа по туру"]];
+    const roleRows = roles.map(([id, label, note]) => '<button type="button" class="action-row" data-action="set-role" data-role="' + id + '"><span class="action-icon">' + (state.role === id ? "✓" : "") + '</span><span><strong>' + label + '</strong><small>' + note + '</small></span><b>›</b></button>').join("");
+    return chrome('<section class="sheet"><div class="sheet-head"><button type="button" class="back-btn" data-action="close-access" aria-label="Назад">‹</button><div class="sheet-title"><h2>Роль просмотра</h2><p>Проверка прав в прототипе</p></div></div><div class="sheet-scroll"><section class="action-list">' + roleRows + '</section><section class="block"><button type="button" class="action-row" data-action="toggle-offline"><span class="action-icon">' + (state.offline ? "✓" : "○") + '</span><span><strong>' + (state.offline ? "Вернуть подключение" : "Показать без подключения") + '</strong><small>Проверить режим только чтения</small></span><b>›</b></button></section></div></section>', { nav: false });
   }
 
   function forbiddenScreen() {
     const params = new URLSearchParams({ role: state.role, offline: state.offline ? "1" : "0" });
-    return chrome('<section class="sheet forbidden-sheet"><div class="sheet-head"><span class="forbidden-icon">!</span><div class="sheet-title"><h2>Нет доступа к лидам</h2><p>Данные не загружены</p></div></div><div class="sheet-scroll"><section class="state-card"><strong>Раздел недоступен</strong><p>Это не режим «Только просмотр»: роль «' + esc(roleLabels[state.role] || "Пользователь") + '» не может просматривать лиды вообще. Менеджеру доступны только назначенные ему заявки.</p><a class="primary blue button-link wide" href="./tour-operations.html?' + esc(params.toString()) + '">Вернуться к турам</a></section></div></section>');
+    const contextTourId = pageParams.get("tourId");
+    if (contextTourId) params.set("tourId", contextTourId);
+    return chrome('<section class="sheet forbidden-sheet"><div class="sheet-head"><span class="forbidden-icon">!</span><div class="sheet-title"><h2>Нет доступа к лидам</h2><p>Данные не загружены</p></div></div><div class="sheet-scroll"><section class="state-card"><strong>Раздел недоступен</strong><p>Это не режим «Только просмотр»: роль «' + esc(roleLabels[state.role] || "Пользователь") + '» не может просматривать лиды вообще. Менеджеру доступны только назначенные ему заявки.</p><button type="button" class="primary blue wide" data-action="nav" data-view="tours">Вернуться к турам</button></section></div></section>');
   }
 
   function selectField(label, name, values, selected) {
@@ -1091,6 +1115,7 @@
   }
 
   app.addEventListener("input", event => {
+    if (!workspaceActive) return;
     if (event.target.id === "lead-search") {
       const position = event.target.selectionStart;
       state.query = event.target.value;
@@ -1111,6 +1136,7 @@
   });
 
   app.addEventListener("change", event => {
+    if (!workspaceActive) return;
     if (event.target.name === "mergeTarget") {
       state.mergeTargetId = event.target.value;
       render();
@@ -1138,6 +1164,7 @@
   });
 
   app.addEventListener("submit", event => {
+    if (!workspaceActive) return;
     event.preventDefault();
     const form = event.target;
     if (form.id === "lead-form") {
@@ -1224,8 +1251,10 @@
   });
 
   app.addEventListener("click", event => {
+    if (!workspaceActive) return;
     const target = event.target.closest("[data-action],[data-open-lead],[data-edit-tourist],[data-stage],[data-detail-tab],[data-quick-status],[data-list-mode]");
     if (!target || target.disabled) return;
+    if (target.dataset.action === "open-tour-summary") event.preventDefault?.();
     if (target.dataset.openLead) {
       const requestedLead = leads.find(lead => lead.id === target.dataset.openLead);
       if (!canAccessLead(requestedLead)) {
@@ -1275,7 +1304,7 @@
       return;
     }
     const action = target.dataset.action;
-    if (action === "open-access") {
+    if (action === "open-access" || action === "role-menu") {
       state.accessReturnScreen = state.screen === "detail" ? "detail" : "list";
       state.screen = "access";
       render();
@@ -1286,13 +1315,23 @@
       render();
       return;
     }
-    if (action === "select-role") {
-      showToast("Роль задаётся серверной сессией и не меняется в интерфейсе");
+    if (action === "set-role") {
+      const nextRole = roleLabels[target.dataset.role] ? target.dataset.role : "viewer";
+      state.role = nextRole;
+      state.activeLeadId = isLeadRole() && canAccessLead(activeLead()) ? state.activeLeadId : null;
+      state.screen = isLeadRole() ? "list" : "access";
+      window.UNIQUE_TOUR_HOST?.updateSession?.({ role: state.role, offline: state.offline });
+      if (embeddedInTourShell && !isLeadRole()) {
+        window.UNIQUE_TOUR_HOST?.navigateFromLeads?.("tours");
+        return;
+      }
+      render();
       return;
     }
     if (action === "toggle-offline") {
       state.offline = !state.offline;
       if (!state.offline) savePrototypeData();
+      window.UNIQUE_TOUR_HOST?.updateSession?.({ role: state.role, offline: state.offline });
       render();
       return;
     }
@@ -1564,23 +1603,28 @@
       state.leadReadScrollTop = null;
       state.screen = "list";
       state.detailTab = "details";
-      showToast("Лид удалён из mock-данных");
+      showToast("Лид удалён из тестовых данных");
       return;
     }
-    if (action === "nav-placeholder") {
-      if (target.dataset.nav === "leads") return;
+    if (action === "nav") {
+      const destination = target.dataset.view;
+      if (destination === "leads") return;
+      if (embeddedInTourShell && window.UNIQUE_TOUR_HOST?.navigateFromLeads) {
+        window.UNIQUE_TOUR_HOST.navigateFromLeads(destination);
+        return;
+      }
       const params = new URLSearchParams({ role: state.role, offline: state.offline ? "1" : "0" });
       const currentLead = activeLead();
       const contextTourId = canAccessLead(currentLead) ? currentLead.eventId : pageParams.get("tourId");
       if (contextTourId) params.set("tourId", contextTourId);
-      if (target.dataset.nav === "tourists") params.set("view", "tourists");
+      if (destination === "tourists" || destination === "finance") params.set("view", destination);
       window.location.href = "./tour-operations.html?" + params.toString();
       return;
     }
     render();
   });
 
-  window.__prototypeDebug = {
+  const leadsDebugApi = {
     snapshot() {
       const lead = activeLead();
       const visibleLeadRecords = accessibleLeads();
@@ -1603,5 +1647,46 @@
     },
   };
 
-  render();
+  window.UNIQUE_MOBILE_LEADS = {
+    activate(options = {}) {
+      workspaceActive = true;
+      if (roleLabels[options.role]) state.role = options.role;
+      if (typeof options.offline === "boolean") state.offline = options.offline;
+      leads.forEach(syncLeadTouristContext);
+      if (options.leadId) {
+        const requestedLead = leads.find(lead => lead.id === options.leadId);
+        state.activeLeadId = canAccessLead(requestedLead) ? requestedLead.id : null;
+        state.detailTab = ["details", "chat", "documents", "tasks"].includes(options.detailTab) ? options.detailTab : "details";
+        state.screen = state.activeLeadId ? "detail" : "list";
+      } else if (options.newLead && globalCapabilities().canCreateLead) {
+        state.activeLeadId = null;
+        state.screen = "lead-form";
+      } else if (!isLeadRole()) {
+        state.activeLeadId = null;
+        state.screen = "list";
+      } else {
+        state.activeLeadId = null;
+        state.detailTab = "details";
+        state.screen = "list";
+      }
+      window.__prototypeDebug = leadsDebugApi;
+      render();
+    },
+    deactivate() {
+      workspaceActive = false;
+    },
+    isActive() {
+      return workspaceActive;
+    },
+    snapshot() {
+      return leadsDebugApi.snapshot();
+    },
+  };
+
+  if (embeddedInTourShell) {
+    window.UNIQUE_TOUR_HOST?.activatePendingLeads?.();
+  } else {
+    window.__prototypeDebug = leadsDebugApi;
+    render();
+  }
 })();

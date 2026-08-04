@@ -51,6 +51,7 @@ function formEntries(values) {
 }
 
 function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()) {
+  const sourceFiles = Array.isArray(file) ? file : [file];
   const listeners = {};
   let scrollTop = 0;
   let focusedSelector = null;
@@ -82,9 +83,15 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     },
   };
 
+  const workspaceStyles = { disabled: true };
   const document = {
+    currentScript: null,
     querySelector(selector) { return selector === appSelector ? root : root.querySelector(selector); },
-    getElementById(id) { return id === appSelector.replace('#', '') ? root : null; },
+    getElementById(id) {
+      if (id === appSelector.replace('#', '')) return root;
+      if (id === 'mobile-leads-workspace-styles') return workspaceStyles;
+      return null;
+    },
     createElement() {
       return {
         click() {},
@@ -147,10 +154,14 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     setTimeout: windowObject.setTimeout,
     clearTimeout: windowObject.clearTimeout,
   };
-  if (file !== 'mock-crm-data.js' && fs.existsSync('mock-crm-data.js')) {
+  if (!sourceFiles.includes('mock-crm-data.js') && fs.existsSync('mock-crm-data.js')) {
     vm.runInNewContext(fs.readFileSync('mock-crm-data.js', 'utf8'), context, { filename: 'mock-crm-data.js' });
   }
-  vm.runInNewContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
+  sourceFiles.forEach((sourceFile) => {
+    document.currentScript = { dataset: { embeddedLeads: sourceFiles.length > 1 && sourceFile === 'mobile-leads.js' ? 'true' : 'false' } };
+    vm.runInNewContext(fs.readFileSync(sourceFile, 'utf8'), context, { filename: sourceFile });
+  });
+  document.currentScript = null;
 
   function findTagByAttribute(attribute, value) {
     const tags = root.html.match(/<[^>]+>/g) || [];
@@ -183,7 +194,9 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
   function click(dataset) {
     actualElement(dataset);
     const button = { dataset, disabled: false };
-    (listeners.click || []).forEach((handler) => handler({ target: { closest: () => button } }));
+    let defaultPrevented = false;
+    (listeners.click || []).forEach((handler) => handler({ preventDefault() { defaultPrevented = true; }, target: { closest: () => button } }));
+    return { defaultPrevented };
   }
 
   function dispatch(dataset) {
@@ -230,6 +243,7 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     getFocusedSelector() { return focusedSelector; },
     setScrollTop(value) { scrollTop = Number(value || 0); },
     getScrollTop() { return scrollTop; },
+    workspaceStyles,
   };
 }
 
@@ -390,7 +404,8 @@ const lead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042');
 const leadTabs = [...lead.root.innerHTML.matchAll(/data-detail-tab="([^"]+)"[^>]*>([^<]+)/g)].map((match) => match[2].trim());
 assert.deepEqual(leadTabs, ['Редактировать', 'Чат', 'Документы', 'Задачи']);
 assert.match(lead.root.innerHTML, /Соколова Анна Игоревна/, 'lead deep link opens the requested card');
-assert.doesNotMatch(lead.root.innerHTML, />\s*(?:Финансы|Расходы)\s*</i);
+assert.match(lead.root.innerHTML, />\s*Финансы\s*</i, 'manager navigation stays identical inside a lead card');
+assert.doesNotMatch(lead.root.innerHTML, />\s*Расходы\s*</i);
 
 // Lead Read is the canonical web form projected as ordered mobile cards; edit opens the same form at the chosen block.
 assertMarkupOrder(lead.root.innerHTML, [
@@ -511,6 +526,65 @@ for (const requestedRole of ['viewer', 'guide']) {
 // Without an explicit deep link, Guide opens the unchanged first-edition Tasks workspace.
 const guideHome = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=viewer');
 assert.equal(guideHome.snapshot().view, 'operations');
+
+// Leads are an in-app workspace of the same prototype shell, not a hard-navigation application.
+const unifiedWorkspace = loadPrototype(['tour-operations.js', 'mobile-leads.js'], '#app', '?tourId=china&tourSection=summary&routeCityId=route-xian-1&operation=hotel&role=manager');
+const unifiedTourBeforeLeads = deepClone(unifiedWorkspace.snapshot());
+unifiedWorkspace.click({ action: 'open-leads' });
+assert.equal(unifiedWorkspace.window.location.href, '');
+assert.equal(unifiedWorkspace.workspaceStyles.disabled, false);
+assert.match(unifiedWorkspace.root.innerHTML, /class="status-icons"/);
+assert.match(unifiedWorkspace.root.innerHTML, /class="user-row"/);
+assert.match(unifiedWorkspace.root.innerHTML, /data-action="role-menu"[^>]*>Менеджер<\/button>/);
+const unifiedLeadNav = (unifiedWorkspace.root.innerHTML.match(/<nav class="[^"]*\bbottom-nav\b[^"]*"[^>]*>([\s\S]*?)<\/nav>/) || [])[1] || '';
+assert.deepEqual([...unifiedLeadNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), ['Туры', 'Туристы', 'Финансы', 'Лиды']);
+assert.match(unifiedLeadNav, /class="nav-item active"[^>]*data-action="nav" data-view="leads"/);
+assert.doesNotMatch(unifiedWorkspace.root.innerHTML, /● ● ▰|data-action="nav-placeholder"/);
+unifiedWorkspace.click({ action: 'nav', view: 'tours' });
+const unifiedTourAfterReturn = unifiedWorkspace.snapshot();
+assert.equal(unifiedWorkspace.workspaceStyles.disabled, true);
+assert.equal(unifiedTourAfterReturn.selectedTourId, unifiedTourBeforeLeads.selectedTourId);
+assert.equal(unifiedTourAfterReturn.routeCityId, unifiedTourBeforeLeads.routeCityId);
+assert.equal(unifiedTourAfterReturn.stage, unifiedTourBeforeLeads.stage);
+assert.equal(unifiedTourAfterReturn.view, unifiedTourBeforeLeads.view);
+
+unifiedWorkspace.click({ action: 'open-leads' });
+unifiedWorkspace.click({ openLead: 'lead-1042' });
+const summaryLinkClick = unifiedWorkspace.click({ action: 'open-tour-summary' });
+assert.equal(summaryLinkClick.defaultPrevented, true, 'the in-app summary link must cancel its browser navigation');
+const summaryFromLead = unifiedWorkspace.snapshot();
+assert.equal(summaryFromLead.selectedTourId, 'china');
+assert.equal(summaryFromLead.view, 'operations');
+assert.equal(summaryFromLead.scopeLead, 'lead-1042');
+assert.equal(unifiedWorkspace.window.location.href, '');
+
+const guideSwitchFromLeads = loadPrototype(['tour-operations.js', 'mobile-leads.js'], '#app', '?tourId=china&tourSection=summary&routeCityId=route-xian-1&operation=hotel&role=manager');
+guideSwitchFromLeads.click({ action: 'open-leads' });
+guideSwitchFromLeads.click({ action: 'role-menu' });
+guideSwitchFromLeads.click({ action: 'set-role', role: 'viewer' });
+assert.equal(guideSwitchFromLeads.snapshot().role, 'viewer');
+assert.equal(guideSwitchFromLeads.snapshot().view, 'operations');
+assert.match(guideSwitchFromLeads.root.innerHTML, /Задачи/);
+assert.doesNotMatch(guideSwitchFromLeads.root.innerHTML, />\s*Лиды\s*</);
+guideSwitchFromLeads.click({ action: 'role-menu' });
+guideSwitchFromLeads.click({ action: 'select-role', role: 'manager' });
+guideSwitchFromLeads.click({ action: 'open-leads' });
+assert.match(guideSwitchFromLeads.root.innerHTML, /CRM · \d+ активных/);
+assert.doesNotMatch(guideSwitchFromLeads.root.innerHTML, /<h2>Роль просмотра<\/h2>/);
+
+// Both embedded workspaces share one canonical tourist array, so a later lead save cannot overwrite a tour-profile edit.
+const sharedTouristFlow = loadPrototype(['tour-operations.js', 'mobile-leads.js'], '#app', '?tourId=china&view=tourists&tourist=t1&touristSection=profile&role=manager');
+sharedTouristFlow.click({ action: 'toggle-profile-section', section: 'personal' });
+sharedTouristFlow.click({ action: 'edit-profile-section', id: 't1', section: 'personal' });
+sharedTouristFlow.submit('profile-section-form', {
+  lastName: 'Соколова', firstName: 'Анна', middleName: 'Игоревна', birthDate: '1989-04-18',
+  phone: '+7 999 111-22-33', email: 'anna.sokolova@example.com',
+}, { id: 't1', section: 'personal' });
+sharedTouristFlow.click({ action: 'open-leads' });
+sharedTouristFlow.click({ openLead: 'lead-1042' });
+sharedTouristFlow.click({ action: 'add-from-lead' });
+assert.equal(sharedTouristFlow.snapshot().tourists.find((tourist) => tourist.id === 't1').phone, '+7 999 111-22-33');
+assert.equal(JSON.parse(sharedTouristFlow.storage.get('unique-guide-tourists-v3')).find((tourist) => tourist.id === 't1').phone, '+7 999 111-22-33');
 assert.match(guideHome.root.innerHTML, /Задачи/);
 const guideStageMarkup = (guideHome.root.innerHTML.match(/aria-label="Задачи гида"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
 const guideStageLabels = [...guideStageMarkup.matchAll(/data-action="guide-stage"[^>]*>([^<]+)/g)].map((match) => match[1].trim());
@@ -1659,8 +1733,10 @@ assert.equal((commercialHtml.match(/<article class="work-card /g) || []).length,
 assert.equal((commercialHtml.match(/<b>[^<]*&nbsp;₽<\/b><\/li>/g) || []).length, 32, 'commercial proposal decomposes the six blocks into thirty-two priced tasks');
 const commercialTaskAmounts = [...commercialHtml.matchAll(/<b>([\d]+(?:&nbsp;[\d]+)*)&nbsp;₽<\/b><\/li>/g)]
   .map((match) => Number(match[1].replaceAll('&nbsp;', '')));
-assert.equal(commercialTaskAmounts.reduce((sum, amount) => sum + amount, 0), 1_488_000, 'priced tasks add up to the stated base estimate');
-['240&nbsp;000&nbsp;₽', '1&nbsp;488&nbsp;000&nbsp;₽', '223&nbsp;200&nbsp;₽', '1&nbsp;711&nbsp;200&nbsp;₽', '1&nbsp;951&nbsp;200&nbsp;₽'].forEach((amount) => assert.match(commercialHtml, new RegExp(escapeRegExp(amount))));
+assert.equal(commercialTaskAmounts.reduce((sum, amount) => sum + amount, 0), 390_000, 'priced tasks add up to the fixed current-development price');
+assert.match(commercialHtml, /390&nbsp;000&nbsp;₽/);
+assert.match(commercialHtml, /прототип и последующая рабочая реализация/);
+['240&nbsp;000&nbsp;₽', '1&nbsp;488&nbsp;000&nbsp;₽', '223&nbsp;200&nbsp;₽', '1&nbsp;711&nbsp;200&nbsp;₽', '1&nbsp;951&nbsp;200&nbsp;₽', '6,20'].forEach((staleValue) => assert.doesNotMatch(commercialHtml, new RegExp(escapeRegExp(staleValue))));
 [
   'https://appfox.ru/research/razrabotka-mob-prilozhenii/',
   'https://antaltalent.ru/wp-content/uploads/2025/10/RUS_Job_market_25-26.pdf',
@@ -1674,10 +1750,12 @@ assert.doesNotMatch(commercialCss, /@import\s+url\(|url\(["']?https?:/i);
 // Markdown is the canonical specification and the visual HTML is a generated, hashed view of it.
 const specMarkdown = fs.readFileSync('mobile-leads-tz.md', 'utf8');
 const specHtml = fs.readFileSync('mobile-leads-tz.html', 'utf8');
+assert.match(specMarkdown, /390 000 ₽ за оба шага/);
 const specImages = [
   '16-lead-final.png', '17-tour-final.png', '18-tourist-profile-final.png',
   '19-tourist-tour-final.png', '20-summary-final.png', '21-team-final.png', '22-statuses-final.png',
   '23-finance-final.png', '24-tours-data-final.png', '25-guide-final.png',
+  '11-offline.png', '13-error-state.png', '14-empty-state.png', '15-summary-375.png',
 ];
 specImages.forEach((image) => {
   const assetPath = `assets/spec/${image}`;
@@ -1686,6 +1764,8 @@ specImages.forEach((image) => {
   assert.match(specHtml, new RegExp(`src="${escapeRegExp(assetPath)}"`), `${assetPath} must be rendered in HTML`);
 });
 assert.equal((specHtml.match(/aria-hidden="true" class="marker/g) || []).length, 40);
+assert.match(specHtml, /class="requirements-drawer" id="technical-appendix"/);
+assert.match(specHtml, /class="grouping-diagram"/);
 const requirementIds = [...new Set(specMarkdown.match(/\b(?:AC|NG|BL)-\d+\b/g) || [])];
 assert.ok(requirementIds.length >= 60, 'the canonical spec must retain acceptance criteria, non-goals and backlog');
 const markdownHash = crypto.createHash('sha256').update(specMarkdown).digest('hex');

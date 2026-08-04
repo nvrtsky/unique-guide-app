@@ -27,27 +27,39 @@
     <h1 id="spec-title">$title$</h1>
     $if(subtitle)$<p class="lead">$subtitle$</p>$endif$
     <div class="meta">
-      <span>Статус: финальное ТЗ прототипа</span>
+      <span>Статус: финальное ТЗ текущей разработки</span>
       <span>Дата: $if(displaydate)$$displaydate$$else$$date$$endif$</span>
-      <span>Источник: mobile-leads-tz.md</span>
+      <span>Формат: сценарии, схемы и экраны</span>
     </div>
     <div class="hero-actions">
       <a class="hero-primary" href="tour-operations.html?tourId=china&amp;tourSection=overview&amp;role=manager">Открыть финальный прототип</a>
       <a class="hero-secondary" href="#final-product">Посмотреть состав MVP</a>
+      <a class="hero-secondary" href="#final-screens">Посмотреть скриншоты</a>
     </div>
     <div class="hero-facts" aria-label="Состав финального MVP">
       <div class="hero-fact"><strong>1</strong><span>публичный прототип для сквозного сценария CRM</span></div>
       <div class="hero-fact"><strong>5</strong><span>туров в демонстрационных данных</span></div>
       <div class="hero-fact"><strong>50</strong><span>туристов из 21 лида</span></div>
-      <div class="hero-fact"><strong>4</strong><span>роли с отдельными capabilities</span></div>
+      <div class="hero-fact"><strong>4</strong><span>роли с разными правами доступа</span></div>
       <div class="hero-fact"><strong>100%</strong><span>сохранение первой редакции гида</span></div>
     </div>
   </section>
 
   <div class="spec-layout">
     <aside class="spec-toc" aria-label="Оглавление ТЗ">
-      <strong>Содержание</strong>
-      $toc$
+      <strong>Клиентская версия</strong>
+      <ul>
+        <li><a href="#final-product">Что получится</a></li>
+        <li><a href="#карта-единого-продукта">Карта приложения</a></li>
+        <li><a href="#основной-путь-менеджера">Путь менеджера</a></li>
+        <li><a href="#два-режима-сводной">Мобильная сводная</a></li>
+        <li><a href="#как-работает-объединение-туристов">Объединение туристов</a></li>
+        <li><a href="#единая-карточка-туриста">Карточка туриста</a></li>
+        <li><a href="#роли-и-справочник">Роли и справочник</a></li>
+        <li><a href="#client-scenarios">Сценарии приёмки</a></li>
+        <li><a href="#final-screens">Все экраны</a></li>
+        <li><a href="#technical-appendix">Техническое приложение</a></li>
+      </ul>
     </aside>
     <main id="main-content" class="spec-content">
       $body$

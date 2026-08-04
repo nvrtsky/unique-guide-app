@@ -7,7 +7,7 @@ output_file="mobile-leads-tz.html"
 spec_hash="$(shasum -a 256 "$spec_file" | awk '{print $1}')"
 
 pandoc "$spec_file" \
-  --from=gfm+raw_html \
+  --from=gfm+raw_html+fenced_divs \
   --to=html5 \
   --standalone \
   --section-divs \

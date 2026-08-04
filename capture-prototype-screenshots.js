@@ -7,7 +7,7 @@ import path from 'node:path';
 const root = process.cwd();
 const outputDirectory = path.join(root, 'assets', 'spec');
 const captures = [
-  ['16-lead-final.png', 'mobile-leads.html?lead=lead-1042&tab=edit&role=manager'],
+  ['16-lead-final.png', 'tour-operations.html?view=leads&lead=lead-1042&tab=details&tourId=china&role=manager'],
   ['17-tour-final.png', 'tour-operations.html?tourId=china&tourSection=overview&role=manager'],
   ['18-tourist-profile-final.png', 'tour-operations.html?tourId=china&tourist=t1&touristSection=profile&role=manager'],
   ['19-tourist-tour-final.png', 'tour-operations.html?tourId=china&tourist=t1&touristSection=tour&expand=tour-context&role=manager'],

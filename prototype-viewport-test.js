@@ -44,6 +44,7 @@ const ROUTES = [
   { path: '/tour-operations.html?tourId=china&tourSection=actions', expect: ['Гранд-тур по Китаю', 'Действия'] },
   { path: '/tour-operations.html?tourId=china&tourSection=actions&role=admin', expect: ['Закрыть тур', 'Архивировать', 'Удалить'], reject: [] },
   { path: '/tour-operations.html?tourId=china&tourSection=actions&role=manager', expect: ['Закрыть тур'], reject: ['Архивировать', 'Удалить тур'] },
+  { path: '/tour-operations.html?view=leads&lead=lead-1042&tourId=china&role=manager', expect: ['Соколова Анна', 'Туры', 'Туристы', 'Финансы', 'Лиды', 'Редактировать'], reject: ['Старый прототип'], clickSummary: true },
   { path: '/tour-operations.html?tourId=china&view=tourists&tourist=t1&touristSection=profile', expect: ['Соколова', 'Личные данные'] },
   { path: '/tour-operations.html?tourId=china&view=tourists&tourist=t1&touristSection=tour&expand=tour-context', expect: ['Соколова', 'В туре', 'Комментарий для гида', 'Выбранный тур', 'Основной турист заявки', 'Ограниченный маршрут'] },
   { path: '/tour-operations.html?tourId=china&view=tourists&tourist=t1&touristSection=profile&role=viewer', expect: ['Соколова', 'Гид', 'Личные данные', 'Загранпаспорт'], reject: ['Паспорт РФ', 'Исходный лид'] },
@@ -59,7 +60,7 @@ const ROUTES = [
   { path: '/mobile-leads.html?lead=lead-1042&role=superadmin', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Соколова', 'anna@example.ru'], minTargets: 3 },
   { path: '/mobile-leads.html?lead=lead-1051&role=manager', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Волков', 'denis@example.ru'], minTargets: 4 },
   { path: '/mobile-leads-tz.html', expect: ['ТЗ MVP', 'Финальный результат', 'Финальные экраны прототипа'], minTargets: 12 },
-  { path: '/commercial-proposal.html', expect: ['Развитие мобильной CRM', '240 000 ₽', '1 488 000 ₽', 'Шесть результатов', 'ПРОВЕРКА РЫНКОМ'], minTargets: 8 },
+  { path: '/commercial-proposal.html', expect: ['Текущая доработка мобильной CRM', '390 000 ₽', 'Шесть результатов', 'ПРОВЕРКА РЫНКОМ'], reject: ['240 000 ₽', '1 488 000 ₽'], minTargets: 8 },
 ];
 
 const contentTypes = {
@@ -226,6 +227,25 @@ async function inspectRoute(client, sessionId, origin, route, viewport) {
   );
   assert.ok(result.documentWidth <= result.viewportWidth + 1, `${route.path} must not horizontally overflow at ${viewport.width}px`);
   assert.equal(result.strongOverflow, false, `${route.path} has card text outside the phone shell`);
+
+  if (route.clickSummary) {
+    const interactionEventStart = client.events.length;
+    const afterClick = await evaluate(client, sessionId, `(async () => {
+      const link = document.querySelector('[data-action="open-tour-summary"]');
+      if (!link) return { missing: true };
+      link.click();
+      await new Promise((resolve) => setTimeout(resolve, 120));
+      return { pathname: location.pathname, search: location.search, text: document.body.innerText };
+    })()`);
+    assert.equal(afterClick.missing, undefined, `${route.path} must expose the summary link`);
+    assert.equal(afterClick.pathname, '/tour-operations.html', 'Lead → Summary must stay in the canonical prototype page');
+    assert.match(afterClick.search, /(?:^|[?&])tourSection=summary(?:&|$)/);
+    assert.match(afterClick.text, /Прибытие/);
+    const documentNavigations = client.events.slice(interactionEventStart).filter((event) =>
+      event.sessionId === sessionId && event.method === 'Network.requestWillBeSent' && event.params.type === 'Document'
+    );
+    assert.equal(documentNavigations.length, 0, 'Lead → Summary must not reload the document');
+  }
 
   const external = client.events.slice(eventStart).filter((event) => {
     if (event.sessionId !== sessionId || event.method !== 'Network.requestWillBeSent') return false;

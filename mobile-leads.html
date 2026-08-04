@@ -1,33 +1,46 @@
 <!doctype html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#14171a">
+  <meta name="theme-color" content="#f4f6f8">
   <title>UNIQUE · Лиды, туры и мобильная сводная</title>
   <link rel="stylesheet" href="./mobile-leads.css">
 </head>
 <body>
   <header class="site-header">
-    <a class="brand" href="./"><strong>UNIQUE</strong><span>MVP МОБИЛЬНОЙ CRM</span></a>
-    <nav aria-label="Разделы прототипа">
-      <a class="site-tab active" aria-current="page" href="./tour-operations.html">Лиды, туры и сводная</a>
-      <a class="site-tab" href="./mobile-leads-tz.html">ТЗ</a>
-      <a class="site-tab" href="./commercial-proposal.html">КП</a>
-      <a class="site-tab quiet" href="./?legacy=1">Старый прототип</a>
+    <a class="brand" href="index.html" aria-label="Вернуться к основному прототипу">
+      <strong>UNIQUE</strong>
+      <span>MVP МОБИЛЬНОЙ CRM</span>
+    </a>
+    <nav aria-label="Навигация прототипа">
+      <a class="site-tab active" aria-current="page" href="tour-operations.html">Лиды, туры и сводная</a>
+      <a class="site-tab" href="mobile-leads-tz.html">ТЗ</a>
+      <a class="site-tab" href="commercial-proposal.html">КП</a>
+      <a class="site-tab" href="./?legacy=1">Старый прототип</a>
     </nav>
   </header>
   <main class="showcase">
     <section class="showcase-copy">
-      <div class="eyebrow">ЭТАП MVP <span>TRAVEL · PEOPLE · EXPERIENCE</span></div>
-      <h1>Единая мобильная CRM</h1>
-      <p>Лид, его туристы и сводная связанного тура — части одного сценария. Технический переход между экранами сохраняет выбранный тур, роль и точку возврата.</p>
-      <div class="legend">
-        <span><i class="dot blue"></i>на основе текущего guide-mobile</span>
-        <span><i class="dot green"></i>без production API</span>
+      <p class="eyebrow">ЭТАП MVP <span>ЕДИНАЯ МОБИЛЬНАЯ CRM</span></p>
+      <h1>Лид → туристы → тур → сводная</h1>
+      <p>Это один сквозной продукт и один публичный прототип. Менеджер начинает с лида, проверяет туристов, открывает связанный тур и продолжает работу в мобильной сводной без копирования данных и потери контекста. Первая редакция для гида остаётся целиком: новые возможности добавляются поверх неё и включаются только по роли.</p>
+      <div class="scenario-list" aria-label="Сценарии прототипа">
+        <span><b>1</b> Откройте лид и перейдите к его туристам и связанному туру</span>
+        <span><b>2</b> Выберите один из 5 туров: в каждом 10 туристов из 3–5 лидов</span>
+        <span><b>3</b> Создайте группу: общий отель, раздельные прибытия и отъезды</span>
+        <span><b>4</b> Объедините одну операцию только внутри этой группы</span>
+        <span><b>5</b> Разрешите конфликт выбором основной записи</span>
+        <span><b>6</b> Отделите туриста без потери личных данных</span>
+        <span><b>7</b> Откройте «Профиль» и «В туре» в карточке туриста</span>
+        <span><b>8</b> Измените программу и задачу по правилам веб-версии</span>
+        <span><b>9</b> Проверьте справочник городов и транспортных точек</span>
+        <span><b>10</b> Проверьте «Финансы», роли, приватность и Excel-экспорт</span>
+        <span><b>11</b> Переключитесь на «Гид»: прежние задачи, туристы и разрешённые финансы сохранены</span>
       </div>
+      <p class="hint">«Лиды», «Туры», «Туристы» и «Финансы» используют одну навигацию. Выбранные тур, роль и offline-режим сохраняются при переходах.</p>
     </section>
-    <section class="phone" aria-label="Кликабельный мобильный прототип">
+    <section class="phone" aria-label="Интерактивный мобильный прототип">
       <div id="app" class="phone-screen"></div>
     </section>
   </main>

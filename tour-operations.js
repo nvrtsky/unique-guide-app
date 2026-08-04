@@ -130,12 +130,9 @@
 
   function saveCanonicalTourists() {
     try {
-      var byId = {};
-      canonicalTouristStore.forEach(function (tourist) { if (tourist && tourist.id) byId[tourist.id] = tourist; });
-      tourists.forEach(function (tourist) { if (tourist && tourist.id) byId[tourist.id] = tourist; });
-      canonicalTouristStore = Object.keys(byId).map(function (id) { return byId[id]; });
+      canonicalTouristStore = tourists;
       if (window.localStorage) {
-        window.localStorage.setItem(TOURIST_STORAGE_KEY, JSON.stringify(canonicalTouristStore));
+        window.localStorage.setItem(TOURIST_STORAGE_KEY, JSON.stringify(tourists));
         window.localStorage.setItem(TOURIST_MIGRATION_STORAGE_KEY, '1');
       }
     } catch (error) {
@@ -145,6 +142,9 @@
 
   tourists.forEach(normalizeCanonicalTourist);
   hydrateCanonicalTourists();
+  canonicalTouristStore = tourists;
+  window.UNIQUE_PROTOTYPE_STORE = window.UNIQUE_PROTOTYPE_STORE || {};
+  window.UNIQUE_PROTOTYPE_STORE.tourists = tourists;
 
   // Production calls this role `viewer`; keep the user-facing CRM label "Гид".
   // The legacy `?role=guide` deep link is normalized below and never enters state.
@@ -720,6 +720,7 @@
   var initialCityIndex = cities.findIndex(function (city) { return city.id === initialRouteCityId; });
   var tourSectionMap = { overview: 'tour-info', summary: 'operations', statuses: 'work', program: 'program', team: 'tour-team', tasks: 'tour-tasks', actions: 'tour-actions', finance: 'finance' };
   var requestedTourSection = initialParams.get('tourSection');
+  var requestedLeadsView = initialParams.get('view') === 'leads';
   var summarySectionMap = { operations: 'operations', tourists: 'tourists', documents: 'documents', statuses: 'work' };
   var requestedSummarySection = summarySectionMap[initialParams.get('summarySection')];
   var requestedLegacyView = initialParams.get('view') === 'statuses' ? 'work' : initialParams.get('view');
@@ -731,7 +732,7 @@
   // Keep the authoring demo default, but fail closed for every explicit unknown role.
   var initialRole = !rawRequestedRole ? 'manager' : (['admin', 'manager', 'escort', 'viewer'].indexOf(requestedRole) !== -1 ? requestedRole : 'forbidden');
   var roleAwareInitialView = initialView;
-  if (!requestedTourSection && !requestedLegacyView && (initialRole === 'viewer' || initialRole === 'escort')) roleAwareInitialView = 'operations';
+  if (!requestedTourSection && (!requestedLegacyView || requestedLeadsView) && (initialRole === 'viewer' || initialRole === 'escort')) roleAwareInitialView = 'operations';
   var initialOffline = initialParams.get('offline') === '1';
   var initialTourist = tourists.find(function (tourist) { return tourist.id === initialTouristId; });
   var initialSelectedTourId = initialParams.get('tourId') || (initialTourist && initialTourist.tourId) || 'china';
@@ -807,6 +808,123 @@
     state.summaryMode = context.summaryMode || 'groups';
     state.pendingScrollTop = Number(context.scrollTop || 0);
   }
+
+  var leadsOriginContext = null;
+  var tourDebugApi = null;
+
+  function setLeadsStylesEnabled(enabled) {
+    var stylesheet = document.getElementById && document.getElementById('mobile-leads-workspace-styles');
+    if (stylesheet) stylesheet.disabled = !enabled;
+  }
+
+  function syncPrototypeUrl(view, extra) {
+    if (!window.history || typeof window.history.replaceState !== 'function') return;
+    var params = new URLSearchParams();
+    params.set('tourId', state.selectedTourId);
+    params.set('role', state.role);
+    params.set('offline', state.offline ? '1' : '0');
+    if (view === 'leads') params.set('view', 'leads');
+    else if (view === 'finance' || view === 'tourists') params.set('view', view);
+    else if (view === 'operations') params.set('tourSection', 'summary');
+    if (view !== 'leads' && currentCity()) params.set('routeCityId', currentCity().id);
+    if (view === 'operations') params.set('operation', state.stage);
+    Object.keys(extra || {}).forEach(function (key) {
+      if (extra[key] != null && extra[key] !== '') params.set(key, extra[key]);
+    });
+    window.history.replaceState({}, '', 'tour-operations.html?' + params.toString());
+  }
+
+  function activateLeadsWorkspace(options) {
+    options = options || {};
+    if (state.role !== 'admin' && state.role !== 'manager') {
+      showToast('Раздел «Лиды» недоступен для этой роли', 'error');
+      return;
+    }
+    if (!leadsOriginContext) leadsOriginContext = captureTourContext();
+    state.overlay = null;
+    setLeadsStylesEnabled(true);
+    syncPrototypeUrl('leads', options.leadId ? { lead: options.leadId, tab: options.detailTab || 'details' } : {});
+    if (window.UNIQUE_MOBILE_LEADS && typeof window.UNIQUE_MOBILE_LEADS.activate === 'function') {
+      window.UNIQUE_MOBILE_LEADS.activate({
+        role: state.role,
+        offline: state.offline,
+        leadId: options.leadId || null,
+        detailTab: options.detailTab || 'details',
+        newLead: Boolean(options.newLead)
+      });
+    } else {
+      window.UNIQUE_TOUR_HOST.pendingLeads = options;
+    }
+  }
+
+  function leaveLeadsWorkspace(destination) {
+    if (window.UNIQUE_MOBILE_LEADS) window.UNIQUE_MOBILE_LEADS.deactivate();
+    setLeadsStylesEnabled(false);
+    if (leadsOriginContext) restoreTourContext(leadsOriginContext);
+    else state.view = 'tour-info';
+    leadsOriginContext = null;
+    state.overlay = null;
+    if (destination === 'tourists') state.view = 'tourists';
+    if (destination === 'finance' && canViewFinance()) state.view = 'finance';
+    if ((state.role === 'viewer' || state.role === 'escort') && destination === 'tours') state.view = 'operations';
+    if (tourDebugApi) window.__prototypeDebug = tourDebugApi;
+    syncPrototypeUrl(state.view);
+    render();
+  }
+
+  window.UNIQUE_TOUR_HOST = {
+    pendingLeads: requestedLeadsView ? {
+      leadId: initialParams.get('lead'),
+      detailTab: initialParams.get('tab') || 'details',
+      newLead: initialParams.get('newLead') === '1'
+    } : null,
+    activatePendingLeads: function () {
+      if (!this.pendingLeads) return;
+      var pending = this.pendingLeads;
+      this.pendingLeads = null;
+      activateLeadsWorkspace(pending);
+    },
+    openLeads: function (options) {
+      activateLeadsWorkspace(options || {});
+    },
+    navigateFromLeads: function (destination) {
+      leaveLeadsWorkspace(destination || 'tours');
+    },
+    updateSession: function (session) {
+      if (session && roleLabels[session.role]) state.role = session.role;
+      if (session && typeof session.offline === 'boolean') state.offline = session.offline;
+    },
+    openSummaryFromLeads: function (context) {
+      if (!context || !canViewTourId(context.tourId)) return;
+      if (window.UNIQUE_MOBILE_LEADS) window.UNIQUE_MOBILE_LEADS.deactivate();
+      setLeadsStylesEnabled(false);
+      leadsOriginContext = null;
+      state.selectedTourId = context.tourId;
+      state.view = 'operations';
+      state.scopeLead = context.leadId || null;
+      state.returnLead = context.leadId || null;
+      state.returnTab = context.detailTab || 'details';
+      state.overlay = null;
+      if (tourDebugApi) window.__prototypeDebug = tourDebugApi;
+      syncPrototypeUrl('operations', { lead: state.scopeLead });
+      render();
+    },
+    openTouristFromLeads: function (context) {
+      var tourist = context && touristById(context.touristId);
+      if (!tourist || !canViewTourId(context.tourId) || tourist.tourId !== context.tourId) return;
+      if (window.UNIQUE_MOBILE_LEADS) window.UNIQUE_MOBILE_LEADS.deactivate();
+      setLeadsStylesEnabled(false);
+      leadsOriginContext = null;
+      state.selectedTourId = context.tourId;
+      state.view = 'tourists';
+      state.returnLead = context.leadId || null;
+      state.returnTab = context.detailTab || 'details';
+      state.overlay = { kind: 'tourist-detail', touristId: context.touristId, expanded: new Set(), detailTab: 'profile' };
+      if (tourDebugApi) window.__prototypeDebug = tourDebugApi;
+      syncPrototypeUrl('tourists', { tourist: context.touristId, returnLead: state.returnLead });
+      render();
+    }
+  };
 
   function overlaySnapshot(overlay) {
     if (!overlay) return null;
@@ -3281,7 +3399,7 @@
     });
     var index = tourists.findIndex(function (item) { return item.id === touristId; });
     tourists.splice(index, 1);
-    canonicalTouristStore = canonicalTouristStore.filter(function (item) { return item.id !== touristId; });
+    canonicalTouristStore = tourists;
     normalizeTourGroupRepresentative(priorTourGroupId);
     if (tourist.isPrimary) {
       var replacement = tourists.find(function (item) { return item.leadId === tourist.leadId; });
@@ -3524,6 +3642,7 @@
   }
 
   root.addEventListener('input', function (event) {
+    if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
     if (event.target.dataset.touristSearch !== undefined) {
       state.touristQuery = event.target.value;
       render();
@@ -3583,6 +3702,7 @@
   });
 
   root.addEventListener('change', function (event) {
+    if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
     if (state.overlay && state.overlay.kind === 'tour-form') {
       if (event.target.dataset.routeGuideId !== undefined) state.overlay.routeGuideIds[event.target.dataset.routeGuideId] = event.target.value;
       if (event.target.name === 'chatAdmin') state.overlay.chatAdminIds[Number(event.target.dataset.chatIndex)] = event.target.value;
@@ -3607,6 +3727,7 @@
   });
 
   root.addEventListener('submit', function (event) {
+    if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
     event.preventDefault();
     var form = event.target;
     var formData = new FormData(form);
@@ -3789,6 +3910,7 @@
   });
 
   root.addEventListener('click', function (event) {
+    if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
     var button = event.target.closest('[data-action]');
     if (!button || button.disabled) return;
     var action = button.dataset.action;
@@ -4576,7 +4698,7 @@
         showToast('Раздел «Лиды» недоступен для этой роли', 'error');
         return;
       }
-      window.location.href = mobileLeadsHref(state.returnLead, state.returnLead ? state.returnTab : null);
+      window.UNIQUE_TOUR_HOST.openLeads({ leadId: state.returnLead, detailTab: state.returnLead ? state.returnTab : 'details' });
       return;
     }
     if (action === 'export-summary') {
@@ -4607,7 +4729,7 @@
         showToast('Исходный лид недоступен для этой роли', 'error');
         return;
       }
-      window.location.href = mobileLeadsHref(button.dataset.id, 'overview');
+      window.UNIQUE_TOUR_HOST.openLeads({ leadId: button.dataset.id, detailTab: 'details' });
       return;
     }
     if (action === 'delete-tourist') {
@@ -4740,7 +4862,10 @@
         return;
       }
       if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnLead && canOpenSourceLead(state.returnLead)) {
-        window.location.href = mobileLeadsHref(state.returnLead, state.returnTab);
+        var sourceLeadId = state.returnLead;
+        var sourceLeadTab = state.returnTab;
+        state.overlay = null;
+        window.UNIQUE_TOUR_HOST.openLeads({ leadId: sourceLeadId, detailTab: sourceLeadTab });
         return;
       }
       if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnLead && !canOpenSourceLead(state.returnLead)) state.returnLead = null;
@@ -5112,7 +5237,7 @@
     return visits;
   }
 
-  window.__prototypeDebug = {
+  tourDebugApi = {
     snapshot: function () {
       return clone({
         tourists: tourists,
@@ -5160,6 +5285,7 @@
       });
     }
   };
+  window.__prototypeDebug = tourDebugApi;
 
   render();
 }());
