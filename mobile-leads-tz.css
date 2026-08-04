@@ -548,6 +548,7 @@ footer { padding: 30px 18px max(30px, env(safe-area-inset-bottom)); color: var(-
 }
 .spec-toc a:hover { background: var(--blue-soft); color: #244f9d; }
 .spec-content { min-width: 0; width: 100%; margin: 0; }
+.spec-content .inline-action { min-height: 44px; margin: 2px 4px; padding: 0 12px; border: 1px solid #cddcf5; border-radius: 11px; background: var(--blue-soft); color: var(--blue); display: inline-flex; align-items: center; font-weight: 800; text-decoration: none; }
 .spec-content > table {
   margin: 0 0 18px;
   overflow: hidden;

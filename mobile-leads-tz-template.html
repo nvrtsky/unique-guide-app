@@ -6,7 +6,7 @@
   <meta name="spec-source" content="mobile-leads-tz.md">
   <meta name="spec-sha256" content="$spec-hash$">
   <meta name="theme-color" content="#14171a">
-  <meta name="description" content="Финальное визуальное ТЗ MVP мобильной CRM: лиды, туристы, туры и сводная.">
+  <meta name="description" content="Финальное визуальное ТЗ MVP единой мобильной CRM: менеджерские лиды, туры, туристы, сводная и сохранённая редакция гида.">
   <title>$if(pagetitle)$$pagetitle$$else$$title$$endif$</title>
   <link rel="stylesheet" href="mobile-leads-tz.css">
 </head>
@@ -15,9 +15,10 @@
   <header class="site-header">
     <a class="brand" href="index.html">UNIQUE</a>
     <nav aria-label="Навигация прототипа">
-      <a href="mobile-leads.html">Лиды</a>
-      <a href="tour-operations.html">Прототип</a>
+      <a href="tour-operations.html">Лиды, туры и сводная</a>
       <a class="active" aria-current="page" href="mobile-leads-tz.html">ТЗ</a>
+      <a href="commercial-proposal.html">КП</a>
+      <a href="./?legacy=1">Старый прототип</a>
     </nav>
   </header>
 
@@ -27,7 +28,7 @@
     $if(subtitle)$<p class="lead">$subtitle$</p>$endif$
     <div class="meta">
       <span>Статус: финальное ТЗ прототипа</span>
-      <span>Дата: $date$</span>
+      <span>Дата: $if(displaydate)$$displaydate$$else$$date$$endif$</span>
       <span>Источник: mobile-leads-tz.md</span>
     </div>
     <div class="hero-actions">
@@ -35,11 +36,11 @@
       <a class="hero-secondary" href="#final-product">Посмотреть состав MVP</a>
     </div>
     <div class="hero-facts" aria-label="Состав финального MVP">
-      <div class="hero-fact"><strong>3</strong><span>отдельных раздела: туры, туристы и лиды</span></div>
-      <div class="hero-fact"><strong>4</strong><span>канонических вкладки карточки лида</span></div>
-      <div class="hero-fact"><strong>6</strong><span>частей итоговой карточки тура</span></div>
-      <div class="hero-fact"><strong>3</strong><span>операции в каждой позиции маршрута</span></div>
-      <div class="hero-fact"><strong>1</strong><span>рабочая версия после переноса</span></div>
+      <div class="hero-fact"><strong>1</strong><span>публичный прототип для сквозного сценария CRM</span></div>
+      <div class="hero-fact"><strong>5</strong><span>туров в демонстрационных данных</span></div>
+      <div class="hero-fact"><strong>50</strong><span>туристов из 21 лида</span></div>
+      <div class="hero-fact"><strong>4</strong><span>роли с отдельными capabilities</span></div>
+      <div class="hero-fact"><strong>100%</strong><span>сохранение первой редакции гида</span></div>
     </div>
   </section>
 
@@ -53,6 +54,6 @@
     </main>
   </div>
 
-  <footer>UNIQUE · финальное ТЗ MVP мобильной CRM · $date$</footer>
+  <footer>UNIQUE · финальное ТЗ MVP мобильной CRM · $if(displaydate)$$displaydate$$else$$date$$endif$</footer>
 </body>
 </html>

@@ -7,6 +7,7 @@
   var requestedParams = new URLSearchParams(window.location.search);
   var requestedTouristId = requestedParams.get('tourist');
   var requestedTourId = requestedParams.get('tourId');
+  var sharedMock = window.UNIQUE_MOCK_DATA || { tours: [], supplementalLeads: [], supplementalTourists: [], financeByLeadId: {} };
 
   var cities = [
     { id: 'route-beijing-1', catalogCityId: 'city-beijing', name: 'Пекин', dates: '14–17 сен', arrival: '2026-09-14', departure: '2026-09-17' },
@@ -55,10 +56,26 @@
       lead: 'Лид Орлова', leadId: 'lead-1048', leadStatus: 'Подтверждён', tourStatus: 'Ожидает', groupId: null, groupRepresentative: false,
       route: ['route-beijing-1', 'route-shanghai-1'], type: 'Младенец', isPrimary: false,
       notes: 'Контакт через основного туриста.', guideComment: 'Нужна детская кроватка.', preferredChannel: ''
+    },
+    {
+      id: 't5', leadTouristId: 'lt-1033-1', contactId: 'contact-206', dealId: 'deal-506', tourId: null,
+      name: 'Морозов Олег', firstName: 'Олег', lastName: 'Морозов', middleName: '', initials: 'МО',
+      birthDate: '', phone: '+7 926 774-30-10', email: 'oleg@example.ru', citizenship: 'Россия',
+      domesticPassport: '', domesticIssuedBy: '', registrationAddress: '', latinName: '', passport: '', passportExpiry: '', scans: [],
+      lead: 'Лид Морозов', leadId: 'lead-1033', leadStatus: 'Потерян', tourStatus: 'Не участвует', groupId: null, groupRepresentative: false,
+      route: [], type: 'Взрослый', isPrimary: true, notes: '', guideComment: '', preferredChannel: ''
     }
   ];
 
-  var TOURIST_STORAGE_KEY = 'unique-guide-tourists-v2';
+  sharedMock.supplementalTourists.forEach(function (seed) {
+    if (!tourists.some(function (tourist) { return tourist.id === seed.id; })) tourists.push(JSON.parse(JSON.stringify(seed)));
+  });
+
+  var TOURIST_STORAGE_KEY = 'unique-guide-tourists-v3';
+  var LEGACY_TOURIST_STORAGE_KEY = 'unique-guide-tourists-v2';
+  var LEGACY_TOURIST_MIGRATION_STORAGE_KEY = 'unique-guide-tourists-v2-mobile-migrated';
+  var TOURIST_MIGRATION_STORAGE_KEY = 'unique-guide-tourists-v3-mobile-migrated';
+  var canonicalTouristSeeds = tourists.map(function (tourist) { return JSON.parse(JSON.stringify(tourist)); });
   var canonicalTouristStore = [];
 
   function normalizeCanonicalTourist(tourist) {
@@ -75,16 +92,37 @@
   function hydrateCanonicalTourists() {
     try {
       if (!window.localStorage) return;
-      var saved = JSON.parse(window.localStorage.getItem(TOURIST_STORAGE_KEY) || '[]');
+      var currentRaw = window.localStorage.getItem(TOURIST_STORAGE_KEY);
+      var legacyRaw = currentRaw == null ? window.localStorage.getItem(LEGACY_TOURIST_STORAGE_KEY) : null;
+      var raw = currentRaw == null ? legacyRaw : currentRaw;
+      if (raw == null) {
+        canonicalTouristStore = tourists.slice();
+        return;
+      }
+      var saved = JSON.parse(raw);
       if (!Array.isArray(saved)) return;
-      canonicalTouristStore = saved.slice();
-      var requestedStoredTourist = saved.find(function (savedTourist) { return savedTourist.id === requestedTouristId; });
-      var hydrationTourId = requestedTourId || (requestedStoredTourist && requestedStoredTourist.tourId) || 'china';
-      saved.forEach(function (savedTourist) {
-        var current = tourists.find(function (tourist) { return tourist.id === savedTourist.id; });
-        if (current) normalizeCanonicalTourist(Object.assign(current, savedTourist));
-        else if (savedTourist.id === requestedTouristId || savedTourist.tourId === hydrationTourId) tourists.push(normalizeCanonicalTourist(Object.assign({}, savedTourist)));
+      var migrated = saved.filter(function (savedTourist) { return savedTourist && savedTourist.id; }).map(function (savedTourist) {
+        var seed = canonicalTouristSeeds.find(function (candidate) { return candidate.id === savedTourist.id; });
+        return normalizeCanonicalTourist(Object.assign({}, seed || {}, savedTourist));
       });
+      if (currentRaw == null) {
+        var migratedIds = {};
+        var legacySeedIds = { t1: true, t2: true, t3: true, t4: true };
+        if (window.localStorage.getItem(LEGACY_TOURIST_MIGRATION_STORAGE_KEY) === '1') {
+          legacySeedIds.t5 = true;
+          legacySeedIds['lead-tourist-1051'] = true;
+        }
+        migrated.forEach(function (tourist) { migratedIds[tourist.id] = true; });
+        canonicalTouristSeeds.forEach(function (seed) {
+          if (!legacySeedIds[seed.id] && !migratedIds[seed.id]) migrated.push(normalizeCanonicalTourist(Object.assign({}, seed)));
+        });
+      }
+      tourists.splice.apply(tourists, [0, tourists.length].concat(migrated));
+      canonicalTouristStore = tourists.slice();
+      if (currentRaw == null) {
+        window.localStorage.setItem(TOURIST_STORAGE_KEY, JSON.stringify(canonicalTouristStore));
+        window.localStorage.setItem(TOURIST_MIGRATION_STORAGE_KEY, '1');
+      }
     } catch (error) {
       console.warn('Tourist profile storage is unavailable', error);
     }
@@ -96,7 +134,10 @@
       canonicalTouristStore.forEach(function (tourist) { if (tourist && tourist.id) byId[tourist.id] = tourist; });
       tourists.forEach(function (tourist) { if (tourist && tourist.id) byId[tourist.id] = tourist; });
       canonicalTouristStore = Object.keys(byId).map(function (id) { return byId[id]; });
-      if (window.localStorage) window.localStorage.setItem(TOURIST_STORAGE_KEY, JSON.stringify(canonicalTouristStore));
+      if (window.localStorage) {
+        window.localStorage.setItem(TOURIST_STORAGE_KEY, JSON.stringify(canonicalTouristStore));
+        window.localStorage.setItem(TOURIST_MIGRATION_STORAGE_KEY, '1');
+      }
     } catch (error) {
       console.warn('Tourist profile changes remain in memory', error);
     }
@@ -108,12 +149,13 @@
   // Production calls this role `viewer`; keep the user-facing CRM label "Гид".
   // The legacy `?role=guide` deep link is normalized below and never enters state.
   var roleLabels = { admin: 'Администратор', manager: 'Менеджер', escort: 'Сопровождающий', viewer: 'Гид', forbidden: 'Пользователь' };
-  var managerTourIds = ['china'];
-  var managerLeadIds = ['lead-1042', 'lead-1048'];
-  var escortTourIds = ['china'];
-  var viewerTourIds = ['china'];
+  var managerTourIds = sharedMock.tours.length ? sharedMock.tours.map(function (tour) { return tour.id; }) : ['china'];
+  var managerLeadIds = ['lead-1042', 'lead-1048'].concat(sharedMock.supplementalLeads.filter(function (lead) { return lead.manager === 'Елена Воронова'; }).map(function (lead) { return lead.id; }));
+  var escortTourIds = ['china', 'morocco'];
+  var viewerTourIds = ['china', 'morocco'];
   var viewerCityIds = ['route-beijing-1', 'route-xian-1'];
-  var LEAD_STORAGE_KEY = 'unique-guide-leads-v1';
+  var LEAD_STORAGE_KEY = 'unique-guide-leads-v2';
+  var LEGACY_LEAD_STORAGE_KEY = 'unique-guide-leads-v1';
   var userDirectory = [
     { id: 'user-guide-li-wei', name: 'Ли Вэй', roles: ['viewer'] },
     { id: 'user-guide-anna-kim', name: 'Анна Ким', roles: ['viewer', 'escort'] },
@@ -124,6 +166,46 @@
     { id: 'user-manager-igor', name: 'Игорь Лебедев', roles: ['manager', 'chat_admin'] }
   ];
   var leadArchiveMocks = {};
+
+  function initialLeadStorageSeeds() {
+    var seeds = [
+      { id: 'lead-1042', eventId: 'china', manager: 'Елена Воронова', assignedUserId: 'manager-elena', archived: false, remainingPayment: '148000', remainingPaymentCurrency: 'CNY', remainingPaymentCollected: false },
+      { id: 'lead-1048', eventId: 'china', manager: 'Елена Воронова', assignedUserId: 'manager-elena', archived: false, remainingPayment: '85000', remainingPaymentCurrency: 'RUB', remainingPaymentCollected: false },
+      { id: 'lead-1051', eventId: 'china', manager: 'Игорь Лебедев', assignedUserId: 'manager-igor', archived: false, remainingPayment: '0', remainingPaymentCurrency: 'RUB', remainingPaymentCollected: false },
+      { id: 'lead-1033', eventId: null, manager: 'Елена Воронова', assignedUserId: 'manager-elena', archived: true }
+    ];
+    sharedMock.supplementalLeads.forEach(function (lead) { seeds.push(JSON.parse(JSON.stringify(lead))); });
+    return seeds;
+  }
+
+  function migrateLeadStorage() {
+    try {
+      if (!window.localStorage || window.localStorage.getItem(LEAD_STORAGE_KEY) != null) return;
+      var legacyRaw = window.localStorage.getItem(LEGACY_LEAD_STORAGE_KEY);
+      if (legacyRaw == null) {
+        window.localStorage.setItem(LEAD_STORAGE_KEY, JSON.stringify(initialLeadStorageSeeds()));
+        return;
+      }
+      var legacyLeads = JSON.parse(legacyRaw);
+      if (!Array.isArray(legacyLeads)) return;
+      var migrated = legacyLeads.filter(function (lead) { return lead && lead.id; });
+      var migratedIds = {};
+      migrated.forEach(function (lead) { migratedIds[lead.id] = true; });
+      if (legacyLeads.length > 0 && !legacyLeads.some(function (lead) { return lead && lead.code; })) {
+        initialLeadStorageSeeds().slice(0, 4).forEach(function (lead) {
+          if (!migratedIds[lead.id]) migrated.push(lead);
+        });
+      }
+      sharedMock.supplementalLeads.forEach(function (lead) {
+        if (!migratedIds[lead.id]) migrated.push(JSON.parse(JSON.stringify(lead)));
+      });
+      window.localStorage.setItem(LEAD_STORAGE_KEY, JSON.stringify(migrated));
+    } catch (error) {
+      console.warn('Lead storage migration is unavailable', error);
+    }
+  }
+
+  migrateLeadStorage();
 
   function directoryUser(userId) {
     return userDirectory.find(function (user) { return user.id === userId; }) || null;
@@ -490,6 +572,83 @@
     }
   ];
 
+  sharedMock.tours.forEach(function (seed) {
+    var existing = tours.find(function (tour) { return tour.id === seed.id; });
+    var values = {
+      id: seed.id, name: seed.title, country: seed.country, cities: seed.cities.slice(),
+      startDate: seed.startDate, endDate: seed.endDate, dates: seed.dates, status: seed.status,
+      isArchived: Boolean(seed.isArchived || seed.status === 'archive'), tourType: seed.tourType,
+      tourTypeLabel: seed.tourTypeLabel, color: seed.color, tourists: 10, bookedCount: 10,
+      capacity: seed.capacity, price: seed.price, priceCurrency: seed.priceCurrency,
+      availableSpots: Math.max(0, Number(seed.capacity || 10) - 10), logisticsCompleteness: seed.logisticsCompleteness,
+      statusCounts: { confirmed: 6, pending: 4, cancelled: 0 }, route: seed.cities.join(' → '),
+      guides: seed.guides || 'Не назначены', cityGuides: existing && existing.cityGuides || {},
+      financeGuideCityId: seed.financeGuideCityId || null,
+      escortUserId: existing && existing.escortUserId || '', escort: existing && existing.escort || 'Не назначен',
+      chatAdminIds: existing && existing.chatAdminIds || ['user-manager-elena'],
+      chatAdmins: existing && existing.chatAdmins || ['Елена Воронова'],
+      site: existing && existing.site || '', description: seed.description
+    };
+    if (existing) Object.assign(existing, values); else tours.push(values);
+  });
+
+  // The first guide edition must remain usable for every tour assigned to a
+  // guide or escort. China keeps the full summary mock above; this small
+  // task model supplies the same guide shell for Morocco without copying China
+  // records into another route. Status changes stay in local prototype memory.
+  var guideOperationalMocks = {
+    morocco: {
+      route: {
+        'route-casablanca-1': {
+          dates: '3–6 окт',
+          arrival: [
+            { id: 'at-221', time: '09:40', date: '3 окт', title: 'AT 221', detail: 'Самолёт · Мохаммед V (CMN) · групповой трансфер', memberIndexes: [0, 1, 2, 3, 4, 5] },
+            { id: 'af-1496', time: '14:15', date: '3 окт', title: 'AF 1496', detail: 'Самолёт · Мохаммед V (CMN) · минивэн', memberIndexes: [6, 7, 8, 9] }
+          ],
+          hotel: [
+            { id: 'odyssee-center', time: '•', date: '3–6 окт', title: 'Odyssee Center Hotel', detail: 'Размещение · Double и Twin · завтрак', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ],
+          departure: [
+            { id: 'ctm-104', time: '08:30', date: '6 окт', title: 'CTM 104', detail: 'Автобус · CTM Casablanca · багаж 1 место', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7] },
+            { id: 'private-casa-marrakesh', time: '10:00', date: '6 окт', title: 'Минивэн 2', detail: 'Авто · холл отеля · детское кресло', memberIndexes: [8, 9] }
+          ]
+        },
+        'route-marrakesh-1': {
+          dates: '6–9 окт',
+          arrival: [
+            { id: 'arrival-marrakesh', time: '12:10', date: '6 окт', title: 'Прибытие из Касабланки', detail: 'Автобус и минивэн · встреча у входа в риад', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ],
+          hotel: [
+            { id: 'riad-kniza', time: '•', date: '6–9 окт', title: 'Riad Kniza', detail: 'Размещение · 5 номеров · ужин 6 октября', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ],
+          departure: [
+            { id: 'marrakesh-ouarzazate', time: '08:00', date: '9 окт', title: 'Автобус в Уарзазат', detail: 'Автобус · вход в риад · остановка на перевале', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ]
+        },
+        'route-ouarzazate-1': {
+          dates: '9–13 окт',
+          arrival: [
+            { id: 'arrival-ouarzazate', time: '13:30', date: '9 окт', title: 'Прибытие в Уарзазат', detail: 'Автобус · площадь аль-Мувахидин · обед', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ],
+          hotel: [
+            { id: 'berbere-palace', time: '•', date: '9–13 окт', title: 'Le Berbère Palace', detail: 'Размещение · Double и Twin · завтрак', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ],
+          departure: [
+            { id: 'at-412', time: '17:50', date: '13 окт', title: 'AT 412', detail: 'Самолёт · Уарзазат (OZZ) · трансфер из отеля', memberIndexes: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9] }
+          ]
+        }
+      },
+      program: [
+        { day: 1, date: '3 октября', city: 'Касабланка', description: 'Встреча в аэропорту, трансфер и заселение.' },
+        { day: 2, date: '4 октября', city: 'Касабланка', description: 'Мечеть Хасана II, набережная и медина.' },
+        { day: 4, date: '6 октября', city: 'Марракеш', description: 'Переезд, заселение в риад и вечер на площади Джемаа-эль-Фна.' },
+        { day: 7, date: '9 октября', city: 'Уарзазат', description: 'Переезд через Тизи-н-Тичка и заселение.' },
+        { day: 11, date: '13 октября', city: 'Уарзазат', description: 'Выезд из отеля, трансфер в аэропорт.' }
+      ]
+    }
+  };
+  var guideOperationalStatuses = {};
+
   var programSeedDescriptions = {
     '2026-09-14': 'Встреча в аэропорту, размещение, вечерняя прогулка по хутунам.',
     '2026-09-15': 'Запретный город, парк Цзиншань и чайная церемония.',
@@ -559,18 +718,20 @@
   var initialTouristId = initialParams.get('tourist');
   var initialRouteCityId = initialParams.get('routeCityId');
   var initialCityIndex = cities.findIndex(function (city) { return city.id === initialRouteCityId; });
-  var tourSectionMap = { overview: 'tour-info', summary: 'operations', statuses: 'work', program: 'program', team: 'tour-team', tasks: 'tour-tasks', actions: 'tour-actions' };
+  var tourSectionMap = { overview: 'tour-info', summary: 'operations', statuses: 'work', program: 'program', team: 'tour-team', tasks: 'tour-tasks', actions: 'tour-actions', finance: 'finance' };
   var requestedTourSection = initialParams.get('tourSection');
   var summarySectionMap = { operations: 'operations', tourists: 'tourists', documents: 'documents', statuses: 'work' };
   var requestedSummarySection = summarySectionMap[initialParams.get('summarySection')];
   var requestedLegacyView = initialParams.get('view') === 'statuses' ? 'work' : initialParams.get('view');
   var initialView = requestedSummarySection && (!requestedTourSection || requestedTourSection === 'summary') ? requestedSummarySection :
-    (tourSectionMap[requestedTourSection] || (['operations', 'tourists', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions'].indexOf(requestedLegacyView) !== -1 ? requestedLegacyView : 'tour-info'));
+    (tourSectionMap[requestedTourSection] || (['operations', 'tourists', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions', 'finance'].indexOf(requestedLegacyView) !== -1 ? requestedLegacyView : 'tour-info'));
   var initialStage = ['arrival', 'hotel', 'departure'].indexOf(initialParams.get('operation')) !== -1 ? initialParams.get('operation') : 'arrival';
   var rawRequestedRole = initialParams.get('role');
   var requestedRole = rawRequestedRole === 'guide' ? 'viewer' : rawRequestedRole;
   // Keep the authoring demo default, but fail closed for every explicit unknown role.
   var initialRole = !rawRequestedRole ? 'manager' : (['admin', 'manager', 'escort', 'viewer'].indexOf(requestedRole) !== -1 ? requestedRole : 'forbidden');
+  var roleAwareInitialView = initialView;
+  if (!requestedTourSection && !requestedLegacyView && (initialRole === 'viewer' || initialRole === 'escort')) roleAwareInitialView = 'operations';
   var initialOffline = initialParams.get('offline') === '1';
   var initialTourist = tourists.find(function (tourist) { return tourist.id === initialTouristId; });
   var initialSelectedTourId = initialParams.get('tourId') || (initialTourist && initialTourist.tourId) || 'china';
@@ -579,11 +740,12 @@
   var requestedReturnTab = initialParams.get('returnTab');
   var initialReturnTab = ['details', 'chat', 'documents', 'tasks'].indexOf(requestedReturnTab) !== -1 ? requestedReturnTab : 'details';
   var state = {
-    view: initialView,
+    view: roleAwareInitialView,
     summaryMode: 'groups',
     touristListMode: initialParams.get('listMode') === 'groups' ? 'groups' : 'list',
     touristQuery: (initialRole === 'admin' || initialRole === 'manager') ? (initialParams.get('query') || '') : '',
-    touristFilters: { needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' },
+    touristFilters: { needsData: false, documentIssue: false, limitedRoute: false, debt: false, type: 'all', group: 'all', status: 'all' },
+    guideTouristFilter: ['attention', 'completed'].indexOf(initialParams.get('guideTouristFilter')) !== -1 ? initialParams.get('guideTouristFilter') : 'all',
     documentFilter: ['attention', 'expiring', 'ready'].indexOf(initialParams.get('documentFilter')) !== -1 ? initialParams.get('documentFilter') : 'attention',
     cityIndex: initialCityIndex >= 0 ? initialCityIndex : 0,
     stage: initialStage,
@@ -596,16 +758,19 @@
     returnTab: initialReturnTab,
     returnContext: null,
     pendingScrollTop: null,
-    tourFilter: 'active',
+    tourFilter: ['all', 'active', 'draft', 'archive'].indexOf(initialParams.get('tourFilter')) !== -1 ? initialParams.get('tourFilter') : 'active',
     tourQuery: '',
     directoryQuery: '',
     selectedTourId: initialSelectedTourId,
+    financeRouteCityId: initialRouteCityId || null,
+    guideRouteCityId: initialRouteCityId || null,
     pointPickerReturn: null,
     role: initialRole,
     offline: initialOffline,
     uiPreview: 'ready',
     saveErrorSnapshot: null
   };
+  if (!state.overlay && initialParams.get('showTours') === '1') state.overlay = { kind: 'tours' };
 
   normalizeAllTourGroupRepresentatives();
   Object.keys(tourGroupSettings).forEach(ensureDefaultSharedHotel);
@@ -637,7 +802,7 @@
     state.scopeLead = context.scopeLeadId || null;
     state.touristListMode = context.listMode || 'list';
     state.touristQuery = context.query || '';
-    state.touristFilters = Object.assign({ needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' }, context.filters || {});
+    state.touristFilters = Object.assign({ needsData: false, documentIssue: false, limitedRoute: false, debt: false, type: 'all', group: 'all', status: 'all' }, context.filters || {});
     state.documentFilter = context.documentFilter || 'attention';
     state.summaryMode = context.summaryMode || 'groups';
     state.pendingScrollTop = Number(context.scrollTop || 0);
@@ -743,6 +908,8 @@
       users: '<path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/>',
       leads: '<path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/>',
       tours: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2Z"/>',
+      tasks: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="m3.5 6 1.5 1.5L7.5 5M3.5 12l1.5 1.5 2.5-2.5M3.5 18l1.5 1.5 2.5-2.5"/>',
+      finance: '<circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.7-1.8-1.1-3.1-1.1-1.8 0-3 .8-3 2 0 3.2 6.2 1.2 6.2 4.4 0 1.2-1.2 2.1-3.2 2.1-1.5 0-2.8-.5-3.7-1.4M12 5.5v13"/>',
       settings: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.09A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.6 15a1.7 1.7 0 0 0-1.56-1H3v-4h.09A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.6 1.7 1.7 0 0 0 10 3.09V3h4v.09A1.7 1.7 0 0 0 15.06 4.6a1.7 1.7 0 0 0 1.88-.34L17 4.2 19.83 7l-.06.06A1.7 1.7 0 0 0 19.4 9c.13.6.6 1.04 1.2 1H21v4h-.09A1.7 1.7 0 0 0 19.4 15Z"/>',
       pin: '<path d="M20 10c0 5-8 11-8 11S4 15 4 10a8 8 0 1 1 16 0Z"/><circle cx="12" cy="10" r="2.5"/>',
       archive: '<path d="M3 6h18M5 6v14h14V6M9 10h6M4 3h16v3H4z"/>',
@@ -779,12 +946,66 @@
     return cities.filter(function (city) { return canViewRouteCity(city.id); });
   }
 
+  function allRouteCitiesForTour(tour) {
+    if (!tour) return [];
+    if (tourHasOperationalModel(tour.id)) return cities;
+    var seed = sharedMock.tours.find(function (candidate) { return candidate.id === tour.id; });
+    if (seed && Array.isArray(seed.route) && seed.route.length) {
+      return seed.route.map(function (routeCity, index) {
+        return {
+          id: routeCity.id,
+          catalogCityId: routeCity.catalogCityId || 'catalog-' + tour.id + '-' + index,
+          name: routeCity.name,
+          dates: routeCity.dates || '',
+          routeIndex: index
+        };
+      });
+    }
+    return (tour.cities || []).map(function (name, index) {
+      return { id: 'route-' + tour.id + '-' + index, catalogCityId: 'catalog-' + tour.id + '-' + index, name: name, dates: '', routeIndex: index };
+    });
+  }
+
+  function guideOperationalMock() {
+    return guideOperationalMocks[state.selectedTourId] || null;
+  }
+
+  function usesGuideOperationalMock() {
+    return Boolean(guideOperationalMock()) && (state.role === 'viewer' || state.role === 'escort') && canViewSelectedTour();
+  }
+
+  function guideOperationalRouteCities() {
+    var mock = guideOperationalMock();
+    return allRouteCitiesForTour(selectedTour()).map(function (city) {
+      var routeMock = mock && mock.route[city.id];
+      return Object.assign({}, city, { dates: routeMock && routeMock.dates || city.dates || selectedTour().dates });
+    });
+  }
+
+  function currentGuideOperationalCity() {
+    var route = guideOperationalRouteCities();
+    return route.find(function (city) { return city.id === state.guideRouteCityId; }) || route[0] || null;
+  }
+
+  function normalizeGuideOperationalCity() {
+    if (!usesGuideOperationalMock()) return;
+    var city = currentGuideOperationalCity();
+    state.guideRouteCityId = city ? city.id : null;
+  }
+
+  function guideOperationStatusKey(cityId, stage, operationId) {
+    return [state.selectedTourId, cityId, stage, operationId].join('|');
+  }
+
+  function guideOperationStatus(cityId, stage, operationId) {
+    var initial = { arrival: 'expected', hotel: 'pending', departure: 'pending' }[stage];
+    return guideOperationalStatuses[guideOperationStatusKey(cityId, stage, operationId)] || initial;
+  }
+
   function routeCitiesForRole(tour) {
     if (!tour) return [];
-    if (!tourHasOperationalModel(tour.id)) return (tour.cities || []).map(function (name, index) {
-      return { id: 'route-' + tour.id + '-' + index, catalogCityId: 'catalog-' + tour.id + '-' + index, name: name, routeIndex: index };
-    });
-    if (state.role !== 'viewer' || tour.id !== state.selectedTourId) return cities;
+    if (!tourHasOperationalModel(tour.id)) return allRouteCitiesForTour(tour);
+    if (state.role !== 'viewer' || tour.id !== state.selectedTourId) return allRouteCitiesForTour(tour);
     return visibleRouteCities();
   }
 
@@ -867,6 +1088,123 @@
     return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Number(value || 0)) + ' ' + (symbols[currency] || currency || '₽');
   }
 
+  var financeOverrides = {};
+  var financeActionCounter = 0;
+  var financeActionRegistry = {};
+
+  function isMoroccoTour(tour) {
+    return /марокко|morocco/i.test(((tour && tour.country) || '') + ' ' + ((tour && tour.name) || ''));
+  }
+
+  function canViewFinance() {
+    if (!canViewSelectedTour()) return false;
+    if (state.role === 'admin' || state.role === 'manager') return true;
+    if (isMoroccoTour(selectedTour()) && (state.role === 'viewer' || state.role === 'escort')) return true;
+    if (state.role !== 'viewer') return false;
+    var financeCityId = selectedTour().financeGuideCityId;
+    return Boolean(financeCityId && viewerTourIds.indexOf(state.selectedTourId) !== -1 && viewerCityIds.indexOf(financeCityId) !== -1);
+  }
+
+  function financeRouteCities() {
+    return routeCitiesForRole(selectedTour());
+  }
+
+  function currentFinanceCity() {
+    var route = financeRouteCities();
+    var selected = route.find(function (city) { return city.id === state.financeRouteCityId; });
+    if (!selected && tourHasOperationalModel(state.selectedTourId)) {
+      selected = route.find(function (city) { return currentCity() && city.id === currentCity().id; });
+    }
+    return selected || route[0] || null;
+  }
+
+  function normalizeFinanceRouteCity() {
+    var city = currentFinanceCity();
+    state.financeRouteCityId = city ? city.id : null;
+    if (city && tourHasOperationalModel(state.selectedTourId)) {
+      var cityIndex = cities.findIndex(function (candidate) { return candidate.id === city.id; });
+      if (cityIndex >= 0) state.cityIndex = cityIndex;
+    }
+    return city;
+  }
+
+  function financeCityLabel(city) {
+    if (!city) return 'Маршрут не указан';
+    if (tourHasOperationalModel(state.selectedTourId)) return cityLabel(city);
+    return city.name;
+  }
+
+  function financeLeadData(leadId) {
+    var base = Object.assign({}, sharedMock.financeByLeadId[leadId] || {}, financeOverrides[leadId] || {});
+    try {
+      var stored = JSON.parse(window.localStorage && window.localStorage.getItem(LEAD_STORAGE_KEY) || '[]');
+      if (Array.isArray(stored)) {
+        var lead = stored.find(function (item) { return item && item.id === leadId; });
+        if (lead) base = Object.assign(base, lead);
+      }
+    } catch (error) {
+      console.warn('Finance lead storage is unavailable', error);
+    }
+    return base;
+  }
+
+  function financeParticipantPool() {
+    var members = currentTourists();
+    var activeCity = currentFinanceCity();
+    if (!activeCity) return [];
+    members = members.filter(function (tourist) { return tourist.route.indexOf(activeCity.id) !== -1; });
+    return members;
+  }
+
+  function buildFinanceRows() {
+    var grouped = {};
+    financeParticipantPool().forEach(function (tourist) {
+      var key = tourist.leadId || tourist.contactLeadId || tourist.groupId || tourist.dealId || tourist.id;
+      if (!grouped[key]) grouped[key] = { id: key, leadId: tourist.leadId || null, members: [], representative: tourist };
+      grouped[key].members.push(tourist);
+      var currentRank = grouped[key].representative.isPrimary ? 2 : (grouped[key].representative.groupRepresentative ? 1 : 0);
+      var nextRank = tourist.isPrimary ? 2 : (tourist.groupRepresentative ? 1 : 0);
+      if (nextRank > currentRank) grouped[key].representative = tourist;
+    });
+    return Object.keys(grouped).map(function (key) {
+      var group = grouped[key];
+      var lead = group.leadId ? financeLeadData(group.leadId) : {};
+      var amount = Number.parseFloat(String(lead.remainingPayment == null ? '' : lead.remainingPayment));
+      var currency = lead.remainingPaymentCurrency || 'RUB';
+      var symbols = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥' };
+      var collected = Boolean(lead.remainingPaymentCollected);
+      var balance = !collected && Number.isFinite(amount) && amount > 0 ? { amount: amount, formatted: new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount), symbol: symbols[currency] || currency, currency: currency } : null;
+      return Object.assign(group, { balance: balance, collected: collected, payerId: group.representative.id });
+    });
+  }
+
+  function financeRowForTourist(tourist) {
+    return buildFinanceRows().find(function (row) { return row.members.some(function (member) { return member.id === tourist.id; }); }) || null;
+  }
+
+  function paymentPresentation(tourist) {
+    var row = financeRowForTourist(tourist);
+    if (!row) return { kind: 'unknown', list: 'Нет данных', detail: 'Нет данных', color: '#8a929c' };
+    if (tourist.id !== row.payerId) return { kind: 'included', list: 'Оплатит ' + row.representative.name, detail: 'Оплатит ' + row.representative.name, color: '#5a626c' };
+    if (row.balance) return { kind: 'due', list: row.balance.formatted + ' ' + row.balance.symbol, detail: row.balance.formatted + ' ' + row.balance.symbol, color: '#c98a1e' };
+    return { kind: 'paid', list: 'Оплачено', detail: 'Полностью оплачено', color: '#1f9d5b' };
+  }
+
+  function saveFinanceCollection(leadId, collected) {
+    financeOverrides[leadId] = Object.assign({}, financeOverrides[leadId] || {}, { remainingPaymentCollected: Boolean(collected) });
+    try {
+      var stored = JSON.parse(window.localStorage && window.localStorage.getItem(LEAD_STORAGE_KEY) || '[]');
+      if (!Array.isArray(stored)) stored = [];
+      var index = stored.findIndex(function (lead) { return lead && lead.id === leadId; });
+      var seed = sharedMock.supplementalLeads.find(function (lead) { return lead.id === leadId; }) || { id: leadId };
+      var next = Object.assign({}, index >= 0 ? stored[index] : seed, financeLeadData(leadId), { id: leadId, remainingPaymentCollected: Boolean(collected) });
+      if (index >= 0) stored[index] = next; else stored.push(next);
+      if (window.localStorage) window.localStorage.setItem(LEAD_STORAGE_KEY, JSON.stringify(stored));
+    } catch (error) {
+      console.warn('Finance collection remains in memory', error);
+    }
+  }
+
   function canViewTourId(tourId) {
     if (state.role === 'admin') return true;
     if (state.role === 'manager') return managerTourIds.indexOf(tourId) !== -1;
@@ -908,10 +1246,8 @@
 
   function bookedCountForTour(tour) {
     if (!tour) return 0;
-    if (tourHasOperationalModel(tour.id)) {
-      return tourists.filter(function (tourist) { return tourist.tourId === tour.id; }).length;
-    }
-    return Number(tour.bookedCount != null ? tour.bookedCount : tour.tourists) || 0;
+    var canonicalCount = tourists.filter(function (tourist) { return tourist.tourId === tour.id; }).length;
+    return canonicalCount || Number(tour.bookedCount != null ? tour.bookedCount : tour.tourists) || 0;
   }
 
   function scopedTourists(includeUnavailable) {
@@ -931,7 +1267,8 @@
   }
 
   function operationGroupForAt(cityId, stage, touristId) {
-    var groups = operationGroups[cityId][stage];
+    var groups = operationGroups[cityId] && operationGroups[cityId][stage];
+    if (!groups) return null;
     var expectedVisitId = visitIdFor(cityId, stage, touristId);
     var id = Object.keys(groups).find(function (groupId) {
       var group = groups[groupId];
@@ -952,7 +1289,7 @@
     var group = operationGroupForAt(cityId, stage, touristId);
     var sourceId = group && (group.sourceId || group.masterId);
     var sourceMatchesTuple = group && group.sourceVisitId === visitIdFor(cityId, stage, sourceId) && group.tourId === ((touristById(touristId) || {}).tourId || 'china');
-    return sourceMatchesTuple ? records[cityId][stage][sourceId] : records[cityId][stage][touristId];
+    return sourceMatchesTuple ? ownRecordAt(cityId, stage, sourceId) : ownRecordAt(cityId, stage, touristId);
   }
 
   function touristById(id) {
@@ -1410,12 +1747,181 @@
     return '<div class="city-picker-wrap"><button type="button" class="city-picker-trigger" data-action="open-city-picker"><span class="city-picker-index">' + (state.cityIndex + 1) + '</span><span><strong>' + h(cityLabel(city)) + '</strong><small>' + h(city.dates) + ' · заполнено ' + filled + ' из ' + total + '</small></span><b>›</b></button></div>';
   }
 
+  function financeCityPickerButton() {
+    var city = normalizeFinanceRouteCity();
+    if (!city) return '<div class="finance-route-note">Позиции маршрута не указаны</div>';
+    var route = financeRouteCities();
+    var participants = financeParticipantPool();
+    var applications = buildFinanceRows().length;
+    var routeIndex = Math.max(0, route.findIndex(function (candidate) { return candidate.id === city.id; }));
+    return '<div class="city-picker-wrap"><button type="button" class="city-picker-trigger" data-action="open-finance-city-picker"><span class="city-picker-index">' +
+      (routeIndex + 1) + '</span><span><strong>' + h(financeCityLabel(city)) + '</strong><small>' + touristCount(participants.length) + ' · ' + applications + ' ' +
+      (applications === 1 ? 'заявка' : (applications >= 2 && applications <= 4 ? 'заявки' : 'заявок')) + '</small></span><b>›</b></button></div>';
+  }
+
   function stageSwitch() {
+    if (state.role === 'viewer' || state.role === 'escort') {
+      var guideStages = [
+        { id: 'arrival', label: 'Встреча' },
+        { id: 'hotel', label: 'Отель' },
+        { id: 'departure', label: 'Отъезд' },
+        { id: 'program', label: 'Программа' }
+      ];
+      return '<div class="stage-wrap guide-stage-wrap"><div class="segmented guide-stage-switch" role="tablist" aria-label="Задачи гида">' +
+        guideStages.map(function (item) {
+          var active = item.id === 'program' ? state.view === 'program' : state.view === 'operations' && state.stage === item.id;
+          return '<button type="button" role="tab" aria-selected="' + active + '" class="' + (active ? 'active' : '') +
+            '" data-action="guide-stage" data-stage="' + item.id + '">' + item.label + '</button>';
+        }).join('') + '</div></div>';
+    }
     return '<div class="stage-wrap"><div class="segmented" role="tablist" aria-label="Логистика по городу">' +
       Object.keys(stageMeta).map(function (stage) {
         return '<button type="button" role="tab" aria-selected="' + (state.stage === stage) + '" class="' + (state.stage === stage ? 'active' : '') +
           '" data-action="stage" data-stage="' + stage + '">' + stageMeta[stage].tab + '</button>';
       }).join('') + '</div></div>';
+  }
+
+  function guideOperationalCityButton() {
+    var city = currentGuideOperationalCity();
+    var route = guideOperationalRouteCities();
+    if (!city) return '';
+    var routePosition = route.findIndex(function (candidate) { return candidate.id === city.id; });
+    return '<div class="city-picker-wrap"><button type="button" class="city-picker-trigger" data-action="open-guide-city-picker"><span class="city-picker-index">' + (routePosition + 1) + '</span><span><strong>' + h(city.name) + '</strong><small>' + h(city.dates) + ' · ' + route.length + ' позиции маршрута</small></span><b>›</b></button></div>';
+  }
+
+  function guideOperationalCityMembers(city) {
+    if (!city) return [];
+    return currentTourists().filter(function (tourist) { return tourist.route.indexOf(city.id) !== -1; });
+  }
+
+  function guideOperationalMembers(operation, city) {
+    var members = currentTourists();
+    var routeCity = city || currentGuideOperationalCity();
+    return (operation.memberIndexes || []).map(function (index) { return members[index]; }).filter(function (tourist) {
+      return Boolean(tourist) && Boolean(routeCity) && tourist.route.indexOf(routeCity.id) !== -1;
+    });
+  }
+
+  function guideTouristOperations(tourist, city, stage) {
+    var routeMock = city && guideOperationalMock() && guideOperationalMock().route[city.id];
+    return (routeMock && routeMock[stage] || []).filter(function (operation) {
+      return guideOperationalMembers(operation, city).some(function (member) { return member.id === tourist.id; });
+    });
+  }
+
+  function guideTouristStageState(tourist, city, stage) {
+    var operations = guideTouristOperations(tourist, city, stage);
+    var completedStatus = { arrival: 'arrived', hotel: 'checked_in', departure: 'departed' }[stage];
+    var initialStatus = { arrival: 'expected', hotel: 'pending', departure: 'pending' }[stage];
+    var completed = operations.length > 0 && operations.every(function (operation) {
+      return guideOperationStatus(city.id, stage, operation.id) === completedStatus;
+    });
+    return {
+      completed: completed,
+      label: operations.length ? statusLabels[stage][completed ? completedStatus : initialStatus] : 'Нет задачи',
+      summary: operations.length ? operations.map(function (operation) { return operation.title; }).join(' · ') : 'Операция не назначена'
+    };
+  }
+
+  function guideTouristCompleted(tourist, city) {
+    return ['arrival', 'hotel', 'departure'].every(function (stage) { return guideTouristStageState(tourist, city, stage).completed; });
+  }
+
+  function guideOperationalTouristRoute(tourist) {
+    return guideOperationalRouteCities().filter(function (city) { return tourist.route.indexOf(city.id) !== -1; });
+  }
+
+  function canViewGuideOperationalTourist(tourist) {
+    var city = currentGuideOperationalCity();
+    return !usesGuideOperationalMock() || Boolean(tourist && city && tourist.route.indexOf(city.id) !== -1);
+  }
+
+  function guideOperationalCard(operation, index, city) {
+    var stage = state.stage;
+    var members = guideOperationalMembers(operation, city);
+    var status = guideOperationStatus(city.id, stage, operation.id);
+    var labels = statusLabels[stage] || {};
+    var completedStatus = { arrival: 'arrived', hotel: 'checked_in', departure: 'departed' }[stage];
+    var initialStatus = { arrival: 'expected', hotel: 'pending', departure: 'pending' }[stage];
+    var completed = status === completedStatus;
+    var visibleMembers = members.slice(0, 2).map(function (tourist) {
+      return memberRow(tourist, tourist.type);
+    }).join('');
+    if (members.length > 2) visibleMembers += '<div class="more-members more-members-static">Ещё ' + (members.length - 2) + '</div>';
+    var action = state.offline ? '<div class="readonly-card-note">Нет подключения. Статус доступен для чтения.</div>' :
+      '<div class="card-actions guide-operation-actions"><button type="button" class="secondary-button" data-action="guide-operation-status" data-city="' + h(city.id) + '" data-stage="' + h(stage) + '" data-operation="' + h(operation.id) + '" data-status="' + h(completed ? initialStatus : completedStatus) + '">' +
+      (completed ? 'Вернуть: ' + h(labels[initialStatus]) : 'Отметить: ' + h(labels[completedStatus])) + '</button></div>';
+    return '<article class="operation-card guide-operation-card" style="--group-color:' + ['#2f6bd8', '#6f52d9', '#1f8a50', '#a46c13'][index % 4] + '"><div class="card-head"><div class="time-block"><strong>' + h(operation.time) + '</strong><span>' + h(operation.date) + '</span></div>' +
+      '<div class="operation-main"><strong>' + icon(stage === 'hotel' ? 'hotel' : 'plane') + h(operation.title) + '</strong><span class="operation-level">' + h(stage === 'arrival' ? 'Встреча' : stageMeta[stage].tab) + ' · задача гида</span><span>' + h(operation.detail) + '</span></div><span class="count-pill">' + touristCount(members.length) + '</span></div>' +
+      '<div class="operation-meta"><span>' + h(city.name) + ' · ' + h(city.dates) + '</span><span>Статус: ' + h(labels[status]) + '</span></div><div class="divider"></div>' + visibleMembers + action + '</article>';
+  }
+
+  function guideOperationalView() {
+    var city = currentGuideOperationalCity();
+    var mock = guideOperationalMock();
+    var routeMock = city && mock && mock.route[city.id];
+    var operations = routeMock && routeMock[state.stage] || [];
+    var cards = operations.map(function (operation, index) { return guideOperationalCard(operation, index, city); }).join('');
+    if (!cards) cards = '<div class="empty-state">' + icon(state.stage === 'hotel' ? 'hotel' : 'plane') + '<strong>' + h(stageMeta[state.stage].empty) + '</strong><span>Менеджер ещё не добавил записи для этой остановки.</span></div>';
+    return statusBar() + topBar(selectedTourName(), selectedTour().dates + ' · ' + touristCount(currentTourists().length)) + roleBanner() + guideOperationalCityButton() + stageSwitch() +
+      '<main class="scroll"><div class="operation-toolbar"><div class="section-copy"><strong>' + h(state.stage === 'arrival' ? 'Встреча и прибытие' : stageMeta[state.stage].heading) + '</strong><span>' + h(city ? city.name : 'Маршрут не задан') + ' · ' + operations.length + ' ' + (operations.length === 1 ? 'запись' : 'записи') + '</span></div></div>' + cards + '</main>';
+  }
+
+  function guideOperationalProgramView() {
+    var mock = guideOperationalMock();
+    var days = mock && mock.program || [];
+    var cards = days.map(function (day) {
+      return '<article class="day-card"><div class="day-date"><strong>' + h(day.day) + '</strong><span>день</span></div><div class="day-copy"><strong>' + h(day.date) + '</strong><span>' + icon('pin') + h(day.city) + '</span><p>' + h(day.description) + '</p></div></article>';
+    }).join('');
+    return statusBar() + topBar(selectedTourName(), 'Программа · ' + days.length + ' опорных дней') + roleBanner() + stageSwitch() +
+      '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>Гид видит дату, город и план дня</span></div></div>' + (cards || '<div class="empty-state"><strong>Программа ещё не заполнена</strong></div>') + '</main>';
+  }
+
+  function guideTouristStatusGrid(tourist, city) {
+    var labels = { arrival: 'Встреча', hotel: 'Отель', departure: 'Отъезд' };
+    return '<div class="status-grid guide-tourist-statuses">' + ['arrival', 'hotel', 'departure'].map(function (stage) {
+      var status = guideTouristStageState(tourist, city, stage);
+      return '<div><span>' + labels[stage] + '</span><strong class="' + (status.completed ? 'completed' : 'attention') + '">' + h(status.label) + '</strong></div>';
+    }).join('') + '</div>';
+  }
+
+  function guideTouristCard(tourist, city) {
+    var contactActions = canViewContactFor(tourist) ? '<div class="card-actions"><button type="button" class="secondary-button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + 'Позвонить</button><button type="button" class="secondary-button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + 'Написать</button></div>' : '';
+    return '<article class="tourist-card guide-tourist-card"><button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(tourist.type) + ' · ' + h(globalGroupLabel(tourist)) + '</small><em>' + h(city.name) + ' · участник остановки</em></span><b>›</b></button>' + guideTouristStatusGrid(tourist, city) + contactActions + '</article>';
+  }
+
+  function filteredGuideOperationalTourists(city) {
+    var query = state.touristQuery.trim().toLowerCase();
+    return guideOperationalCityMembers(city).filter(function (tourist) {
+      var searchable = [tourist.name, tourist.phone, tourist.type, globalGroupLabel(tourist)].join(' ').toLowerCase();
+      if (query && searchable.indexOf(query) === -1) return false;
+      var completed = guideTouristCompleted(tourist, city);
+      if (state.guideTouristFilter === 'completed' && !completed) return false;
+      if (state.guideTouristFilter === 'attention' && completed) return false;
+      return true;
+    });
+  }
+
+  function guideOperationalTouristsView() {
+    var city = currentGuideOperationalCity();
+    var members = guideOperationalCityMembers(city);
+    var counts = { all: members.length, attention: 0, completed: 0 };
+    members.forEach(function (tourist) {
+      if (guideTouristCompleted(tourist, city)) counts.completed += 1;
+      else counts.attention += 1;
+    });
+    var visible = filteredGuideOperationalTourists(city);
+    var cards = visible.map(function (tourist) { return guideTouristCard(tourist, city); }).join('');
+    if (!cards) cards = '<div class="empty-state">' + icon('search') + '<strong>Туристы не найдены</strong><span>Измените запрос или покажите всех участников остановки.</span><button type="button" class="secondary-button empty-state-action" data-action="guide-tourist-filter" data-filter="all">Показать всех</button></div>';
+    var filters = [
+      { id: 'all', label: 'Все' },
+      { id: 'attention', label: 'Требуют внимания' },
+      { id: 'completed', label: 'Завершены' }
+    ];
+    return statusBar() + topBar(selectedTourName(), 'Туристы · ' + touristCount(members.length) + ' на остановке') + roleBanner() + guideOperationalCityButton() +
+      '<main class="scroll"><div class="tourist-search-row guide-tourist-search"><label class="search-box">' + icon('search') + '<input data-tourist-search value="' + h(state.touristQuery) + '" placeholder="ФИО, телефон, тип или группа"></label></div><div class="filter-tabs guide-tourist-filter-tabs" role="tablist" aria-label="Фильтр туристов остановки">' + filters.map(function (filter) {
+        return '<button type="button" role="tab" aria-selected="' + (state.guideTouristFilter === filter.id) + '" class="' + (state.guideTouristFilter === filter.id ? 'active' : '') + '" data-action="guide-tourist-filter" data-filter="' + filter.id + '">' + filter.label + ' · ' + counts[filter.id] + '</button>';
+      }).join('') + '</div><div class="section-row"><div class="section-copy"><strong>Участники остановки</strong><span>' + h(city ? city.name : 'Маршрут не задан') + ' · показано ' + visible.length + ' из ' + members.length + '</span></div></div>' + cards + '</main>';
   }
 
   function memberRow(tourist, note) {
@@ -1498,7 +2004,8 @@
   }
 
   function operationsView() {
-    if (state.summaryMode === 'coverage') return matrixSummaryView();
+    var guideShell = state.role === 'viewer' || state.role === 'escort';
+    if (!guideShell && state.summaryMode === 'coverage') return matrixSummaryView();
     var grouped = groupStageRecords(state.stage);
     var available = scopedTourists(false);
     var filled = available.length - grouped.free.length;
@@ -1517,7 +2024,8 @@
         grouped.free.length + ' из ' + available.length + ' туристов</span></div>' + freeAction + '</div>' +
         '<div class="free-list">' + grouped.free.map(function (tourist) { return memberRow(tourist, 'Нет записи для города'); }).join('') + '</div></section>';
     }
-    var shell = statusBar() + topBar(selectedTourName(), selectedTour().dates + ' · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() + stageSwitch();
+    var shell = statusBar() + topBar(selectedTourName(), selectedTour().dates + ' · ' + touristCount(currentTourists().length)) + roleBanner() +
+      (guideShell ? cityPickerButton() + stageSwitch() : workspaceTabs() + summaryTabs() + cityPickerButton() + stageSwitch());
     var preview = statePreview();
     if (preview) return shell + preview;
     var selectedScopeTourist = state.scopeLead ? currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead && canSeeSourceLeadFor(tourist); }) : null;
@@ -1526,7 +2034,7 @@
     var scopeControl = hasLimitedTouristPrivacy() ? '' : '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button>';
     var canAdd = capabilities().canEditLogistics && !state.offline && available.some(leadConfirmed);
     var addAction = canAdd ? '<button type="button" class="add-button compact-add" data-action="add-stage" aria-label="' + h(stageMeta[state.stage].add) + '">' + icon('plus') + '</button>' : '';
-    return shell + '<main class="scroll">' + summaryModeSwitch() + '<div class="operation-toolbar"><div class="section-copy"><strong>' + stageMeta[state.stage].heading + '</strong><span>' +
+    return shell + '<main class="scroll">' + (guideShell ? '' : summaryModeSwitch()) + '<div class="operation-toolbar"><div class="section-copy"><strong>' + stageMeta[state.stage].heading + '</strong><span>' +
       h(cityLabel(currentCity())) + ' · заполнено ' + filled + ' из ' + available.length + '</span></div>' + scopeControl + addAction + '</div>' + cards + free + '</main>';
   }
 
@@ -1598,6 +2106,7 @@
         if (hasLimitedTouristPrivacy() ? documentState.foreign.ready : documentState.ready) return false;
       }
       if (state.touristFilters.limitedRoute && tourist.route.length >= cities.length) return false;
+      if (state.touristFilters.debt && (!canViewFinance() || paymentPresentation(tourist).kind !== 'due')) return false;
       if (state.touristFilters.type !== 'all' && tourist.type !== state.touristFilters.type) return false;
       if (state.touristFilters.group === 'grouped' && !tourist.groupId) return false;
       if (state.touristFilters.group === 'free' && tourist.groupId) return false;
@@ -1618,7 +2127,9 @@
     var subtitle = restricted ? tourist.type + ' · ' + globalGroupLabel(tourist) : tourist.type + ' · ' + tourist.lead;
     var readinessBadges = operationalOnly ? '<span class="group-pill">Участие · ' + h(tourist.tourStatus) + '</span>' : '<span class="readiness-pill ' + readinessClass(personal.ready) + '">' + h(personal.ready ? 'Данные готовы' : 'Дозаполнить данные') + '</span><span class="readiness-pill ' + readinessClass(visibleDocuments.ready, visibleDocuments.expiring) + '">' + h(visibleDocuments.label) + '</span>';
     var contactActions = canViewContactFor(tourist) ? '<div class="card-actions"><button type="button" class="secondary-button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + 'Позвонить</button><button type="button" class="secondary-button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + 'Написать</button></div>' : '';
-    return '<article class="tourist-card"><button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(subtitle) + '</small><em>Группа тура · ' + h(globalGroupLabel(tourist)) + '</em></span><b>›</b></button><div class="tourist-card-badges">' + primary + readinessBadges + '</div><div class="tourist-next"><span><strong>' + h(cityLabel(currentCity())) + '</strong><small>Логистика · ' + filled + ' из 3</small></span><span class="status-chip">' + h(statusLabel(tourist, currentCity().id, state.stage)) + '</span></div>' + contactActions + '</article>';
+    var payment = canViewFinance() ? paymentPresentation(tourist) : null;
+    var paymentLine = payment ? '<div class="tourist-payment"><span>Оплата</span><strong style="color:' + h(payment.color) + '">' + h(payment.list) + '</strong></div>' : '';
+    return '<article class="tourist-card"><button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(subtitle) + '</small><em>Группа тура · ' + h(globalGroupLabel(tourist)) + '</em></span><b>›</b></button><div class="tourist-card-badges">' + primary + readinessBadges + '</div>' + paymentLine + '<div class="tourist-next"><span><strong>' + h(cityLabel(currentCity())) + '</strong><small>Логистика · ' + filled + ' из 3</small></span><span class="status-chip">' + h(statusLabel(tourist, currentCity().id, state.stage)) + '</span></div>' + contactActions + '</article>';
   }
 
   function touristFilterChips() {
@@ -1626,6 +2137,7 @@
     if (state.touristFilters.needsData) chips.push('<button data-action="quick-filter" data-filter="needsData">Не заполнены данные ×</button>');
     if (state.touristFilters.documentIssue) chips.push('<button data-action="quick-filter" data-filter="documentIssue">Проблемы с документами ×</button>');
     if (state.touristFilters.limitedRoute) chips.push('<button data-action="quick-filter" data-filter="limitedRoute">Ограниченный маршрут ×</button>');
+    if (state.touristFilters.debt) chips.push('<button data-action="quick-filter" data-filter="debt">С долгом ×</button>');
     if (state.touristFilters.type !== 'all') chips.push('<button data-action="clear-type-filter">' + h(state.touristFilters.type) + ' ×</button>');
     if (state.touristFilters.group !== 'all') chips.push('<button data-action="clear-group-filter">' + (state.touristFilters.group === 'grouped' ? 'В группе' : 'Без группы') + ' ×</button>');
     if (state.touristFilters.status !== 'all') chips.push('<button data-action="clear-status-filter">' + h(statusLabels[state.stage][state.touristFilters.status]) + ' ×</button>');
@@ -1654,7 +2166,8 @@
     if (!cards) cards = '<div class="empty-state">' + icon('search') + '<strong>Ничего не найдено</strong><span>Измените запрос или сбросьте фильтры.</span><button type="button" class="secondary-button empty-state-action" data-action="reset-tourist-filters">Сбросить фильтры</button></div>';
     var scopeControl = limitedPrivacy ? '' : '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + (state.scopeLead ? 'Этот лид' : 'Весь тур') + '</button>';
     var searchPlaceholder = limitedPrivacy ? 'ФИО, телефон, тип или группа' : 'ФИО, телефон, лид или группа';
-    return statusBar() + topBar(selectedTourName(), 'Туристы · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() +
+    var guideShell = state.role === 'viewer' || state.role === 'escort';
+    return statusBar() + topBar(selectedTourName(), 'Туристы · ' + touristCount(currentTourists().length)) + roleBanner() + (guideShell ? cityPickerButton() : workspaceTabs() + summaryTabs() + cityPickerButton()) +
       '<main class="scroll"><div class="tourist-search-row"><label class="search-box">' + icon('search') + '<input data-tourist-search value="' + h(state.touristQuery) + '" placeholder="' + h(searchPlaceholder) + '"></label><button type="button" class="filter-button" data-action="tourist-filters" aria-label="Фильтры">' + icon('filter') + '</button></div>' + touristFilterChips() + '<div class="summary-tools"><div class="mini-switch"><button class="' + (state.touristListMode === 'list' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="list">Список</button><button class="' + (state.touristListMode === 'groups' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="groups">По группам</button></div>' + scopeControl + '</div><div class="section-row"><div class="section-copy"><strong>Участники тура</strong><span>' + touristCount(visible.length) + ' найдено</span></div>' + (capabilities().canGroup && !state.offline ? '<button type="button" class="add-button" data-action="start-tourist-group">' + icon('users') + 'Группа</button>' : '') + '</div>' + cards + '</main>';
   }
 
@@ -1753,11 +2266,13 @@
 
   function programView() {
     var canManage = capabilities().canManageProgram && !state.offline;
+    var guideShell = state.role === 'viewer' || state.role === 'escort';
+    var programShell = statusBar() + topBar(selectedTourName(), 'Программа тура') + (guideShell ? roleBanner() + stageSwitch() : workspaceTabs());
     var visibleProgramDays = state.role === 'viewer' ? programDays.filter(function (day) {
       return cities[day.cityIdx] && canViewRouteCity(cities[day.cityIdx].id);
     }) : programDays;
     if (!visibleProgramDays.length) {
-      return statusBar() + topBar(selectedTourName(), 'Программа тура') + workspaceTabs() + '<main class="scroll"><div class="empty-state">' + icon('tours') + '<strong>Программа ещё не сформирована</strong><span>Дни создаются автоматически из дат тура. Вручную добавлять и удалять отдельные дни нельзя.</span>' + (canManage ? '<button type="button" class="primary-button empty-state-action" data-action="generate-program">Сформировать программу</button>' : '') + '</div></main>';
+      return programShell + '<main class="scroll"><div class="empty-state">' + icon('tours') + '<strong>Программа ещё не сформирована</strong><span>Дни создаются автоматически из дат тура. Вручную добавлять и удалять отдельные дни нельзя.</span>' + (canManage ? '<button type="button" class="primary-button empty-state-action" data-action="generate-program">Сформировать программу</button>' : '') + '</div></main>';
     }
     var days = visibleProgramDays.map(function (day) {
       var index = programDays.indexOf(day);
@@ -1765,7 +2280,7 @@
     }).join('');
     var programActions = canManage ? '<div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>Даты заданы туром; редактируются город и описание</span></div></div><div class="tool-grid two-tools"><button data-action="regenerate-program"><strong>Пересоздать</strong><span>Сформировать заново по датам</span></button><button class="danger-tool" data-action="clear-program"><strong>Очистить</strong><span>Удалить всю программу</span></button></div>' :
       '<div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>По дням и городам маршрута</span></div></div><div class="form-note">Режим просмотра. Изменять программу могут менеджер и администратор тура.</div>';
-    return statusBar() + topBar(selectedTourName(), 'Программа · ' + visibleProgramDays.length + ' дней') + workspaceTabs() +
+    return (guideShell ? statusBar() + topBar(selectedTourName(), 'Программа · ' + visibleProgramDays.length + ' дней') + roleBanner() + stageSwitch() : statusBar() + topBar(selectedTourName(), 'Программа · ' + visibleProgramDays.length + ' дней') + workspaceTabs()) +
       '<main class="scroll">' + programActions + days + '</main>';
   }
 
@@ -1829,6 +2344,45 @@
     return statusBar() + topBar(tour.name, 'Действия с туром') + workspaceTabs() + '<main class="scroll">' + (canManage ? '' : '<div class="form-note">Режим просмотра. Изменять тур могут менеджер и администратор.</div>') + '<div class="action-menu">' + rows + '</div></main>';
   }
 
+  function financeView() {
+    normalizeFinanceRouteCity();
+    var rows = buildFinanceRows();
+    var activeFinanceCity = currentFinanceCity();
+    financeActionRegistry = {};
+    var totals = ['₽', '¥', '€', '$'].map(function (symbol) {
+      var amount = rows.reduce(function (sum, row) { return sum + (row.balance && row.balance.symbol === symbol ? row.balance.amount : 0); }, 0);
+      if (!amount) return '';
+      return '<article class="finance-total"><span>Остаток по оплате</span><strong>− ' + h(new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 2 }).format(amount)) + ' ' + h(symbol) + '</strong></article>';
+    }).join('');
+    var cards = rows.map(function (row, rowIndex) {
+      var paid = row.collected || !row.balance;
+      var members = row.members.map(function (member) {
+        return '<div class="finance-member"><span class="avatar">' + h(member.initials) + '</span><strong>' + h(member.name) + '</strong>' + (member.id === row.payerId ? '<em>Плательщик</em>' : '') + '</div>';
+      }).join('');
+      var action = '';
+      if (row.leadId && !state.offline) {
+        var targetCollection = row.collected ? 'false' : (row.balance ? 'true' : null);
+        if (targetCollection) {
+          financeActionCounter += 1;
+          var financeActionKey = 'finance-action-' + financeActionCounter;
+          financeActionRegistry[financeActionKey] = {
+            tourId: state.selectedTourId,
+            routeCityId: activeFinanceCity && activeFinanceCity.id,
+            leadId: row.leadId,
+            collected: targetCollection
+          };
+          action = row.collected ? '<button type="button" class="secondary-button full-button" data-action="finance-collection" data-finance-action="' + financeActionKey + '" data-collected="false">Отменить действие</button>' :
+            '<button type="button" class="primary-button full-button" data-action="finance-collection" data-finance-action="' + financeActionKey + '" data-collected="true">Оплачен</button>';
+        }
+      }
+      return '<article class="finance-card"><div class="finance-card-head"><span><strong>Заявка</strong><small>' + touristCount(row.members.length) + '</small></span><span><small>Остаток по оплате</small><strong class="' + (paid ? 'paid' : 'due') + '">' + (paid ? 'Полностью оплачено' : '− ' + h(row.balance.formatted) + ' ' + h(row.balance.symbol)) + '</strong></span></div><div class="finance-members">' + members + '</div>' + action + '</article>';
+    }).join('');
+    var cityContext = financeCityPickerButton();
+    var note = state.offline ? '<div class="system-banner offline"><span><strong>Нет подключения</strong><small>Остатки доступны для чтения; отметка оплаты заблокирована.</small></span></div>' :
+      '<div class="form-note">Один остаток относится ко всей заявке. Плательщик выбирается из основного туриста лида; остальные участники показаны внутри той же карточки.</div>';
+    return statusBar() + topBar(selectedTourName(), 'Финансы · остатки по оплате') + roleBanner() + cityContext + '<main class="scroll finance-scroll"><div class="section-row"><div class="section-copy"><strong>Финансы</strong><span>Остаток по оплате</span></div></div>' + note + (totals ? '<div class="finance-totals">' + totals + '</div>' : '') + (cards || '<div class="empty-state"><strong>Нет данных по остаткам оплаты</strong><span>Для выбранной позиции маршрута нет заявок.</span></div>') + '</main>';
+  }
+
   function unsupportedTourView() {
     var tour = selectedTour();
     var members = currentTourists().map(function (tourist) {
@@ -1847,14 +2401,17 @@
   }
 
   function bottomNav() {
+    var guideShell = state.role === 'viewer' || state.role === 'escort';
     var items = [
-      { id: 'tour-info', label: 'Туры', icon: 'tours' },
+      guideShell ? { id: 'operations', label: 'Задачи', icon: 'tasks' } : { id: 'tour-info', label: 'Туры', icon: 'tours' },
       { id: 'tourists', label: 'Туристы', icon: 'users' }
     ];
+    if (canViewFinance()) items.push({ id: 'finance', label: 'Финансы', icon: 'finance' });
     if (state.role === 'admin' || state.role === 'manager') items.push({ id: 'leads', label: 'Лиды', icon: 'leads' });
     return '<nav class="bottom-nav" aria-label="Основная навигация">' + items.map(function (item) {
       var tourViews = ['operations', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions'];
-      var active = (item.id === 'tour-info' && tourViews.indexOf(state.view) !== -1) || item.id === state.view;
+      var active = (item.id === 'tour-info' && tourViews.indexOf(state.view) !== -1) ||
+        (item.id === 'operations' && ['operations', 'work', 'program'].indexOf(state.view) !== -1) || item.id === state.view;
       var action = item.id === 'leads' ? 'open-leads' : 'nav';
       return '<button type="button" class="nav-item ' + (active ? 'active' : '') + '" data-action="' + action + '" data-view="' + item.id + '">' +
         icon(item.icon) + '<span>' + item.label + '</span></button>';
@@ -2164,10 +2721,10 @@
   }
 
   function toursScreen(overlay) {
-    var labels = { active: 'Активные', draft: 'Черновики', archive: 'Архив' };
+    var labels = { all: 'Все', active: 'Активные', draft: 'Черновики', archive: 'Архив' };
     var query = state.tourQuery.trim().toLowerCase();
     var filtered = tours.filter(function (tour) {
-      var matchesStatus = state.tourFilter === 'archive' ? (tour.isArchived || tour.status === 'archive' || tour.status === 'cancelled') :
+      var matchesStatus = state.tourFilter === 'all' ? true : state.tourFilter === 'archive' ? (tour.isArchived || tour.status === 'archive' || tour.status === 'cancelled') :
         (!tour.isArchived && tour.status === state.tourFilter);
       return canViewTourId(tour.id) && matchesStatus && (!query || [tour.name, tour.route, tour.guides].join(' ').toLowerCase().indexOf(query) !== -1);
     });
@@ -2221,7 +2778,7 @@
 
   function touristDetailScreen(overlay) {
     var tourist = touristById(overlay.touristId);
-    if (!canViewTouristForSelectedTour(tourist)) return unavailableTouristScreen();
+    if (!canViewTouristForSelectedTour(tourist) || !canViewGuideOperationalTourist(tourist)) return unavailableTouristScreen();
     var personal = personalReadiness(tourist);
     var documents = documentReadiness(tourist);
     var domestic = documents.domestic;
@@ -2254,9 +2811,16 @@
     }).join('');
     var documentActions = canManageDocumentsFor(tourist) && !state.offline ? '<div class="document-actions"><button type="button" data-action="add-scan" data-id="' + tourist.id + '">' + icon('camera') + '<span>Сфотографировать</span></button><button type="button" data-action="upload-scan" data-id="' + tourist.id + '">' + icon('upload') + '<span>Выбрать файл</span></button><button type="button" data-action="open-ocr-review" data-id="' + tourist.id + '">' + icon('document') + '<span>Запустить OCR</span></button></div>' : '';
     var foreignContent = profileValue('ФИО латиницей', tourist.latinName) + profileValue('Номер', tourist.passport) + profileValue('Годен до', tourist.passportExpiry) + (scans || '<div class="empty-inline">Сканы не загружены</div>') + documentActions;
-    var logisticsContent = visibleRouteCities().filter(function (city) { return tourist.route.indexOf(city.id) !== -1; }).map(function (city) {
-      var routePosition = cities.indexOf(city);
+    var guideMockDetail = usesGuideOperationalMock();
+    var allowedRouteCities = guideMockDetail ? guideOperationalTouristRoute(tourist) : (limitedPrivacy ? visibleRouteCities() : cities).filter(function (city) { return tourist.route.indexOf(city.id) !== -1; });
+    var logisticsContent = allowedRouteCities.map(function (city, allowedIndex) {
+      var routePosition = guideMockDetail ? guideOperationalRouteCities().indexOf(city) : cities.indexOf(city);
       var rows = ['arrival', 'hotel', 'departure'].map(function (stage) {
+        if (guideMockDetail) {
+          var guideStatus = guideTouristStageState(tourist, city, stage);
+          var guideStageLabel = stage === 'arrival' ? 'Встреча' : stageMeta[stage].tab;
+          return '<div class="profile-operation guide-profile-operation"><span><strong>' + h(guideStageLabel) + '</strong><small>' + h(guideStatus.summary) + '</small></span><span><em>Задача гида</em><small>' + h(guideStatus.label) + '</small></span><b>' + (guideStatus.completed ? '✓' : '•') + '</b></div>';
+        }
         var own = ownRecordAt(city.id, stage, tourist.id);
         var effective = effectiveRecordAt(city.id, stage, tourist.id);
         var origin = operationOriginAt(city.id, stage, tourist.id);
@@ -2265,12 +2829,11 @@
         var ownAction = canEditOwn ? '<button type="button" class="text-button" data-action="edit-own-operation" data-id="' + tourist.id + '" data-route-city-id="' + city.id + '" data-stage="' + stage + '">Изменить личную запись</button>' : '';
         return '<button type="button" class="profile-operation" data-action="jump-profile-operation" data-id="' + tourist.id + '" data-route-city-id="' + city.id + '" data-stage="' + stage + '"><span><strong>' + h(stageMeta[stage].tab) + '</strong><small>' + h(recordSummary(effective, stage)) + '</small></span><span><em>' + h(origin.label) + '</em>' + (ownDiffers ? '<small>Личная: ' + h(recordSummary(own, stage)) + '</small>' : '') + '</span><b>›</b></button>' + ownAction;
       }).join('');
-      return '<section class="route-city-card"><div><strong>' + h(cityLabel(city)) + '</strong><span>' + h(city.dates) + ' · остановка ' + (routePosition + 1) + '</span></div>' + rows + '</section>';
+      return '<section class="route-city-card"><div><strong>' + h(guideMockDetail ? city.name : cityLabel(city)) + '</strong><span>' + h(city.dates) + ' · остановка ' + (routePosition >= 0 ? routePosition + 1 : allowedIndex + 1) + '</span></div>' + rows + '</section>';
     }).join('');
     var settingsContent = limitedPrivacy ? profileValue('Тип туриста', tourist.type) :
       profileValue('Тип туриста', tourist.type) + profileValue('Основной турист в лиде', tourist.isPrimary ? 'Да' : 'Нет') + profileValue('Примечание', tourist.notes, true);
-    var allowedRouteCities = (limitedPrivacy ? visibleRouteCities() : cities).filter(function (city) { return tourist.route.indexOf(city.id) !== -1; });
-    var routeContextLabel = allowedRouteCities.map(cityLabel).join(' → ') || 'Нет доступных остановок';
+    var routeContextLabel = allowedRouteCities.map(function (city) { return guideMockDetail ? city.name : cityLabel(city); }).join(' → ') || 'Нет доступных остановок';
     var tourContextContent = profileValue('Комментарий для гида', tourist.guideComment) +
       (restrictedContext ? '' : profileValue('Исходный лид', tourist.lead) + profileValue('Статус лида', tourist.leadStatus)) +
       profileValue('Выбранный тур', selectedTourName()) +
@@ -2283,7 +2846,9 @@
     var editButton = canEditProfileFor(tourist) && !state.offline ? '<button type="button" class="icon-button" data-action="edit-profile-section" data-id="' + tourist.id + '" data-section="personal" aria-label="Изменить личные данные">' + icon('edit') + '</button>' : '';
     var deleteButton = capability.canDelete && !state.offline ? '<button type="button" class="danger-button full-button" data-action="delete-tourist" data-id="' + tourist.id + '">Удалить туриста</button>' : '';
 
-    var statusSummary = tourHasOperationalModel(state.selectedTourId) ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(cityLabel(currentCity())) + '</span></div><div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Заселение</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены в MVP.</div>';
+    var guideDetailCity = guideMockDetail ? currentGuideOperationalCity() : null;
+    var statusSummary = guideMockDetail && guideDetailCity ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(guideDetailCity.name) + '</span></div>' + guideTouristStatusGrid(tourist, guideDetailCity) :
+      (tourHasOperationalModel(state.selectedTourId) ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(cityLabel(currentCity())) + '</span></div><div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Заселение</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены в MVP.</div>');
     var detailTabs = '<div class="profile-tabs"><button type="button" class="' + (detailTab === 'profile' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="profile">Профиль</button><button type="button" class="' + (detailTab === 'tour' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="tour">В туре</button></div>';
     var profileSections = section('personal', 'Личные данные', personal.label, personalContent, true) +
       (limitedPrivacy ? '' : section('citizenship', 'Гражданство', tourist.citizenship || 'Не заполнено', citizenshipContent, true)) +
@@ -2298,8 +2863,10 @@
     var attentionDetails = [!limitedPrivacy && domestic.category === 'missing' ? domestic.label : '', foreign.category === 'missing' ? foreign.issue : ''].filter(Boolean).join(' · ');
     var profileBody = operationalOnly ? '<div class="empty-state error-state">' + icon('alert') + '<strong>Профиль недоступен</strong><span>Исходный лид не назначен текущему менеджеру. Вкладка «В туре» сохраняет доступ к операционным данным без раскрытия контактов и документов.</span></div>' :
       ((attentionCount ? '<div class="attention-card">' + icon('alert') + '<span><strong>Есть незаполненные необязательные данные</strong><small>' + h(attentionDetails) + '</small></span></div>' : '<div class="success-note">Обязательные поля профиля заполнены.</div>') + '<div class="quick-actions"><button type="button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + '<span>Позвонить</span></button><button type="button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + '<span>Написать</span></button><button type="button" data-action="copy-tourist-contact" data-id="' + tourist.id + '">' + icon('document') + '<span>Копировать</span></button></div>' + profileSections);
+    var payment = canViewFinance() ? paymentPresentation(tourist) : null;
+    var financeDetail = payment ? '<article class="tourist-finance-detail"><span><small>' + (payment.kind === 'due' || payment.kind === 'paid' ? 'Остаток оплаты' : 'Оплата') + '</small><strong style="color:' + h(payment.color) + '">' + h(payment.detail) + '</strong></span><em>' + h(tourist.leadStatus) + '</em></article>' : '';
 
-    return '<section class="screen"><header class="screen-header"><button type="button" class="back-button" data-action="close-overlay" aria-label="Назад">' + icon('back') + '</button><div class="screen-title"><strong>' + h(tourist.name) + '</strong><span>' + h(identitySubtitle) + '</span></div>' + editButton + '</header>' + detailTabs + '<div class="screen-scroll profile-scroll">' + (canEditProfileFor(tourist) ? '' : roleBanner(tourist)) + '<div class="person-hero profile-hero"><span class="avatar dark">' + h(tourist.initials) + '</span><div><strong>' + h(tourist.name) + '</strong><span>' + h(heroSubtitle) + '</span></div></div>' + profileBadges + (detailTab === 'profile' ? profileBody : tourSections) + deleteButton + '</div></section>';
+    return '<section class="screen"><header class="screen-header"><button type="button" class="back-button" data-action="close-overlay" aria-label="Назад">' + icon('back') + '</button><div class="screen-title"><strong>' + h(tourist.name) + '</strong><span>' + h(identitySubtitle) + '</span></div>' + editButton + '</header>' + detailTabs + '<div class="screen-scroll profile-scroll">' + (canEditProfileFor(tourist) ? '' : roleBanner(tourist)) + '<div class="person-hero profile-hero"><span class="avatar dark">' + h(tourist.initials) + '</span><div><strong>' + h(tourist.name) + '</strong><span>' + h(heroSubtitle) + '</span></div></div>' + profileBadges + (detailTab === 'profile' ? profileBody : tourSections) + financeDetail + deleteButton + '</div></section>';
   }
 
   function profileEditScreen(overlay) {
@@ -2409,6 +2976,36 @@
     return '<section class="screen">' + screenHeader('Выберите город', 'Позиции маршрута не объединяются по названию') + '<div class="screen-scroll"><div class="form-note">Повторяющийся город сохраняет отдельный routeCityId и собственные операции.</div>' + rows + '</div></section>';
   }
 
+  function guideOperationalCityPickerScreen() {
+    var current = currentGuideOperationalCity();
+    var mock = guideOperationalMock();
+    var rows = guideOperationalRouteCities().map(function (city, index) {
+      var routeMock = mock && mock.route[city.id];
+      var counts = ['arrival', 'hotel', 'departure'].map(function (stage) {
+        return (stage === 'arrival' ? 'Встреча' : stageMeta[stage].tab) + ' ' + ((routeMock && routeMock[stage] || []).length);
+      }).join(' · ');
+      return '<button type="button" class="route-stop ' + (current && current.id === city.id ? 'active' : '') + '" data-action="select-guide-city" data-city="' + h(city.id) + '"><span class="route-stop-index">' + (index + 1) + '</span><span><strong>' + h(city.name) + '</strong><small>' + h(city.dates) + '</small><em>' + h(counts) + '</em></span><b>' + (current && current.id === city.id ? icon('check') : '›') + '</b></button>';
+    }).join('');
+    return '<section class="screen">' + screenHeader('Выберите город', 'Задачи гида по маршруту') + '<div class="screen-scroll"><div class="form-note">Каждая остановка хранит свои встречи, размещение и отъезд.</div>' + rows + '</div></section>';
+  }
+
+  function financeCityPickerScreen() {
+    var activeCity = normalizeFinanceRouteCity();
+    var rows = financeRouteCities().map(function (city, index) {
+      var members = currentTourists().filter(function (tourist) { return tourist.route.indexOf(city.id) !== -1; });
+      var applications = new Set(members.map(function (tourist) {
+        return tourist.leadId || tourist.contactLeadId || tourist.groupId || tourist.dealId || tourist.id;
+      })).size;
+      var active = activeCity && activeCity.id === city.id;
+      var detail = touristCount(members.length) + ' · ' + applications + ' ' + (applications === 1 ? 'заявка' : (applications >= 2 && applications <= 4 ? 'заявки' : 'заявок'));
+      return '<button type="button" class="route-stop ' + (active ? 'active' : '') + '" data-action="select-finance-city" data-route-city-id="' + h(city.id) + '"><span class="route-stop-index">' +
+        (index + 1) + '</span><span><strong>' + h(financeCityLabel(city)) + '</strong><small>' + h(city.dates || selectedTour().dates || '') + '</small><em>' + h(detail) + '</em></span><b>' +
+        (active ? icon('check') : '›') + '</b></button>';
+    }).join('');
+    return '<section class="screen">' + screenHeader('Выберите город', 'Финансы выбранной позиции маршрута') + '<div class="screen-scroll"><div class="form-note">Суммы и заявки пересчитываются только по туристам, которые едут через выбранную позицию маршрута.</div>' +
+      (rows || '<div class="empty-state"><strong>Маршрут не указан</strong><span>Добавьте позиции маршрута в карточке тура.</span></div>') + '</div></section>';
+  }
+
   function roleMenuScreen() {
     var rows = ['admin', 'manager', 'escort', 'viewer'].map(function (role) {
       return '<button type="button" class="source-card ' + (state.role === role ? 'active' : '') + '" data-action="select-role" data-role="' + role + '"><span class="radio"></span><span class="member-copy"><strong>' + h(roleLabels[role]) + '</strong><span>' + h(role === 'admin' ? 'Все действия и удаление' : role === 'manager' ? 'Профиль, логистика и группы' : role === 'escort' ? 'Read-only профиль, статусы всего тура' : 'Read-only профиль, статусы назначенных городов') + '</span></span></button>';
@@ -2421,7 +3018,8 @@
     var types = ['all', 'Взрослый', 'Ребёнок', 'Младенец'];
     var groups = [['all','Все'],['grouped','В группе'],['free','Без группы']];
     var statuses = [['all', 'Все']].concat(Object.keys(statusLabels[state.stage]).map(function (status) { return [status, statusLabels[state.stage][status]]; }));
-    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><section class="sheet"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>Фильтры туристов</strong><span>Текущий тур · ' + h(cityLabel(currentCity())) + '</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><div class="filter-toggle-list"><button type="button" class="' + (state.touristFilters.needsData ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="needsData"><span class="check">' + icon('check') + '</span><span><strong>Не заполнены данные</strong><small>ФИО, дата рождения и обязательные контакты</small></span></button><button type="button" class="' + (state.touristFilters.documentIssue ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="documentIssue"><span class="check">' + icon('check') + '</span><span><strong>Проблема с документами</strong><small>Не заполнено или скоро истекает</small></span></button><button type="button" class="' + (state.touristFilters.limitedRoute ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="limitedRoute"><span class="check">' + icon('check') + '</span><span><strong>Ограниченный маршрут</strong><small>Турист едет не по всем остановкам тура</small></span></button></div><div class="selection-head"><strong>Тип туриста</strong></div><div class="choice-chips">' + types.map(function (type) { return '<button type="button" class="' + (state.touristFilters.type === type ? 'active' : '') + '" data-action="set-type-filter" data-type="' + type + '">' + (type === 'all' ? 'Все' : type) + '</button>'; }).join('') + '</div><div class="selection-head"><strong>Группа тура</strong></div><div class="choice-chips">' + groups.map(function (group) { return '<button type="button" class="' + (state.touristFilters.group === group[0] ? 'active' : '') + '" data-action="set-group-filter" data-group="' + group[0] + '">' + group[1] + '</button>'; }).join('') + '</div><div class="selection-head"><strong>Статус · ' + h(stageMeta[state.stage].tab) + '</strong></div><div class="choice-chips">' + statuses.map(function (status) { return '<button type="button" class="' + (state.touristFilters.status === status[0] ? 'active' : '') + '" data-action="set-status-filter" data-status="' + status[0] + '">' + h(status[1]) + '</button>'; }).join('') + '</div></div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="reset-tourist-filters">Сбросить</button><button type="button" class="primary-button blue" data-action="close-overlay">Показать</button></footer></section></div>';
+    var debtFilter = canViewFinance() ? '<button type="button" class="' + (state.touristFilters.debt ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="debt"><span class="check">' + icon('check') + '</span><span><strong>С долгом</strong><small>Показывает плательщиков с непогашенным остатком</small></span></button>' : '';
+    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><section class="sheet"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>Фильтры туристов</strong><span>Текущий тур · ' + h(cityLabel(currentCity())) + '</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><div class="filter-toggle-list"><button type="button" class="' + (state.touristFilters.needsData ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="needsData"><span class="check">' + icon('check') + '</span><span><strong>Не заполнены данные</strong><small>ФИО, дата рождения и обязательные контакты</small></span></button><button type="button" class="' + (state.touristFilters.documentIssue ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="documentIssue"><span class="check">' + icon('check') + '</span><span><strong>Проблема с документами</strong><small>Не заполнено или скоро истекает</small></span></button><button type="button" class="' + (state.touristFilters.limitedRoute ? 'active' : '') + '" data-action="toggle-tourist-filter" data-filter="limitedRoute"><span class="check">' + icon('check') + '</span><span><strong>Ограниченный маршрут</strong><small>Турист едет не по всем остановкам тура</small></span></button>' + debtFilter + '</div><div class="selection-head"><strong>Тип туриста</strong></div><div class="choice-chips">' + types.map(function (type) { return '<button type="button" class="' + (state.touristFilters.type === type ? 'active' : '') + '" data-action="set-type-filter" data-type="' + type + '">' + (type === 'all' ? 'Все' : type) + '</button>'; }).join('') + '</div><div class="selection-head"><strong>Группа тура</strong></div><div class="choice-chips">' + groups.map(function (group) { return '<button type="button" class="' + (state.touristFilters.group === group[0] ? 'active' : '') + '" data-action="set-group-filter" data-group="' + group[0] + '">' + group[1] + '</button>'; }).join('') + '</div><div class="selection-head"><strong>Статус · ' + h(stageMeta[state.stage].tab) + '</strong></div><div class="choice-chips">' + statuses.map(function (status) { return '<button type="button" class="' + (state.touristFilters.status === status[0] ? 'active' : '') + '" data-action="set-status-filter" data-status="' + status[0] + '">' + h(status[1]) + '</button>'; }).join('') + '</div></div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="reset-tourist-filters">Сбросить</button><button type="button" class="primary-button blue" data-action="close-overlay">Показать</button></footer></section></div>';
   }
 
   function statusMenuScreen(overlay) {
@@ -2521,6 +3119,8 @@
     if (overlay.kind === 'bulk-tourists') return bulkTouristsScreen(overlay);
     if (overlay.kind === 'scope-select') return scopeSelectScreen();
     if (overlay.kind === 'city-picker') return cityPickerScreen();
+    if (overlay.kind === 'guide-city-picker') return guideOperationalCityPickerScreen();
+    if (overlay.kind === 'finance-city-picker') return financeCityPickerScreen();
     if (overlay.kind === 'role-menu') return roleMenuScreen();
     if (overlay.kind === 'tourist-filters') return touristFiltersScreen();
     if (overlay.kind === 'status-menu') return statusMenuScreen(overlay);
@@ -2545,6 +3145,8 @@
 
   function render() {
     normalizeCityForRole();
+    normalizeGuideOperationalCity();
+    if (state.view === 'finance' && !canViewFinance()) state.view = (state.role === 'viewer' || state.role === 'escort') ? 'operations' : 'tour-info';
     var views = {
       operations: operationsView,
       tourists: touristsView,
@@ -2554,11 +3156,16 @@
       'tour-info': tourInfoView,
       'tour-team': tourTeamView,
       'tour-tasks': tourTasksView,
-      'tour-actions': tourActionsView
+      'tour-actions': tourActionsView,
+      finance: financeView
     };
     var tourVisible = canViewSelectedTour();
-    var nonOperationalViews = ['tour-info', 'tour-team', 'tour-actions'];
-    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || tourInfoView) : (nonOperationalViews.indexOf(state.view) !== -1 ? (views[state.view] || tourInfoView) : unsupportedTourView));
+    var nonOperationalViews = ['tour-info', 'tour-team', 'tour-actions', 'finance'];
+    var guideMockViews = { operations: guideOperationalView, program: guideOperationalProgramView, tourists: guideOperationalTouristsView };
+    var guideMockView = guideMockViews[state.view];
+    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || tourInfoView) :
+      (usesGuideOperationalMock() && guideMockView ? guideMockView :
+        (nonOperationalViews.indexOf(state.view) !== -1 ? (views[state.view] || tourInfoView) : unsupportedTourView)));
     var overlaySafeWithoutTour = state.overlay && ['role-menu', 'tours'].indexOf(state.overlay.kind) !== -1;
     root.innerHTML = '<div class="app">' + view() +
       bottomNav() + (tourVisible || overlaySafeWithoutTour ? renderOverlay() : '') + (state.toast ? '<div class="toast ' + h(state.toastKind) + '" role="status" aria-live="polite">' + icon(state.toastKind === 'error' ? 'alert' : 'success') + '<span>' + h(state.toast) + '</span></div>' : '') + '</div>';
@@ -3220,8 +3827,74 @@
       render();
       return;
     }
+    if (action === 'guide-stage') {
+      var guideStage = button.dataset.stage;
+      if (guideStage === 'program') {
+        state.view = 'program';
+      } else if (['arrival', 'hotel', 'departure'].indexOf(guideStage) !== -1) {
+        state.stage = guideStage;
+        state.view = 'operations';
+      }
+      state.overlay = null;
+      render();
+      return;
+    }
+    if (action === 'guide-tourist-filter') {
+      if (!usesGuideOperationalMock() || ['all', 'attention', 'completed'].indexOf(button.dataset.filter) === -1) return;
+      state.guideTouristFilter = button.dataset.filter;
+      render();
+      return;
+    }
+    if (action === 'open-guide-city-picker') {
+      if (!usesGuideOperationalMock()) { showToast('Задачи этого тура недоступны', 'error'); return; }
+      state.overlay = { kind: 'guide-city-picker' };
+      render();
+      return;
+    }
+    if (action === 'select-guide-city') {
+      var guideCity = guideOperationalRouteCities().find(function (city) { return city.id === button.dataset.city; });
+      if (!usesGuideOperationalMock() || !guideCity) { showToast('Эта позиция маршрута недоступна', 'error'); return; }
+      state.guideRouteCityId = guideCity.id;
+      state.overlay = null;
+      render();
+      return;
+    }
+    if (action === 'guide-operation-status') {
+      if (!usesGuideOperationalMock()) { showToast('Статус недоступен для этого тура', 'error'); return; }
+      if (state.offline) { showToast('Нет подключения: статус не изменён', 'error'); return; }
+      var activeGuideCity = currentGuideOperationalCity();
+      var routeMock = activeGuideCity && guideOperationalMock().route[activeGuideCity.id];
+      var validOperation = routeMock && (routeMock[button.dataset.stage] || []).some(function (operation) { return operation.id === button.dataset.operation; });
+      var validStatus = statusLabels[button.dataset.stage] && statusLabels[button.dataset.stage][button.dataset.status];
+      if (!validOperation || !validStatus || button.dataset.city !== activeGuideCity.id || button.dataset.stage !== state.stage) {
+        showToast('Задача изменилась. Обновите статус ещё раз.', 'error');
+        return;
+      }
+      guideOperationalStatuses[guideOperationStatusKey(button.dataset.city, button.dataset.stage, button.dataset.operation)] = button.dataset.status;
+      showToast('Статус: ' + statusLabels[button.dataset.stage][button.dataset.status]);
+      return;
+    }
     if (action === 'open-city-picker') {
       state.overlay = { kind: 'city-picker' };
+      render();
+      return;
+    }
+    if (action === 'open-finance-city-picker') {
+      if (!canViewFinance()) { showToast('Финансы недоступны для этой роли', 'error'); return; }
+      state.overlay = { kind: 'finance-city-picker' };
+      render();
+      return;
+    }
+    if (action === 'select-finance-city') {
+      var financeRouteCityId = button.dataset.routeCityId;
+      var financeCity = financeRouteCities().find(function (city) { return city.id === financeRouteCityId; });
+      if (!financeCity) { showToast('Эта позиция маршрута недоступна', 'error'); return; }
+      state.financeRouteCityId = financeCity.id;
+      if (tourHasOperationalModel(state.selectedTourId)) {
+        var financeCityIndex = cities.findIndex(function (city) { return city.id === financeCity.id; });
+        if (financeCityIndex >= 0) state.cityIndex = financeCityIndex;
+      }
+      state.overlay = null;
       render();
       return;
     }
@@ -3246,11 +3919,14 @@
       var selectedRole = button.dataset.role === 'guide' ? 'viewer' : button.dataset.role;
       if (['admin', 'manager', 'escort', 'viewer'].indexOf(selectedRole) === -1) selectedRole = 'forbidden';
       state.role = selectedRole;
+      if (state.view === 'finance' && !canViewFinance()) state.view = 'tour-info';
+      if ((state.role === 'viewer' || state.role === 'escort') && state.view === 'tour-info') state.view = 'operations';
       var scopedLeadTouristAfterRoleChange = state.scopeLead && currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead; });
       if (!canSeeSourceLeadFor(scopedLeadTouristAfterRoleChange)) state.scopeLead = null;
       if (!canOpenSourceLead(state.returnLead)) state.returnLead = null;
       state.touristQuery = '';
-      state.touristFilters = { needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' };
+      state.touristFilters = { needsData: false, documentIssue: false, limitedRoute: false, debt: false, type: 'all', group: 'all', status: 'all' };
+      state.guideTouristFilter = 'all';
       state.returnContext = null;
       state.saveErrorSnapshot = null;
       state.draft = null;
@@ -3341,7 +4017,7 @@
     }
     if (action === 'reset-tourist-filters') {
       state.touristQuery = '';
-      state.touristFilters = { needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' };
+      state.touristFilters = { needsData: false, documentIssue: false, limitedRoute: false, debt: false, type: 'all', group: 'all', status: 'all' };
       state.overlay = null;
       render();
       return;
@@ -3692,8 +4368,11 @@
         return;
       }
       state.selectedTourId = button.dataset.id;
+      state.guideRouteCityId = null;
+      state.touristQuery = '';
+      state.guideTouristFilter = 'all';
       state.overlay = null;
-      state.view = button.dataset.id === 'china' ? 'operations' : 'tour-info';
+      state.view = button.dataset.id === 'china' || usesGuideOperationalMock() ? 'operations' : 'tour-info';
       render();
       return;
     }
@@ -3743,7 +4422,7 @@
     }
     if (action === 'tourist-detail') {
       var detailTourist = touristById(button.dataset.id);
-      if (!canViewTouristForSelectedTour(detailTourist)) {
+      if (!canViewTouristForSelectedTour(detailTourist) || !canViewGuideOperationalTourist(detailTourist)) {
         showToast('Карточка туриста недоступна в выбранном туре', 'error');
         return;
       }
@@ -3979,9 +4658,32 @@
       return;
     }
     if (action === 'nav') {
+      if (button.dataset.view === 'finance' && !canViewFinance()) {
+        showToast('Финансы недоступны для этой роли', 'error');
+        return;
+      }
       state.view = button.dataset.view;
       state.overlay = null;
       render();
+      return;
+    }
+    if (action === 'finance-collection') {
+      if (!canViewFinance()) { showToast('Финансы недоступны для этой роли', 'error'); return; }
+      if (state.offline) { showToast('Нет подключения: отметка оплаты не сохранена', 'error'); return; }
+      var financeActionKey = button.dataset.financeAction;
+      var financeAction = financeActionKey && financeActionRegistry[financeActionKey];
+      var requestedCollection = button.dataset.collected;
+      var activeFinanceCity = currentFinanceCity();
+      var financeRow = financeAction && buildFinanceRows().find(function (row) { return row.leadId === financeAction.leadId; });
+      if (!financeAction || !financeRow || !financeRow.leadId || financeAction.tourId !== state.selectedTourId ||
+          financeAction.routeCityId !== (activeFinanceCity && activeFinanceCity.id) || financeAction.collected !== requestedCollection ||
+          ['true', 'false'].indexOf(requestedCollection) === -1) {
+        showToast('Заявка не относится к выбранной позиции маршрута', 'error');
+        return;
+      }
+      delete financeActionRegistry[financeActionKey];
+      saveFinanceCollection(financeRow.leadId, requestedCollection === 'true');
+      showToast(requestedCollection === 'true' ? 'Остаток отмечен как полученный' : 'Отметка оплаты отменена');
       return;
     }
     if (action === 'inert') {
@@ -4429,6 +5131,22 @@
         view: state.view,
         cityIndex: state.cityIndex,
         routeCityId: currentCity().id,
+        guideRouteCityId: currentGuideOperationalCity() ? currentGuideOperationalCity().id : null,
+        guideOperationalStatuses: guideOperationalStatuses,
+        guideTouristFilter: state.guideTouristFilter,
+        guideTouristMemberIds: usesGuideOperationalMock() ? guideOperationalCityMembers(currentGuideOperationalCity()).map(function (tourist) { return tourist.id; }) : [],
+        guideTouristVisibleIds: usesGuideOperationalMock() ? filteredGuideOperationalTourists(currentGuideOperationalCity()).map(function (tourist) { return tourist.id; }) : [],
+        financeRouteCityId: currentFinanceCity() ? currentFinanceCity().id : null,
+        financeRows: canViewFinance() ? buildFinanceRows().map(function (row) {
+          return {
+            id: row.id,
+            leadId: row.leadId,
+            memberIds: row.members.map(function (member) { return member.id; }),
+            payerId: row.payerId,
+            collected: row.collected,
+            balance: row.balance
+          };
+        }) : [],
         stage: state.stage,
         touristListMode: state.touristListMode,
         touristQuery: state.touristQuery,

@@ -22,6 +22,7 @@ const VIEWPORTS = [
 ];
 const ROUTES = [
   { path: '/tour-operations.html?tourId=china&tourSection=overview', expect: ['Гранд-тур по Китаю', 'Обзор'] },
+  { path: '/tour-operations.html?tourId=china&showTours=1&tourFilter=all&role=manager', expect: ['Туры', 'Япония: сезон момидзи', 'Италия для своих', 'Марокко: города и пустыня', 'Стамбул и Каппадокия', '10 из'] },
   { path: '/tour-operations.html?tourId=china&tourSection=summary', expect: ['Прибытие', 'Отель', 'Отъезд'] },
   { path: '/tour-operations.html?tourId=china&tourSection=summary&summarySection=tourists', expect: ['Участники тура', 'Туристы'] },
   { path: '/tour-operations.html?tourId=china&tourSection=summary&summarySection=documents', expect: ['Документы туристов', 'Документы'] },
@@ -30,6 +31,14 @@ const ROUTES = [
   { path: '/tour-operations.html?tourId=china&tourSection=program', expect: ['Гранд-тур по Китаю', 'Программа'] },
   { path: '/tour-operations.html?tourId=china&tourSection=team', expect: ['Гранд-тур по Китаю', 'Команда'] },
   { path: '/tour-operations.html?tourId=china&tourSection=team&role=viewer', expect: ['Гранд-тур по Китаю', 'Гиды по городам', 'Пекин', 'Сиань'], reject: ['Шанхай', 'Сопровождающий', 'Администраторы чата'] },
+  { path: '/tour-operations.html?tourId=china&role=viewer', expect: ['Гранд-тур по Китаю', 'Задачи', 'Встреча', 'Отель', 'Отъезд', 'Программа', 'Туристы', 'Финансы'], reject: ['Лиды', 'Разделы сводной'] },
+  { path: '/tour-operations.html?tourId=morocco&role=viewer', expect: ['Марокко: города и пустыня', 'Задачи', 'Встреча', 'Отель', 'Отъезд', 'Программа', 'Касабланка', 'AT 221', 'Туристы', 'Финансы'], reject: ['Сводная тура ещё не подготовлена', 'Пекин', 'CZ 342', 'Лиды'] },
+  { path: '/tour-operations.html?tourId=morocco&role=viewer&view=tourists&routeCityId=route-marrakesh-1', expect: ['Марокко: города и пустыня', 'Туристы', 'Марракеш', 'Участники остановки', 'Все · 8', 'Требуют внимания · 8', 'Встреча', 'Отель', 'Отъезд'], reject: ['Сводная тура ещё не подготовлена', 'Пекин', 'CZ 342', 'Лиды'] },
+  { path: '/tour-operations.html?tourId=morocco&role=escort&operation=hotel&routeCityId=route-marrakesh-1', expect: ['Марракеш', 'Riad Kniza', 'Ожидает заселения', 'Отметить: Заселён'], reject: ['Сводная тура ещё не подготовлена', 'Пекин'] },
+  { path: '/tour-operations.html?tourId=morocco&role=viewer&view=program', expect: ['Марокко: города и пустыня', 'Программа тура', 'Касабланка', 'Уарзазат'], reject: ['Сводная тура ещё не подготовлена', 'Пекин'] },
+  { path: '/tour-operations.html?tourId=china&view=finance&role=manager', expect: ['Финансы', 'Остаток по оплате', 'Плательщик', 'Оплачен'] },
+  { path: '/tour-operations.html?tourId=china&view=finance&role=escort', expect: ['Задачи', 'Встреча'], reject: ['Остаток по оплате', 'Финансы'] },
+  { path: '/tour-operations.html?tourId=morocco&view=finance&role=escort', expect: ['Финансы', 'Остаток по оплате', 'Плательщик'] },
   { path: '/tour-operations.html?tourId=china&tourSection=summary&routeCityId=route-shanghai-1&role=viewer', expect: ['Пекин · остановка 1', 'Гид'], reject: ['Шанхай', 'Пекин · остановка 2'] },
   { path: '/tour-operations.html?tourId=china&tourSection=tasks', expect: ['Гранд-тур по Китаю', 'Задачи'] },
   { path: '/tour-operations.html?tourId=china&tourSection=actions', expect: ['Гранд-тур по Китаю', 'Действия'] },
@@ -50,6 +59,7 @@ const ROUTES = [
   { path: '/mobile-leads.html?lead=lead-1042&role=superadmin', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Соколова', 'anna@example.ru'], minTargets: 3 },
   { path: '/mobile-leads.html?lead=lead-1051&role=manager', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Волков', 'denis@example.ru'], minTargets: 4 },
   { path: '/mobile-leads-tz.html', expect: ['ТЗ MVP', 'Финальный результат', 'Финальные экраны прототипа'], minTargets: 12 },
+  { path: '/commercial-proposal.html', expect: ['Развитие мобильной CRM', '240 000 ₽', '1 488 000 ₽', 'Шесть результатов', 'ПРОВЕРКА РЫНКОМ'], minTargets: 8 },
 ];
 
 const contentTypes = {
@@ -204,8 +214,9 @@ async function inspectRoute(client, sessionId, origin, route, viewport) {
     };
   })()`);
 
-  route.expect.forEach((text) => assert.ok(result.text.includes(text), `${route.path} must render “${text}”`));
-  (route.reject || []).forEach((text) => assert.ok(!result.text.includes(text), `${route.path} must hide “${text}”`));
+  const normalizedText = result.text.replace(/\s+/g, ' ');
+  route.expect.forEach((text) => assert.ok(normalizedText.includes(text.replace(/\s+/g, ' ')), `${route.path} must render “${text}”`));
+  (route.reject || []).forEach((text) => assert.ok(!normalizedText.includes(text.replace(/\s+/g, ' ')), `${route.path} must hide “${text}”`));
   const minimumTargets = route.minTargets || 5;
   assert.ok(result.targetCount >= minimumTargets, `${route.path} must expose at least ${minimumTargets} meaningful touch targets`);
   assert.equal(

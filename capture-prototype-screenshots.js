@@ -14,6 +14,9 @@ const captures = [
   ['20-summary-final.png', 'tour-operations.html?tourId=china&tourSection=summary&role=manager'],
   ['21-team-final.png', 'tour-operations.html?tourId=china&tourSection=team&role=manager'],
   ['22-statuses-final.png', 'tour-operations.html?tourId=china&view=statuses&role=manager'],
+  ['23-finance-final.png', 'tour-operations.html?tourId=china&view=finance&role=manager'],
+  ['24-tours-data-final.png', 'tour-operations.html?tourId=china&showTours=1&tourFilter=all&role=manager'],
+  ['25-guide-final.png', 'tour-operations.html?tourId=china&role=viewer'],
 ];
 
 function browserPath() {

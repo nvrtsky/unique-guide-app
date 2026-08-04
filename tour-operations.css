@@ -94,6 +94,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .segmented { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 4px; padding: 4px; border-radius: 13px; background: #e8ecf0; }
 .segmented button { min-height: 44px; border: 0; border-radius: 10px; background: transparent; color: #66707a; cursor: pointer; font-size: 12px; font-weight: 800; }
 .segmented button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(20,23,26,.1); }
+.guide-stage-switch { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.guide-stage-switch button { padding: 0 4px; font-size: 11px; }
 
 .scroll { width: 100%; max-width: 100%; min-width: 0; min-height: 0; flex: 1 1 auto; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain; scrollbar-width: none; padding: 0 16px calc(94px + var(--safe-bottom)); }
 .section-row { min-height: 48px; justify-content: space-between; gap: 12px; }
@@ -132,6 +134,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .member-copy strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; }
 .member-copy span { display: block; margin-top: 2px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 12px; font-weight: 600; }
 .card-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 10px; }
+.guide-operation-actions { grid-template-columns: 1fr; }
+.guide-operation-card .operation-main > span:last-child { white-space: normal; line-height: 1.4; }
 .secondary-button, .primary-button, .danger-button { min-height: 46px; border-radius: 12px; padding: 0 13px; cursor: pointer; font-size: 12px; font-weight: 800; }
 .secondary-button { border: 1px solid var(--line); background: #fff; color: var(--ink); }
 .primary-button { border: 0; background: var(--ink); color: #fff; display: inline-flex; align-items: center; justify-content: center; gap: 7px; }
@@ -304,6 +308,7 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .filter-tabs { margin-bottom: 10px; padding: 3px; border-radius: 12px; background: #e8ecf0; display: grid; grid-template-columns: repeat(3, 1fr); }
 .filter-tabs button { min-height: 44px; border: 0; border-radius: 9px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
 .filter-tabs button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(20,23,26,.1); }
+.guide-tourist-filter-tabs button { padding: 4px 6px; font-size: 10.5px; line-height: 1.2; }
 .search-box { height: 46px; margin-bottom: 10px; padding: 0 11px; border: 1px solid var(--line); border-radius: 12px; background: #fff; display: flex; align-items: center; gap: 8px; color: var(--muted); }
 .search-box input { min-width: 0; flex: 1; height: 44px; border: 0; outline: 0; background: transparent; }
 .compact-stats { margin-bottom: 11px; }
@@ -396,6 +401,39 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .summary-tabs { flex: 0 0 auto; margin: 0 16px 6px; padding: 4px; border-radius: 13px; background: #e8ecf0; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); }
 .summary-tabs button { min-width: 0; min-height: 44px; padding: 0 4px; border: 0; border-radius: 10px; background: transparent; color: var(--muted); font-size: 12px; font-weight: 800; }
 .summary-tabs button.active { background: #fff; color: var(--ink); box-shadow: 0 1px 3px rgba(20,23,26,.1); }
+
+.finance-scroll { padding-top: 6px; }
+.finance-route-note { margin: 0 16px 8px; min-height: 44px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 13px; background: #fff; color: var(--muted); font-size: 12px; font-weight: 750; }
+.finance-totals { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 12px 0; }
+.finance-total { min-width: 0; padding: 13px; border: 1px solid var(--line); border-radius: 16px; background: #fff; }
+.finance-total span { display: block; color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.finance-total strong { display: block; margin-top: 5px; color: #e5484d; font-size: 16px; overflow-wrap: anywhere; }
+.finance-card { margin-bottom: 10px; padding: 13px 14px; border: 1px solid var(--line); border-radius: 18px; background: #fff; box-shadow: 0 1px 2px rgba(20,23,26,.03); }
+.finance-card-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding-bottom: 9px; }
+.finance-card-head > span { min-width: 0; }
+.finance-card-head > span:last-child { text-align: right; }
+.finance-card-head strong, .finance-card-head small { display: block; }
+.finance-card-head strong { font-size: 13px; }
+.finance-card-head small { color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.finance-card-head .paid { color: #1f9d5b; }
+.finance-card-head .due { color: #e5484d; }
+.finance-members { border-top: 1px solid #f2f4f7; }
+.finance-member { min-height: 50px; display: flex; align-items: center; gap: 9px; border-bottom: 1px solid #f6f7f9; }
+.finance-member strong { min-width: 0; flex: 1; font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.finance-member em { flex: 0 0 auto; padding: 4px 8px; border-radius: 20px; background: #fbf1df; color: #c98a1e; font-size: 10px; font-style: normal; font-weight: 800; }
+.tourist-payment { min-height: 42px; margin: 0 12px 8px; padding: 8px 10px; border-radius: 11px; background: #f7f8fa; display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.tourist-payment span { color: var(--muted); font-size: 10.5px; font-weight: 700; }
+.tourist-payment strong { min-width: 0; font-size: 11.5px; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tourist-finance-detail { min-height: 64px; margin: 12px 0; padding: 13px 14px; border: 1px solid var(--line); border-radius: 16px; background: #fff; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.tourist-finance-detail span { min-width: 0; }
+.tourist-finance-detail small, .tourist-finance-detail strong { display: block; }
+.tourist-finance-detail small { color: var(--muted); font-size: 10.5px; }
+.tourist-finance-detail strong { margin-top: 3px; font-size: 15px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tourist-finance-detail em { flex: 0 0 auto; padding: 5px 9px; border-radius: 20px; background: #eef1f4; color: #5a626c; font-size: 10.5px; font-style: normal; font-weight: 800; }
+
+@media (max-width: 380px) {
+  .finance-totals { grid-template-columns: 1fr; }
+}
 .city-picker-wrap { flex: 0 0 auto; padding: 0 16px 6px; }
 .city-picker-trigger { width: 100%; min-height: 52px; padding: 6px 11px; border: 1px solid var(--line); border-radius: 14px; background: #fff; color: var(--ink); display: flex; align-items: center; gap: 10px; text-align: left; }
 .city-picker-index, .route-stop-index { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 11px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; font-size: 12px; font-weight: 800; }
@@ -440,6 +478,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .tourist-card-main em { margin-top: 4px; color: var(--purple); font-size: 12px; font-style: normal; font-weight: 800; }
 .tourist-card-main b { color: var(--muted); font-size: 20px; }
 .tourist-card-badges { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 6px; }
+.guide-tourist-statuses { margin: 10px 0 0; }
+.guide-tourist-statuses strong.completed { color: var(--green); }
+.guide-tourist-statuses strong.attention { color: var(--orange); }
+.guide-tourist-search .search-box { width: 100%; }
 .readiness-pill { display: inline-flex; min-height: 28px; padding: 5px 8px; border-radius: 16px; align-items: center; font-size: 12px; font-weight: 800; }
 .readiness-pill.ready { background: var(--green-soft); color: var(--green); }
 .readiness-pill.warning-state { background: var(--orange-soft); color: #795216; }
@@ -522,6 +564,8 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .profile-operation small { margin-top: 3px; overflow-wrap: anywhere; color: var(--muted); font-size: 12px; line-height: 1.35; }
 .profile-operation em { color: var(--blue); font-size: 12px; font-style: normal; font-weight: 800; }
 .profile-operation b { color: var(--muted); }
+.guide-profile-operation { cursor: default; }
+.guide-profile-operation b { color: var(--green); }
 .scan-row { min-height: 58px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 9px; }
 .scan-row > span:first-child { width: 36px; height: 36px; flex: 0 0 36px; border-radius: 10px; background: var(--blue-soft); color: var(--blue); display: grid; place-items: center; }
 .scan-row > span:first-child svg { width: 18px; height: 18px; }

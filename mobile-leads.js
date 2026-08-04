@@ -10,6 +10,7 @@
     converted: ["Подтверждён", "confirmed"],
     lost: ["Отложен", "lost"],
   };
+  const sharedMock = window.UNIQUE_MOCK_DATA || { tours: [], supplementalLeads: [], supplementalTourists: [] };
   const stageOrder = Object.keys(stages);
   const roleLabels = { admin: "Администратор", manager: "Менеджер", escort: "Сопровождающий", viewer: "Гид" };
   const managerAssignedLeadIds = new Set(["lead-1042", "lead-1048"]);
@@ -18,19 +19,15 @@
     "Япония: сезон момидзи": "japan",
     "Не выбран": null,
   };
-  const tourOptions = [
-    { id: "china", title: "Гранд-тур по Китаю", dates: "12.09.2026 — 26.09.2026", route: [
-      { id: "route-beijing-1", name: "Пекин" },
-      { id: "route-xian-1", name: "Сиань" },
-      { id: "route-shanghai-1", name: "Шанхай" },
-      { id: "route-beijing-2", name: "Пекин (2)" },
-    ] },
-    { id: "japan", title: "Япония: сезон момидзи", dates: "07.11.2026 — 18.11.2026", route: [
-      { id: "route-tokyo-1", name: "Токио" },
-      { id: "route-kyoto-1", name: "Киото" },
-      { id: "route-osaka-1", name: "Осака" },
-    ] },
-  ];
+  sharedMock.tours.forEach(tour => { tourIdsByTitle[tour.title] = tour.id; });
+  const tourOptions = sharedMock.tours.length
+    ? sharedMock.tours.map(tour => ({ id: tour.id, title: tour.title, dates: tour.dateOption || tour.dates, route: tour.route.map(city => ({ ...city })) }))
+    : [
+      { id: "china", title: "Гранд-тур по Китаю", dates: "12.09.2026 — 26.09.2026", route: [
+        { id: "route-beijing-1", name: "Пекин" }, { id: "route-xian-1", name: "Сиань" },
+        { id: "route-shanghai-1", name: "Шанхай" }, { id: "route-beijing-2", name: "Пекин (2)" },
+      ] },
+    ];
   const fieldOptions = {
     roomType: [["Single", "Single"], ["Twin", "Twin"], ["Double", "Double"]],
     hotelCategory: [["3*", "3*"], ["4*", "4*"], ["5*", "5*"]],
@@ -105,16 +102,27 @@
     },
   ];
 
-  const canonicalTouristStorageKey = "unique-guide-tourists-v2";
-  const canonicalMigrationStorageKey = "unique-guide-tourists-v2-mobile-migrated";
+  sharedMock.supplementalLeads.forEach(seed => {
+    if (!leads.some(lead => lead.id === seed.id)) leads.push(JSON.parse(JSON.stringify(seed)));
+  });
+  leads.forEach(lead => {
+    if (lead.manager === "Елена Воронова" && !lead.archived) managerAssignedLeadIds.add(lead.id);
+  });
+
+  const canonicalTouristStorageKey = "unique-guide-tourists-v3";
+  const legacyCanonicalTouristStorageKey = "unique-guide-tourists-v2";
+  const legacyCanonicalMigrationStorageKey = "unique-guide-tourists-v2-mobile-migrated";
+  const canonicalMigrationStorageKey = "unique-guide-tourists-v3-mobile-migrated";
   const returnContextStorageKey = "unique-guide-mobile-leads-return-v1";
-  const leadStorageKey = "unique-guide-leads-v1";
+  const leadStorageKey = "unique-guide-leads-v2";
+  const legacyLeadStorageKey = "unique-guide-leads-v1";
   const routeCityIds = {
     "Пекин": "route-beijing-1",
     "Сиань": "route-xian-1",
     "Шанхай": "route-shanghai-1",
     "Пекин (2)": "route-beijing-2",
   };
+  tourOptions.forEach(tour => tour.route.forEach(city => { routeCityIds[city.name] = city.id; }));
 
   function canonicalTourist(values) {
     const tourist = {
@@ -173,28 +181,47 @@
     }),
   ];
 
+  sharedMock.supplementalTourists.forEach(seed => {
+    if (!canonicalSeedTourists.some(tourist => tourist.id === seed.id)) canonicalSeedTourists.push(canonicalTourist(JSON.parse(JSON.stringify(seed))));
+  });
+
   function loadCanonicalTourists() {
-    let saved = [];
-    let hasStoredCanonical = false;
-    let mobileMigrationComplete = false;
     try {
-      const raw = window.localStorage?.getItem(canonicalTouristStorageKey);
-      hasStoredCanonical = raw != null;
-      mobileMigrationComplete = window.localStorage?.getItem(canonicalMigrationStorageKey) === "1";
-      saved = JSON.parse(raw || "[]");
-      if (!Array.isArray(saved)) saved = [];
+      const currentRaw = window.localStorage?.getItem(canonicalTouristStorageKey);
+      if (currentRaw != null) {
+        const current = JSON.parse(currentRaw);
+        if (!Array.isArray(current)) return [];
+        return current.filter(item => item?.id).map(item => {
+          const seed = canonicalSeedTourists.find(candidate => candidate.id === item.id);
+          return canonicalTourist({ ...(seed || {}), ...item });
+        });
+      }
+
+      const legacyRaw = window.localStorage?.getItem(legacyCanonicalTouristStorageKey);
+      if (legacyRaw == null) return canonicalSeedTourists.map(canonicalTourist);
+      const legacy = JSON.parse(legacyRaw);
+      if (!Array.isArray(legacy)) return canonicalSeedTourists.map(canonicalTourist);
+
+      const migrated = legacy.filter(item => item?.id).map(item => {
+        const seed = canonicalSeedTourists.find(candidate => candidate.id === item.id);
+        return canonicalTourist({ ...(seed || {}), ...item });
+      });
+      const migratedIds = new Set(migrated.map(tourist => tourist.id));
+      const legacySeedIds = new Set(["t1", "t2", "t3", "t4"]);
+      if (window.localStorage?.getItem(legacyCanonicalMigrationStorageKey) === "1") {
+        legacySeedIds.add("t5");
+        legacySeedIds.add("lead-tourist-1051");
+      }
+      canonicalSeedTourists.forEach(seed => {
+        if (!legacySeedIds.has(seed.id) && !migratedIds.has(seed.id)) migrated.push(canonicalTourist(seed));
+      });
+      window.localStorage?.setItem(canonicalTouristStorageKey, JSON.stringify(migrated));
+      window.localStorage?.setItem(canonicalMigrationStorageKey, "1");
+      return migrated;
     } catch (error) {
       console.warn("Canonical tourist storage is unavailable", error);
+      return canonicalSeedTourists.map(canonicalTourist);
     }
-    if (!hasStoredCanonical) return canonicalSeedTourists.map(canonicalTourist);
-    const normalized = saved.filter(item => item?.id).map(canonicalTourist);
-    if (mobileMigrationComplete) return normalized;
-    const savedIds = new Set(normalized.map(tourist => tourist.id));
-    ["lead-tourist-1051", "t5"].forEach(id => {
-      const seed = canonicalSeedTourists.find(tourist => tourist.id === id);
-      if (seed && !savedIds.has(id)) normalized.push(canonicalTourist(seed));
-    });
-    return normalized;
   }
 
   const canonicalTourists = loadCanonicalTourists();
@@ -250,7 +277,9 @@
 
   function loadStoredLeads() {
     try {
-      const raw = window.localStorage?.getItem(leadStorageKey);
+      const currentRaw = window.localStorage?.getItem(leadStorageKey);
+      const legacyRaw = currentRaw == null ? window.localStorage?.getItem(legacyLeadStorageKey) : null;
+      const raw = currentRaw == null ? legacyRaw : currentRaw;
       if (raw == null) return;
       const saved = JSON.parse(raw);
       if (!Array.isArray(saved)) return;
@@ -262,10 +291,22 @@
         tourists: [],
       }));
       const restoredIds = new Set(restored.map(lead => lead.id));
-      leads.forEach(lead => { if (!restoredIds.has(lead.id)) restored.push(lead); });
+      if (currentRaw == null) {
+        const isCompleteLegacySnapshot = saved.length === 0 || saved.some(lead => lead?.code);
+        if (!isCompleteLegacySnapshot) {
+          ["lead-1042", "lead-1048", "lead-1051", "lead-1033"].forEach(id => {
+            const seed = seeds.get(id);
+            if (seed && !restoredIds.has(id)) restored.push(normalizeLead(JSON.parse(JSON.stringify(seed))));
+          });
+        }
+        sharedMock.supplementalLeads.forEach(seed => {
+          if (!restoredIds.has(seed.id)) restored.push(normalizeLead(JSON.parse(JSON.stringify(seed))));
+        });
+      }
       leads.splice(0, leads.length, ...restored);
       managerAssignedLeadIds.clear();
-      leads.forEach(lead => { if (lead.manager === "Елена Воронова") managerAssignedLeadIds.add(lead.id); });
+      leads.forEach(lead => { if (lead.manager === "Елена Воронова" && !lead.archived) managerAssignedLeadIds.add(lead.id); });
+      if (currentRaw == null) saveLeads();
     } catch (error) {
       console.warn("Lead storage is unavailable", error);
     }

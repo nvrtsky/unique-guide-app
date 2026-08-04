@@ -15,6 +15,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+      - run: node --check mock-crm-data.js
       - run: node --check mobile-leads.js
       - run: node --check tour-operations.js
       - run: node --check prototype-smoke-test.js
@@ -25,7 +26,7 @@ jobs:
       - run: node prototype-viewport-test.js
       - name: Verify isolated mock adapter
         run: |
-          if grep -En 'fetch[[:space:]]*\(|new[[:space:]]+XMLHttpRequest|new[[:space:]]+WebSocket|new[[:space:]]+EventSource|sendBeacon[[:space:]]*\(|/api/' mobile-leads.js tour-operations.js; then
+          if grep -En 'fetch[[:space:]]*\(|new[[:space:]]+XMLHttpRequest|new[[:space:]]+WebSocket|new[[:space:]]+EventSource|sendBeacon[[:space:]]*\(|/api/' mock-crm-data.js mobile-leads.js tour-operations.js; then
             echo "The prototype must not call an API"
             exit 1
           fi
@@ -57,6 +58,13 @@ jobs:
           test -s assets/spec/20-summary-final.png
           test -s assets/spec/21-team-final.png
           test -s assets/spec/22-statuses-final.png
+          test -s assets/spec/23-finance-final.png
+          test -s assets/spec/24-tours-data-final.png
+          test -s assets/spec/25-guide-final.png
+          test -s mock-crm-data.js
+          test -f .nojekyll
+          test -s commercial-proposal.html
+          test -s commercial-proposal.css
           test -s mobile-leads-tz-template.html
           test -s build-mobile-spec.sh
           test -s capture-prototype-screenshots.js

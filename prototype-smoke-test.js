@@ -147,6 +147,9 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     setTimeout: windowObject.setTimeout,
     clearTimeout: windowObject.clearTimeout,
   };
+  if (file !== 'mock-crm-data.js' && fs.existsSync('mock-crm-data.js')) {
+    vm.runInNewContext(fs.readFileSync('mock-crm-data.js', 'utf8'), context, { filename: 'mock-crm-data.js' });
+  }
   vm.runInNewContext(fs.readFileSync(file, 'utf8'), context, { filename: file });
 
   function findTagByAttribute(attribute, value) {
@@ -235,6 +238,17 @@ function selectCity(prototype, index) {
   prototype.click({ action: 'select-city', index: String(index) });
 }
 
+function selectFinanceCity(prototype, routeCityId) {
+  prototype.click({ action: 'open-finance-city-picker' });
+  prototype.click({ action: 'select-finance-city', routeCityId });
+}
+
+function financeCollectionAction(prototype, collected) {
+  const match = prototype.root.innerHTML.match(new RegExp(`data-action="finance-collection"[^>]*data-finance-action="([^"]+)"[^>]*data-collected="${collected}"`));
+  assert.ok(match, `Finance ${collected === 'true' ? 'pay' : 'unpay'} action must exist`);
+  return { action: 'finance-collection', financeAction: match[1], collected };
+}
+
 function selectRole(prototype, role) {
   prototype.click({ action: 'role-menu' });
   prototype.click({ action: 'select-role', role });
@@ -257,9 +271,121 @@ function leadFormValues(overrides = {}) {
   };
 }
 
-// Navigation remains split into Tours, Tourists and Leads, without standalone finance screens.
+// The technical Lead surface remains linked into one public CRM entry point.
 const leadList = loadPrototype('mobile-leads.js', '#app');
 ['Туры', 'Туристы', 'Лиды'].forEach((label) => assert.match(leadList.root.innerHTML, new RegExp(label)));
+
+// The clean mock contract is intentionally large enough to exercise lists, filters and finance aggregation.
+const datasetAdmin = loadPrototype('mobile-leads.js', '#app', '?role=admin').snapshot();
+const datasetTours = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=admin').snapshot().tours;
+const expectedDataset = { china: 5, japan: 4, italy: 3, morocco: 5, turkey: 4 };
+assert.equal(datasetTours.length, 5, 'clean data contains exactly five tours');
+assert.equal(new Set(datasetAdmin.tourists.map((tourist) => tourist.id)).size, datasetAdmin.tourists.length, 'tourist IDs are unique');
+assert.equal(new Set(datasetAdmin.leads.map((leadItem) => leadItem.id)).size, datasetAdmin.leads.length, 'lead IDs are unique');
+Object.entries(expectedDataset).forEach(([tourId, expectedLeadCount]) => {
+  const tourMembers = datasetAdmin.tourists.filter((tourist) => tourist.tourId === tourId);
+  assert.equal(tourMembers.length, 10, `${tourId} contains exactly ten tourists`);
+  assert.equal(new Set(tourMembers.map((tourist) => tourist.leadId)).size, expectedLeadCount, `${tourId} contains the planned number of leads`);
+  tourMembers.forEach((tourist) => {
+    assert.ok(tourist.leadId, `${tourist.id} belongs to a lead`);
+    assert.ok(datasetAdmin.leads.some((leadItem) => leadItem.id === tourist.leadId && leadItem.eventId === tourId), `${tourist.id} belongs to a lead from the same tour`);
+  });
+});
+assert.equal(datasetAdmin.tourists.filter((tourist) => Object.hasOwn(expectedDataset, tourist.tourId)).length, 50, 'five tours contain exactly fifty tourists');
+
+// Storage upgrades preserve legacy edits, add only the new v3 mock rows and keep legacy deletions deleted.
+const legacyTourist = deepClone(datasetAdmin.tourists.find((tourist) => tourist.id === 't1'));
+legacyTourist.phone = '+7 900 000-11-22';
+legacyTourist.notes = 'Правка туриста из v2 должна сохраниться.';
+const touristMigrationStorage = new Map([
+  ['unique-guide-tourists-v2', JSON.stringify([legacyTourist])],
+]);
+const touristMigration = loadPrototype('mobile-leads.js', '#app', '?role=admin', touristMigrationStorage);
+const migratedTourist = touristMigration.snapshot().tourists.find((tourist) => tourist.id === 't1');
+assert.equal(migratedTourist.phone, '+7 900 000-11-22');
+assert.equal(migratedTourist.notes, 'Правка туриста из v2 должна сохраниться.');
+assert.ok(touristMigration.snapshot().tourists.some((tourist) => tourist.id === 'tourist-japan-01'), 'v2 → v3 adds the new supplemental dataset once');
+assert.ok(touristMigration.snapshot().tourists.some((tourist) => tourist.id === 'lead-tourist-1051'), 'an unfinished v2 mobile migration receives its prior schema additions');
+assert.ok(touristMigration.snapshot().tourists.some((tourist) => tourist.id === 't5'));
+assert.ok(!touristMigration.snapshot().tourists.some((tourist) => tourist.id === 't2'), 'a legacy seed missing from v2 remains deleted');
+assert.equal(touristMigrationStorage.get('unique-guide-tourists-v3-mobile-migrated'), '1');
+const storedMigratedTourists = JSON.parse(touristMigrationStorage.get('unique-guide-tourists-v3'));
+assert.equal(storedMigratedTourists.find((tourist) => tourist.id === 't1').phone, '+7 900 000-11-22');
+assert.ok(!storedMigratedTourists.some((tourist) => tourist.id === 't2'));
+const tourFirstMigrationStorage = new Map([
+  ['unique-guide-tourists-v2', JSON.stringify([legacyTourist])],
+]);
+const tourFirstMigration = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=admin', tourFirstMigrationStorage);
+assert.equal(tourFirstMigration.snapshot().tourists.find((tourist) => tourist.id === 't1').notes, 'Правка туриста из v2 должна сохраниться.');
+assert.ok(tourFirstMigration.snapshot().tourists.some((tourist) => tourist.id === 'tourist-japan-01'));
+assert.ok(!tourFirstMigration.snapshot().tourists.some((tourist) => tourist.id === 't2'));
+const leadsAfterTourFirstMigration = loadPrototype('mobile-leads.js', '#app', '?role=admin', tourFirstMigrationStorage);
+assert.equal(leadsAfterTourFirstMigration.snapshot().tourists.find((tourist) => tourist.id === 't1').phone, '+7 900 000-11-22');
+assert.ok(!leadsAfterTourFirstMigration.snapshot().tourists.some((tourist) => tourist.id === 't2'));
+const completedLegacyTouristStorage = new Map([
+  ['unique-guide-tourists-v2', JSON.stringify([legacyTourist])],
+  ['unique-guide-tourists-v2-mobile-migrated', '1'],
+]);
+const completedLegacyTourists = loadPrototype('mobile-leads.js', '#app', '?role=admin', completedLegacyTouristStorage).snapshot().tourists;
+assert.ok(!completedLegacyTourists.some((tourist) => tourist.id === 'lead-tourist-1051'), 'completed v2 snapshots keep deletions of prior schema additions');
+assert.ok(!completedLegacyTourists.some((tourist) => tourist.id === 't5'));
+
+// The Tours surface can perform the lead v1 → v2 upgrade before Leads opens.
+const legacyLead = deepClone(datasetAdmin.leads.find((leadItem) => leadItem.id === 'lead-1042'));
+legacyLead.phone = '+7 900 333-44-55';
+legacyLead.note = 'Правка лида из v1 должна сохраниться.';
+const leadMigrationStorage = new Map([
+  ['unique-guide-leads-v1', JSON.stringify([legacyLead])],
+]);
+loadPrototype('tour-operations.js', '#app', '?tourId=china&role=admin', leadMigrationStorage);
+const storedMigratedLeads = JSON.parse(leadMigrationStorage.get('unique-guide-leads-v2'));
+assert.equal(storedMigratedLeads.find((leadItem) => leadItem.id === 'lead-1042').phone, '+7 900 333-44-55');
+assert.ok(storedMigratedLeads.some((leadItem) => leadItem.id === 'lead-japan-01'), 'v1 → v2 adds the new supplemental leads once');
+assert.ok(!storedMigratedLeads.some((leadItem) => leadItem.id === 'lead-1048'), 'a legacy lead missing from v1 remains deleted');
+const migratedLeadSurface = loadPrototype('mobile-leads.js', '#app', '?role=admin', leadMigrationStorage);
+assert.equal(migratedLeadSurface.snapshot().leads.find((leadItem) => leadItem.id === 'lead-1042').note, 'Правка лида из v1 должна сохраниться.');
+assert.ok(!migratedLeadSurface.snapshot().leads.some((leadItem) => leadItem.id === 'lead-1048'));
+const partialLegacyLeadStorage = new Map([
+  ['unique-guide-leads-v1', JSON.stringify([{ id: 'lead-1042', eventId: 'china', manager: 'Елена Воронова', remainingPayment: '77777' }])],
+]);
+loadPrototype('tour-operations.js', '#app', '?tourId=china&role=admin', partialLegacyLeadStorage);
+const partialMigratedLeads = JSON.parse(partialLegacyLeadStorage.get('unique-guide-leads-v2'));
+assert.equal(partialMigratedLeads.find((leadItem) => leadItem.id === 'lead-1042').remainingPayment, '77777');
+assert.ok(partialMigratedLeads.some((leadItem) => leadItem.id === 'lead-1048'), 'a partial v1 write from Tours is completed before becoming authoritative');
+const partialLeadSurface = loadPrototype('mobile-leads.js', '#app', '?role=admin', partialLegacyLeadStorage);
+assert.equal(partialLeadSurface.snapshot().leads.find((leadItem) => leadItem.id === 'lead-1042').remainingPayment, '77777');
+const oldBaseLeadIds = new Set(['lead-1042', 'lead-1048', 'lead-1051', 'lead-1033']);
+const emptyLegacyToursFirstStorage = new Map([['unique-guide-leads-v1', '[]']]);
+loadPrototype('tour-operations.js', '#app', '?tourId=china&role=admin', emptyLegacyToursFirstStorage);
+const emptyToursFirstV2 = JSON.parse(emptyLegacyToursFirstStorage.get('unique-guide-leads-v2'));
+assert.ok(!emptyToursFirstV2.some((leadItem) => oldBaseLeadIds.has(leadItem.id)), 'Tours-first migration treats an empty full v1 snapshot as authoritative');
+assert.ok(emptyToursFirstV2.some((leadItem) => leadItem.id === 'lead-japan-01'), 'new v2 supplemental leads may be added to an empty legacy snapshot');
+const emptyToursFirstLeads = loadPrototype('mobile-leads.js', '#app', '?role=admin', emptyLegacyToursFirstStorage).snapshot().leads;
+assert.ok(!emptyToursFirstLeads.some((leadItem) => oldBaseLeadIds.has(leadItem.id)));
+
+const emptyLegacyLeadsFirstStorage = new Map([['unique-guide-leads-v1', '[]']]);
+const emptyLeadsFirst = loadPrototype('mobile-leads.js', '#app', '?role=admin', emptyLegacyLeadsFirstStorage).snapshot().leads;
+assert.ok(!emptyLeadsFirst.some((leadItem) => oldBaseLeadIds.has(leadItem.id)), 'Leads-first migration keeps all four deleted old base leads deleted');
+assert.ok(emptyLeadsFirst.some((leadItem) => leadItem.id === 'lead-japan-01'));
+const emptyLeadsFirstTours = loadPrototype('tour-operations.js', '#app', '?tourId=japan&role=admin', emptyLegacyLeadsFirstStorage).snapshot();
+assert.ok(!JSON.parse(emptyLegacyLeadsFirstStorage.get('unique-guide-leads-v2')).some((leadItem) => oldBaseLeadIds.has(leadItem.id)), 'Tours reload does not resurrect old base leads after Leads-first migration');
+assert.ok(emptyLeadsFirstTours.tours.some((tour) => tour.id === 'japan'));
+
+// v3 is authoritative across both surfaces: deleting in the Summary cannot be undone by a Leads reload.
+const deletionStorage = new Map();
+loadPrototype('mobile-leads.js', '#app', '?role=admin', deletionStorage);
+deletionStorage.delete('unique-guide-tourists-v3-mobile-migrated');
+const deletingTourist = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t2&role=admin', deletionStorage);
+deletingTourist.click({ action: 'delete-tourist', id: 't2' });
+deletingTourist.click({ action: 'confirm-delete-tourist', id: 't2' });
+assert.ok(!deletingTourist.snapshot().tourists.some((tourist) => tourist.id === 't2'));
+assert.equal(deletionStorage.get('unique-guide-tourists-v3-mobile-migrated'), '1');
+assert.ok(!JSON.parse(deletionStorage.get('unique-guide-tourists-v3')).some((tourist) => tourist.id === 't2'));
+const leadsAfterTouristDelete = loadPrototype('mobile-leads.js', '#app', '?role=admin', deletionStorage);
+assert.ok(!leadsAfterTouristDelete.snapshot().tourists.some((tourist) => tourist.id === 't2'), 'Leads reload does not resurrect a Summary deletion');
+const summaryAfterTouristDelete = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&role=admin', deletionStorage);
+assert.ok(!summaryAfterTouristDelete.snapshot().tourists.some((tourist) => tourist.id === 't2'), 'Summary reload keeps the authoritative deletion');
+
 const lead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042');
 const leadTabs = [...lead.root.innerHTML.matchAll(/data-detail-tab="([^"]+)"[^>]*>([^<]+)/g)].map((match) => match[2].trim());
 assert.deepEqual(leadTabs, ['Редактировать', 'Чат', 'Документы', 'Задачи']);
@@ -327,7 +453,9 @@ assert.doesNotMatch(unknownLeadRole.root.innerHTML, /Соколова|anna@examp
 
 // A manager sees only assigned leads in lists and receives a hard refusal for a foreign direct link.
 const managerLeadList = loadPrototype('mobile-leads.js', '#app', '?role=manager');
-assert.deepEqual(managerLeadList.snapshot().leads.map((item) => item.id).sort(), ['lead-1042', 'lead-1048']);
+const visibleManagerLeadIds = managerLeadList.snapshot().leads.map((item) => item.id).sort();
+assert.ok(visibleManagerLeadIds.includes('lead-1042') && visibleManagerLeadIds.includes('lead-turkey-04'));
+assert.equal(visibleManagerLeadIds.length, 16, 'manager sees all active mock leads assigned to Elena');
 assert.match(managerLeadList.root.innerHTML, /Соколова|Орлова/);
 assert.doesNotMatch(managerLeadList.root.innerHTML, /Волков Денис|lead-1051|denis@example\.ru/);
 const foreignManagerLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1051&role=manager');
@@ -375,10 +503,242 @@ for (const requestedRole of ['viewer', 'guide']) {
   assert.match(viewerTour.root.innerHTML, /Гид/);
   const restrictedNav = (viewerTour.root.innerHTML.match(/<nav class="[^"]*\bbottom-nav\b[^"]*"[^>]*>([\s\S]*?)<\/nav>/) || [])[1] || '';
   const restrictedNavLabels = [...restrictedNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1].trim());
-  assert.deepEqual(restrictedNavLabels, ['Туры', 'Туристы']);
+  assert.deepEqual(restrictedNavLabels, ['Задачи', 'Туристы', 'Финансы'], 'assigned collection guide keeps the first-edition areas and receives only the permitted Finance tab');
   assert.doesNotMatch(viewerTour.root.innerHTML, /189[\s\u00a0]*000|Открыть на сайте/);
   assert.doesNotMatch(viewerTour.root.innerHTML, /Шанхай|Пекин · остановка 2/, 'viewer Overview is limited to assigned route positions');
 }
+
+// Without an explicit deep link, Guide opens the unchanged first-edition Tasks workspace.
+const guideHome = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=viewer');
+assert.equal(guideHome.snapshot().view, 'operations');
+assert.match(guideHome.root.innerHTML, /Задачи/);
+const guideStageMarkup = (guideHome.root.innerHTML.match(/aria-label="Задачи гида"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
+const guideStageLabels = [...guideStageMarkup.matchAll(/data-action="guide-stage"[^>]*>([^<]+)/g)].map((match) => match[1].trim());
+assert.deepEqual(guideStageLabels, ['Встреча', 'Отель', 'Отъезд', 'Программа']);
+assert.doesNotMatch(guideHome.root.innerHTML, /class="workspace-tabs"|aria-label="Разделы сводной"/, 'manager summary navigation must not leak into the first-edition guide shell');
+guideHome.click({ action: 'guide-stage', stage: 'program' });
+assert.equal(guideHome.snapshot().view, 'program');
+assert.match(guideHome.root.innerHTML, /Программа тура/);
+guideHome.click({ action: 'guide-stage', stage: 'arrival' });
+assert.equal(guideHome.snapshot().view, 'operations');
+assert.equal(guideHome.snapshot().stage, 'arrival');
+
+// Morocco uses the same first-edition guide task shell with its own route and
+// local mock operations. China records must never appear in this tour.
+for (const role of ['viewer', 'escort']) {
+  const moroccoGuide = loadPrototype('tour-operations.js', '#app', `?tourId=morocco&role=${role}`);
+  assert.equal(moroccoGuide.snapshot().view, 'operations');
+  assert.equal(moroccoGuide.snapshot().guideRouteCityId, 'route-casablanca-1');
+  assert.match(moroccoGuide.root.innerHTML, /Марокко: города и пустыня/);
+  assert.match(moroccoGuide.root.innerHTML, /Касабланка|AT 221/);
+  assert.doesNotMatch(moroccoGuide.root.innerHTML, /Сводная тура ещё не подготовлена|Пекин|CZ 342/);
+  moroccoGuide.click({ action: 'guide-stage', stage: 'hotel' });
+  assert.equal(moroccoGuide.snapshot().stage, 'hotel');
+  assert.match(moroccoGuide.root.innerHTML, /Odyssee Center Hotel/);
+  moroccoGuide.click({ action: 'open-guide-city-picker' });
+  assert.match(moroccoGuide.root.innerHTML, /Марракеш/);
+  moroccoGuide.click({ action: 'select-guide-city', city: 'route-marrakesh-1' });
+  assert.equal(moroccoGuide.snapshot().guideRouteCityId, 'route-marrakesh-1');
+  assert.match(moroccoGuide.root.innerHTML, /Riad Kniza[^]*?8 туристов/);
+  moroccoGuide.click({ action: 'guide-stage', stage: 'departure' });
+  moroccoGuide.click({ action: 'guide-operation-status', city: 'route-marrakesh-1', stage: 'departure', operation: 'marrakesh-ouarzazate', status: 'departed' });
+  assert.equal(moroccoGuide.snapshot().guideOperationalStatuses['morocco|route-marrakesh-1|departure|marrakesh-ouarzazate'], 'departed');
+  assert.match(moroccoGuide.root.innerHTML, /Статус: Уехал/);
+  moroccoGuide.click({ action: 'guide-stage', stage: 'program' });
+  assert.equal(moroccoGuide.snapshot().view, 'program');
+  assert.match(moroccoGuide.root.innerHTML, /Программа тура/);
+  assert.match(moroccoGuide.root.innerHTML, /Касабланка|Уарзазат/);
+}
+const moroccoGuideDeepLink = loadPrototype('tour-operations.js', '#app', '?tourId=morocco&role=viewer&routeCityId=route-ouarzazate-1&operation=departure');
+assert.equal(moroccoGuideDeepLink.snapshot().guideRouteCityId, 'route-ouarzazate-1');
+assert.match(moroccoGuideDeepLink.root.innerHTML, /AT 412/);
+assert.match(moroccoGuideDeepLink.root.innerHTML, /AT 412[^]*?4 туриста/);
+const guideTourSwitch = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=viewer');
+guideTourSwitch.click({ action: 'open-tours' });
+guideTourSwitch.click({ action: 'select-tour', id: 'morocco' });
+assert.equal(guideTourSwitch.snapshot().selectedTourId, 'morocco');
+assert.equal(guideTourSwitch.snapshot().view, 'operations');
+assert.match(guideTourSwitch.root.innerHTML, /AT 221/);
+assert.doesNotMatch(guideTourSwitch.root.innerHTML, /Сводная тура ещё не подготовлена/);
+const offlineMoroccoGuide = loadPrototype('tour-operations.js', '#app', '?tourId=morocco&role=escort&offline=1');
+const offlineGuideBefore = deepClone(offlineMoroccoGuide.snapshot().guideOperationalStatuses);
+offlineMoroccoGuide.dispatch({ action: 'guide-operation-status', city: 'route-casablanca-1', stage: 'arrival', operation: 'at-221', status: 'arrived' });
+assert.deepEqual(offlineMoroccoGuide.snapshot().guideOperationalStatuses, offlineGuideBefore);
+assert.match(offlineMoroccoGuide.root.innerHTML, /Нет подключения/);
+
+// Guide and escort keep the first-edition Tourists workspace on Morocco, scoped to the active route position.
+for (const role of ['viewer', 'escort']) {
+  const guideTourists = loadPrototype('tour-operations.js', '#app', `?tourId=morocco&role=${role}&view=tourists`);
+  assert.equal(guideTourists.snapshot().view, 'tourists');
+  assert.equal(guideTourists.snapshot().guideRouteCityId, 'route-casablanca-1');
+  assert.equal(guideTourists.snapshot().guideTouristMemberIds.length, 10);
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 10);
+  assert.match(guideTourists.root.innerHTML, /city-picker-index">1</);
+  assert.match(guideTourists.root.innerHTML, /Участники остановки/);
+  ['Встреча', 'Отель', 'Отъезд'].forEach((label) => assert.match(guideTourists.root.innerHTML, new RegExp(label)));
+  assert.doesNotMatch(guideTourists.root.innerHTML, /Сводная тура ещё не подготовлена|Пекин|CZ 342/);
+
+  guideTourists.input({ touristSearch: '' }, 'Ахметова');
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 2);
+  assert.match(guideTourists.root.innerHTML, /Ахметова/);
+  assert.doesNotMatch(guideTourists.root.innerHTML, /Захарова/);
+  guideTourists.input({ touristSearch: '' }, '');
+  guideTourists.click({ action: 'guide-tourist-filter', filter: 'completed' });
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 0);
+  assert.match(guideTourists.root.innerHTML, /Туристы не найдены/);
+  guideTourists.click({ action: 'guide-tourist-filter', filter: 'attention' });
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 10);
+  guideTourists.click({ action: 'guide-tourist-filter', filter: 'all' });
+
+  guideTourists.click({ action: 'open-guide-city-picker' });
+  guideTourists.click({ action: 'select-guide-city', city: 'route-marrakesh-1' });
+  assert.equal(guideTourists.snapshot().guideTouristMemberIds.length, 8);
+  assert.match(guideTourists.root.innerHTML, /city-picker-index">2</);
+  assert.match(guideTourists.root.innerHTML, /Марракеш[^]*?показано 8 из 8/);
+  guideTourists.click({ action: 'open-guide-city-picker' });
+  guideTourists.click({ action: 'select-guide-city', city: 'route-ouarzazate-1' });
+  assert.equal(guideTourists.snapshot().guideTouristMemberIds.length, 4);
+  assert.match(guideTourists.root.innerHTML, /city-picker-index">3</);
+  assert.deepEqual(guideTourists.snapshot().guideTouristMemberIds, ['tourist-morocco-01', 'tourist-morocco-02', 'tourist-morocco-05', 'tourist-morocco-06']);
+
+  guideTourists.click({ action: 'tourist-detail', id: 'tourist-morocco-01' });
+  assert.match(guideTourists.root.innerHTML, /Профиль[^]*?В туре/);
+  guideTourists.click({ action: 'tourist-detail-tab', tab: 'tour' });
+  guideTourists.click({ action: 'toggle-profile-section', section: 'tour-context' });
+  guideTourists.click({ action: 'toggle-profile-section', section: 'logistics' });
+  assert.match(guideTourists.root.innerHTML, /Касабланка → Марракеш → Уарзазат/);
+  assert.match(guideTourists.root.innerHTML, /AT 221[^]*?Riad Kniza[^]*?AT 412/);
+  assert.match(guideTourists.root.innerHTML, /Фактические статусы[^]*?Уарзазат/);
+  assert.doesNotMatch(guideTourists.root.innerHTML, /Пекин|Сиань|Шанхай|CZ 342/);
+  guideTourists.click({ action: 'close-overlay' });
+
+  guideTourists.click({ action: 'open-guide-city-picker' });
+  guideTourists.click({ action: 'select-guide-city', city: 'route-marrakesh-1' });
+  guideTourists.click({ action: 'nav', view: 'operations' });
+  guideTourists.click({ action: 'guide-stage', stage: 'arrival' });
+  guideTourists.click({ action: 'guide-operation-status', city: 'route-marrakesh-1', stage: 'arrival', operation: 'arrival-marrakesh', status: 'arrived' });
+  guideTourists.click({ action: 'guide-stage', stage: 'hotel' });
+  guideTourists.click({ action: 'guide-operation-status', city: 'route-marrakesh-1', stage: 'hotel', operation: 'riad-kniza', status: 'checked_in' });
+  guideTourists.click({ action: 'guide-stage', stage: 'departure' });
+  guideTourists.click({ action: 'guide-operation-status', city: 'route-marrakesh-1', stage: 'departure', operation: 'marrakesh-ouarzazate', status: 'departed' });
+  guideTourists.click({ action: 'nav', view: 'tourists' });
+  guideTourists.click({ action: 'guide-tourist-filter', filter: 'completed' });
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 8);
+  assert.match(guideTourists.root.innerHTML, /Завершены · 8/);
+  guideTourists.click({ action: 'guide-tourist-filter', filter: 'attention' });
+  assert.equal(guideTourists.snapshot().guideTouristVisibleIds.length, 0);
+}
+
+const forbiddenMoroccoStopTourist = loadPrototype('tour-operations.js', '#app', '?tourId=morocco&role=viewer&view=tourists&routeCityId=route-ouarzazate-1&tourist=tourist-morocco-03');
+assert.match(forbiddenMoroccoStopTourist.root.innerHTML, /Карточка недоступна/);
+assert.doesNotMatch(forbiddenMoroccoStopTourist.root.innerHTML, /Захарова Полина/);
+
+// Finance reproduces the working application's per-lead balance and role rules.
+const financeStorage = new Map();
+const managerFinance = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=finance&role=manager', financeStorage);
+assert.equal(managerFinance.snapshot().view, 'finance');
+assert.match(managerFinance.root.innerHTML, /Финансы · остатки по оплате/);
+assert.match(managerFinance.root.innerHTML, /148[\s\u00a0]*000[^<]*¥/);
+assert.match(managerFinance.root.innerHTML, /Соколова Анна Игоревна[^]*?Плательщик/);
+assert.equal(managerFinance.snapshot().financeRouteCityId, 'route-beijing-1');
+assert.equal(managerFinance.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 10, 'Beijing Finance includes only its ten route participants');
+selectFinanceCity(managerFinance, 'route-xian-1');
+assert.equal(managerFinance.snapshot().financeRouteCityId, 'route-xian-1');
+assert.equal(managerFinance.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 8, 'changing the active route position recalculates the China finance participant pool');
+managerFinance.click(financeCollectionAction(managerFinance, 'true'));
+let storedFinanceLeads = JSON.parse(financeStorage.get('unique-guide-leads-v2'));
+assert.equal(storedFinanceLeads.find((item) => item.id === 'lead-1042').remainingPaymentCollected, true);
+assert.match(managerFinance.root.innerHTML, /Отменить действие/);
+managerFinance.click(financeCollectionAction(managerFinance, 'false'));
+storedFinanceLeads = JSON.parse(financeStorage.get('unique-guide-leads-v2'));
+assert.equal(storedFinanceLeads.find((item) => item.id === 'lead-1042').remainingPaymentCollected, false, 'pay/unpay updates the same lead instead of duplicating it');
+assert.equal(storedFinanceLeads.filter((item) => item.id === 'lead-1042').length, 1);
+const leadsAfterDirectTourWrite = loadPrototype('mobile-leads.js', '#app', '?role=admin', financeStorage);
+assert.equal(leadsAfterDirectTourWrite.snapshot().leads.length, datasetAdmin.leads.length, 'a first write from Tours creates a complete lead snapshot');
+assert.ok(leadsAfterDirectTourWrite.snapshot().leads.some((item) => item.id === 'lead-1048'));
+assert.ok(leadsAfterDirectTourWrite.snapshot().leads.some((item) => item.id === 'lead-turkey-04'));
+
+const offlineFinance = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=finance&role=manager&offline=1');
+assert.match(offlineFinance.root.innerHTML, /Остатки доступны для чтения; отметка оплаты заблокирована/);
+assert.doesNotMatch(offlineFinance.root.innerHTML, /data-action="finance-collection"/);
+
+const guideFinance = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=finance&role=viewer');
+assert.equal(guideFinance.snapshot().view, 'finance', 'guide assigned to financeGuideCityId can open Finance');
+assert.match(guideFinance.root.innerHTML, /Финансы · остатки по оплате/);
+
+const escortChinaFinance = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=finance&role=escort');
+assert.equal(escortChinaFinance.snapshot().view, 'operations', 'ordinary escort is returned to first-edition Tasks');
+assert.doesNotMatch(escortChinaFinance.root.innerHTML, /Финансы · остатки по оплате|148[\s\u00a0]*000/);
+
+for (const role of ['viewer', 'escort']) {
+  const moroccoFinanceStorage = new Map();
+  const moroccoFinance = loadPrototype('tour-operations.js', '#app', `?tourId=morocco&view=finance&role=${role}`, moroccoFinanceStorage);
+  assert.equal(moroccoFinance.snapshot().view, 'finance', `Morocco exception grants Finance to ${role}`);
+  assert.match(moroccoFinance.root.innerHTML, /Финансы · остатки по оплате/);
+  assert.doesNotMatch(moroccoFinance.root.innerHTML, /data-lead-id|lead-morocco-/i, `Finance DOM must not expose leadId to ${role}`);
+  moroccoFinance.click(financeCollectionAction(moroccoFinance, 'true'));
+  const storedMoroccoFinanceLeads = JSON.parse(moroccoFinanceStorage.get('unique-guide-leads-v2'));
+  assert.equal(storedMoroccoFinanceLeads.find((item) => item.id === 'lead-morocco-01').remainingPaymentCollected, true, `${role} can still mark the current route-scoped application`);
+  assert.doesNotMatch(moroccoFinance.root.innerHTML, /data-lead-id|lead-morocco-/i, `rerendered Finance DOM must keep leadId private for ${role}`);
+  assert.equal(moroccoFinance.snapshot().financeRouteCityId, 'route-casablanca-1');
+  selectFinanceCity(moroccoFinance, 'route-ouarzazate-1');
+  assert.equal(moroccoFinance.snapshot().financeRouteCityId, 'route-ouarzazate-1');
+  assert.equal(moroccoFinance.snapshot().financeRows.length, 2, `Morocco exception still scopes ${role} to the active route city`);
+  assert.equal(moroccoFinance.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 4);
+}
+
+const staleMoroccoFinanceStorage = new Map();
+const staleMoroccoFinance = loadPrototype('tour-operations.js', '#app', '?tourId=morocco&view=finance&role=viewer', staleMoroccoFinanceStorage);
+const staleFinanceAction = financeCollectionAction(staleMoroccoFinance, 'true');
+selectFinanceCity(staleMoroccoFinance, 'route-ouarzazate-1');
+const financeRowsBeforeStaleReplay = deepClone(staleMoroccoFinance.snapshot().financeRows);
+staleMoroccoFinance.dispatch(staleFinanceAction);
+const staleMoroccoLeads = JSON.parse(staleMoroccoFinanceStorage.get('unique-guide-leads-v2') || '[]');
+assert.ok(!staleMoroccoLeads.find((item) => item.id === 'lead-morocco-01') || staleMoroccoLeads.find((item) => item.id === 'lead-morocco-01').remainingPaymentCollected !== true, 'a stale Finance action cannot mutate a row after routeCityId changes');
+assert.deepEqual(staleMoroccoFinance.snapshot().financeRows, financeRowsBeforeStaleReplay, 'stale replay cannot mutate whichever application now occupies the former visual position');
+assert.match(staleMoroccoFinance.root.innerHTML, /Заявка не относится к выбранной позиции маршрута/);
+
+const moroccoFinanceByCity = loadPrototype('tour-operations.js', '#app', '?tourId=morocco&view=finance&role=manager');
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.length, 5);
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 10);
+assert.match(moroccoFinanceByCity.root.innerHTML, /120[\s\u00a0]*000[^<]*₽/);
+assert.match(moroccoFinanceByCity.root.innerHTML, /227[\s\u00a0]*000[^<]*¥/);
+moroccoFinanceByCity.click({ action: 'open-finance-city-picker' });
+['Касабланка', 'Марракеш', 'Уарзазат', '10 туристов · 5 заявок', '8 туристов · 4 заявки', '4 туриста · 2 заявки'].forEach((label) => {
+  assert.match(moroccoFinanceByCity.root.innerHTML, new RegExp(label));
+});
+moroccoFinanceByCity.click({ action: 'select-finance-city', routeCityId: 'route-marrakesh-1' });
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.length, 4);
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 8);
+assert.match(moroccoFinanceByCity.root.innerHTML, /120[\s\u00a0]*000[^<]*₽/);
+assert.match(moroccoFinanceByCity.root.innerHTML, /100[\s\u00a0]*500[^<]*¥/);
+assert.doesNotMatch(moroccoFinanceByCity.root.innerHTML, /Власова/);
+selectFinanceCity(moroccoFinanceByCity, 'route-ouarzazate-1');
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.length, 2);
+assert.equal(moroccoFinanceByCity.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 4);
+assert.match(moroccoFinanceByCity.root.innerHTML, /100[\s\u00a0]*500[^<]*¥/);
+assert.doesNotMatch(moroccoFinanceByCity.root.innerHTML, /120[\s\u00a0]*000[^<]*₽|Захарова|Осипова|Власова/);
+
+const japanFinanceByCity = loadPrototype('tour-operations.js', '#app', '?tourId=japan&view=finance&role=manager&routeCityId=route-kyoto-1');
+assert.equal(japanFinanceByCity.snapshot().financeRouteCityId, 'route-kyoto-1', 'non-China Finance honors a stable routeCityId deep link');
+assert.match(japanFinanceByCity.root.innerHTML, /Киото/);
+selectFinanceCity(japanFinanceByCity, 'route-osaka-1');
+assert.equal(japanFinanceByCity.snapshot().financeRouteCityId, 'route-osaka-1');
+assert.equal(japanFinanceByCity.snapshot().financeRows.reduce((sum, row) => sum + row.memberIds.length, 0), 10);
+
+const viewerJapanFinance = loadPrototype('tour-operations.js', '#app', '?tourId=japan&view=finance&role=viewer');
+assert.notEqual(viewerJapanFinance.snapshot().view, 'finance');
+assert.doesNotMatch(viewerJapanFinance.root.innerHTML, /Финансы · остатки по оплате/);
+
+const managerDebtFilter = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&role=manager');
+managerDebtFilter.click({ action: 'tourist-filters' });
+assert.match(managerDebtFilter.root.innerHTML, /С долгом/);
+managerDebtFilter.click({ action: 'toggle-tourist-filter', filter: 'debt' });
+assert.equal(managerDebtFilter.snapshot().touristFilters.debt, true);
+selectRole(managerDebtFilter, 'escort');
+assert.equal(managerDebtFilter.snapshot().touristFilters.debt, false, 'losing Finance access clears the debt filter');
+managerDebtFilter.click({ action: 'tourist-filters' });
+assert.doesNotMatch(managerDebtFilter.root.innerHTML, /С долгом/);
 
 const viewerDisallowedCity = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&routeCityId=route-shanghai-1&role=viewer');
 assert.equal(viewerDisallowedCity.snapshot().routeCityId, 'route-beijing-1', 'a forbidden city deep link is normalized before render');
@@ -514,7 +874,7 @@ assert.equal(viewerProfile.window.location.href, viewerHrefBeforeForgery);
 // A manager assigned to the tour still sees an unassigned tourist operationally, without Lead PII or documents.
 const managerPrivacyStorage = new Map();
 loadPrototype('mobile-leads.js', '#app', '?role=admin', managerPrivacyStorage);
-const privacyTourists = JSON.parse(managerPrivacyStorage.get('unique-guide-tourists-v2'));
+const privacyTourists = JSON.parse(managerPrivacyStorage.get('unique-guide-tourists-v3'));
 const privacyTourist = privacyTourists.find((tourist) => tourist.id === 'lead-tourist-1051');
 Object.assign(privacyTourist, {
   lead: 'Лид Секретный-1051',
@@ -527,7 +887,7 @@ Object.assign(privacyTourist, {
   passport: 'PRIVATE-FOREIGN-7654321',
   scans: [{ id: 'private-scan', name: 'private-passport-scan.pdf' }],
 });
-managerPrivacyStorage.set('unique-guide-tourists-v2', JSON.stringify(privacyTourists));
+managerPrivacyStorage.set('unique-guide-tourists-v3', JSON.stringify(privacyTourists));
 const managerPrivacy = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&summarySection=tourists&role=manager', managerPrivacyStorage);
 const privateTokens = /Лид Секретный-1051|lead-1051|\+7 999 111-22-33|restricted-denis@example\.test|PRIVATE-RF-987654|PRIVATE AUTHORITY|PRIVATE ADDRESS|DENIS PRIVATE VOLKOV|PRIVATE-FOREIGN-7654321|private-passport-scan\.pdf/;
 assert.match(managerPrivacy.root.innerHTML, /Волков Денис Олегович/);
@@ -599,7 +959,7 @@ const readinessBaseline = deepClone(profile.snapshot().tourists);
 function readinessStorage(mutate) {
   const stored = deepClone(readinessBaseline);
   mutate(stored);
-  return new Map([['unique-guide-tourists-v2', JSON.stringify(stored)]]);
+  return new Map([['unique-guide-tourists-v3', JSON.stringify(stored)]]);
 }
 
 const missingPrimaryPersonal = loadPrototype(
@@ -666,7 +1026,7 @@ assert.equal(createdPrimary.passport, '75 7654321');
 // EventCard and the Tours list derive participant counts from the same live tourist store.
 const dynamicTourCount = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview&role=manager', leadCrudStorage);
 const dynamicChinaCount = dynamicTourCount.snapshot().tourists.filter((tourist) => tourist.tourId === 'china').length;
-assert.equal(dynamicChinaCount, 6);
+assert.equal(dynamicChinaCount, 11);
 assert.match(dynamicTourCount.root.innerHTML, new RegExp(`${dynamicChinaCount} из 12 участников`));
 assert.match(dynamicTourCount.root.innerHTML, new RegExp(`<span>Свободно<\\/span><strong>${12 - dynamicChinaCount}<\\/strong>`));
 dynamicTourCount.click({ action: 'open-tours' });
@@ -1138,12 +1498,12 @@ assert.equal(forgedDraftReopen.snapshot().tours.find((tour) => tour.id === 'japa
 function lifecycleStorage() {
   const storage = new Map();
   const leadSeed = loadPrototype('mobile-leads.js', '#app', '?role=admin', storage);
-  storage.set('unique-guide-leads-v1', JSON.stringify(leadSeed.snapshot().leads));
+  storage.set('unique-guide-leads-v2', JSON.stringify(leadSeed.snapshot().leads));
   return storage;
 }
 function linkedLeads(storage, tourSnapshot, tourId) {
   const linkedLeadIds = new Set(tourSnapshot.tourists.filter((tourist) => tourist.tourId === tourId).map((tourist) => tourist.leadId));
-  return JSON.parse(storage.get('unique-guide-leads-v1')).filter((item) => linkedLeadIds.has(item.id));
+  return JSON.parse(storage.get('unique-guide-leads-v2')).filter((item) => linkedLeadIds.has(item.id));
 }
 
 // AC-46: cancel/archive preserve tour data while linked Leads follow the lifecycle; reopen/unarchive restores them.
@@ -1278,15 +1638,38 @@ assert.match(operationDraftState.root.innerHTML, /<option value="train"[^>]*sele
 
 // Static isolation: the prototype is mock/localStorage-only and has no production integration.
 const activeFiles = [
+  'mock-crm-data.js',
   'mobile-leads.html', 'mobile-leads.css', 'mobile-leads.js',
   'tour-operations.html', 'tour-operations.css', 'tour-operations.js',
   'mobile-leads-tz.html', 'mobile-leads-tz.css',
 ];
 const activeSource = activeFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
-const activeJs = fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
+const activeJs = fs.readFileSync('mock-crm-data.js', 'utf8') + fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
 assert.doesNotMatch(activeSource, /@import\s+url\(|url\(["']?https?:|<script[^>]+https?:|<link[^>]+https?:/i);
 assert.doesNotMatch(activeJs, /(?:fetch\s*\(|new\s+XMLHttpRequest|new\s+WebSocket|new\s+EventSource|sendBeacon\s*\(|\/api\/)/);
-assert.doesNotMatch(activeSource, />\s*(?:Финансы|Расходы)\s*</i);
+assert.match(fs.readFileSync('tour-operations.js', 'utf8'), /label: 'Финансы'/, 'the unified prototype must include the working-app Finance entry point');
+assert.doesNotMatch(activeSource, />\s*Расходы\s*</i, 'the prototype does not invent a separate Expenses module');
+
+// Delivery companion pages are complete, local-only documents rather than broken navigation targets.
+const commercialHtml = fs.readFileSync('commercial-proposal.html', 'utf8');
+const commercialCss = fs.readFileSync('commercial-proposal.css', 'utf8');
+assert.ok(fs.existsSync('.nojekyll'), 'GitHub Pages must serve the static branch without Jekyll processing');
+assert.match(fs.readFileSync('index.html', 'utf8'), /tour-operations\.html/);
+assert.equal((commercialHtml.match(/<article class="work-card /g) || []).length, 6, 'commercial proposal contains six priced deliverables');
+assert.equal((commercialHtml.match(/<b>[^<]*&nbsp;₽<\/b><\/li>/g) || []).length, 32, 'commercial proposal decomposes the six blocks into thirty-two priced tasks');
+const commercialTaskAmounts = [...commercialHtml.matchAll(/<b>([\d]+(?:&nbsp;[\d]+)*)&nbsp;₽<\/b><\/li>/g)]
+  .map((match) => Number(match[1].replaceAll('&nbsp;', '')));
+assert.equal(commercialTaskAmounts.reduce((sum, amount) => sum + amount, 0), 1_488_000, 'priced tasks add up to the stated base estimate');
+['240&nbsp;000&nbsp;₽', '1&nbsp;488&nbsp;000&nbsp;₽', '223&nbsp;200&nbsp;₽', '1&nbsp;711&nbsp;200&nbsp;₽', '1&nbsp;951&nbsp;200&nbsp;₽'].forEach((amount) => assert.match(commercialHtml, new RegExp(escapeRegExp(amount))));
+[
+  'https://appfox.ru/research/razrabotka-mob-prilozhenii/',
+  'https://antaltalent.ru/wp-content/uploads/2025/10/RUS_Job_market_25-26.pdf',
+  'https://clutch.co/directory/mobile-application-developers/pricing',
+  'https://twenty.com/pricing',
+  'https://www.salesforce.com/service/field-service-management/pricing/',
+].forEach((sourceUrl) => assert.match(commercialHtml, new RegExp(escapeRegExp(sourceUrl))));
+assert.doesNotMatch(commercialHtml, /<script\b|<link[^>]+https?:/i);
+assert.doesNotMatch(commercialCss, /@import\s+url\(|url\(["']?https?:/i);
 
 // Markdown is the canonical specification and the visual HTML is a generated, hashed view of it.
 const specMarkdown = fs.readFileSync('mobile-leads-tz.md', 'utf8');
@@ -1294,6 +1677,7 @@ const specHtml = fs.readFileSync('mobile-leads-tz.html', 'utf8');
 const specImages = [
   '16-lead-final.png', '17-tour-final.png', '18-tourist-profile-final.png',
   '19-tourist-tour-final.png', '20-summary-final.png', '21-team-final.png', '22-statuses-final.png',
+  '23-finance-final.png', '24-tours-data-final.png', '25-guide-final.png',
 ];
 specImages.forEach((image) => {
   const assetPath = `assets/spec/${image}`;
@@ -1301,7 +1685,7 @@ specImages.forEach((image) => {
   assert.match(specMarkdown, new RegExp(escapeRegExp(assetPath)), `${assetPath} must be documented in Markdown`);
   assert.match(specHtml, new RegExp(`src="${escapeRegExp(assetPath)}"`), `${assetPath} must be rendered in HTML`);
 });
-assert.equal((specHtml.match(/aria-hidden="true" class="marker/g) || []).length, 28);
+assert.equal((specHtml.match(/aria-hidden="true" class="marker/g) || []).length, 40);
 const requirementIds = [...new Set(specMarkdown.match(/\b(?:AC|NG|BL)-\d+\b/g) || [])];
 assert.ok(requirementIds.length >= 60, 'the canonical spec must retain acceptance criteria, non-goals and backlog');
 const markdownHash = crypto.createHash('sha256').update(specMarkdown).digest('hex');
