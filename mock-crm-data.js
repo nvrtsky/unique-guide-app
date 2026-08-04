@@ -101,7 +101,7 @@
       tourCost: String(180000 + index * 5000), tourCostCurrency: 'RUB', advancePayment: String(60000 + index * 2500), advancePaymentCurrency: 'RUB',
       remainingPayment: remaining, remainingPaymentCurrency: currency, remainingPaymentCollected: collected,
       paymentStatus: collected || noBalance ? 'paid' : 'partial', paymentMethod: index % 2 ? 'bank_transfer' : 'card', bookingId: 'BK-' + plan.code.slice(2),
-      note: 'Тестовая заявка для проверки мобильного MVP.', touristIds: [], messages: [], tasks: []
+      note: 'Тестовая заявка для проверки мобильного прототипа.', touristIds: [], messages: [], tasks: []
     };
   }
 

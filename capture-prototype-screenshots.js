@@ -17,6 +17,12 @@ const captures = [
   ['23-finance-final.png', 'tour-operations.html?tourId=china&view=finance&role=manager'],
   ['24-tours-data-final.png', 'tour-operations.html?tourId=china&showTours=1&tourFilter=all&role=manager'],
   ['25-guide-final.png', 'tour-operations.html?tourId=china&role=viewer'],
+  ['26-chat-hub-final.png', 'tour-operations.html?view=chats&chatScope=staff&tourId=china&role=manager'],
+  ['27-chat-staff-final.png', 'tour-operations.html?view=chats&chatScope=staff&chat=staff-tour-china&tourId=china&role=manager'],
+  ['28-chat-client-final.png', 'tour-operations.html?view=chats&chatScope=client&chat=client-tourist-t1&tourId=china&role=manager'],
+  ['29-chat-wazzup-final.png', 'tour-operations.html?view=leads&lead=lead-1042&tab=chat&tourId=china&role=manager&wazzup=loaded'],
+  ['30-chat-wazzup-error-final.png', 'tour-operations.html?view=leads&lead=lead-1042&tab=chat&tourId=china&role=manager&wazzup=error'],
+  ['31-chat-guide-final.png', 'tour-operations.html?view=chats&chatScope=client&chat=client-tour-china&tourId=china&role=viewer'],
 ];
 
 function browserPath() {

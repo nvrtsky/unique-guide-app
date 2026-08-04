@@ -351,6 +351,10 @@ button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-
 .loader { width: 34px; height: 34px; border: 3px solid #dfe4ea; border-top-color: var(--blue); border-radius: 50%; animation: spin .8s linear infinite; }
 .chat-caption { min-height: 44px; margin-bottom: 9px; display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--muted); font-size: 11px; }
 .chat-caption button { width: 44px; height: 44px; border: 0; border-radius: 12px; background: #fff; color: var(--ink); font-size: 20px; }
+.channel-notice { min-height: 64px; margin: 2px 0 10px; padding: 11px 12px; border: 1px solid #d8c9f4; border-radius: 14px; background: #f5f1fd; color: #4b3a7b; }
+.channel-notice strong, .channel-notice span { display: block; }
+.channel-notice strong { font-size: 12px; }
+.channel-notice span { margin-top: 4px; font-size: 11px; line-height: 1.45; }
 .task-badges { margin-bottom: 9px; display: flex; flex-wrap: wrap; gap: 5px; }
 .task-badges span { padding: 5px 8px; border-radius: 12px; background: #f0f3f6; color: var(--muted); font-size: 9.5px; font-weight: 800; }
 .task-card { min-height: 66px; border-bottom: 1px solid var(--line-soft); display: flex; align-items: center; gap: 8px; }

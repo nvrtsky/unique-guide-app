@@ -527,6 +527,44 @@ for (const requestedRole of ['viewer', 'guide']) {
 const guideHome = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=viewer');
 assert.equal(guideHome.snapshot().view, 'operations');
 
+// The manager chat center keeps staff, in-app clients and Wazzup shortcuts separate.
+const chatHub = loadPrototype(['mobile-chats.js', 'tour-operations.js'], '#app', '?tourId=china&view=chats&chatScope=staff&role=manager');
+const initialChatSnapshot = chatHub.window.UNIQUE_MOBILE_CHATS.snapshot();
+assert.equal(initialChatSnapshot.screen, 'list');
+assert.equal(initialChatSnapshot.activeTab, 'staff');
+assert.deepEqual(Array.from(initialChatSnapshot.scopes, (scope) => scope.id), ['staff', 'client', 'wazzup']);
+assert.equal(initialChatSnapshot.unreadTotal, initialChatSnapshot.unread.staff + initialChatSnapshot.unread.client, 'Wazzup does not inflate the internal unread counter');
+assert.match(chatHub.root.innerHTML, /Общий чат команды/);
+assert.match(chatHub.root.innerHTML, /Команда/);
+assert.match(chatHub.root.innerHTML, /Клиенты/);
+assert.match(chatHub.root.innerHTML, /Wazzup/);
+
+chatHub.window.UNIQUE_MOBILE_CHATS.handleAction('tab', { dataset: { chatAction: 'tab', chatTab: 'client' } });
+assert.match(chatHub.root.innerHTML, /Личный чат с туристом/);
+chatHub.window.UNIQUE_MOBILE_CHATS.handleAction('open-thread', { dataset: { chatAction: 'open-thread', chatThreadId: 'client-tourist-t1' } });
+assert.match(chatHub.root.innerHTML, /Сообщения видят Анна Соколова и сотрудники с доступом/);
+assert.match(chatHub.root.innerHTML, /Клиентский чат в приложении/);
+
+// Contextual actions reuse the same in-app client threads.
+const contextualPersonalChat = loadPrototype(['mobile-chats.js', 'tour-operations.js'], '#app', '?tourId=china&tourSection=summary&summarySection=tourists&role=manager');
+contextualPersonalChat.click({ action: 'message-tourist', id: 't1' });
+assert.equal(contextualPersonalChat.snapshot().view, 'chats');
+assert.equal(contextualPersonalChat.window.UNIQUE_MOBILE_CHATS.snapshot().activeThreadId, 'client-tourist-t1');
+assert.match(contextualPersonalChat.root.innerHTML, /Анна Соколова/);
+
+const guideTourChat = loadPrototype(['mobile-chats.js', 'tour-operations.js'], '#app', '?tourId=china&role=viewer');
+guideTourChat.click({ action: 'open-tour-chat' });
+assert.equal(guideTourChat.snapshot().view, 'chats');
+assert.equal(guideTourChat.window.UNIQUE_MOBILE_CHATS.snapshot().activeThreadId, 'client-tour-china');
+assert.match(guideTourChat.root.innerHTML, /Сообщения видят участники тура и сотрудники с доступом/);
+
+// A Wazzup shortcut opens the existing lead chat instead of merging its history into UNIQUE.
+const wazzupShortcut = loadPrototype(['mobile-chats.js', 'tour-operations.js', 'mobile-leads.js'], '#app', '?tourId=china&view=chats&chatScope=wazzup&role=manager');
+wazzupShortcut.window.UNIQUE_MOBILE_CHATS.handleAction('open-thread', { dataset: { chatAction: 'open-thread', chatThreadId: 'wazzup-lead-1042-wa' } });
+assert.equal(wazzupShortcut.workspaceStyles.disabled, false);
+assert.match(wazzupShortcut.root.innerHTML, /Wazzup · внешний канал/);
+assert.match(wazzupShortcut.root.innerHTML, /Историю и статусы сообщений показывает Wazzup/);
+
 // Leads are an in-app workspace of the same prototype shell, not a hard-navigation application.
 const unifiedWorkspace = loadPrototype(['tour-operations.js', 'mobile-leads.js'], '#app', '?tourId=china&tourSection=summary&routeCityId=route-xian-1&operation=hotel&role=manager');
 const unifiedTourBeforeLeads = deepClone(unifiedWorkspace.snapshot());
@@ -537,7 +575,7 @@ assert.match(unifiedWorkspace.root.innerHTML, /class="status-icons"/);
 assert.match(unifiedWorkspace.root.innerHTML, /class="user-row"/);
 assert.match(unifiedWorkspace.root.innerHTML, /data-action="role-menu"[^>]*>Менеджер<\/button>/);
 const unifiedLeadNav = (unifiedWorkspace.root.innerHTML.match(/<nav class="[^"]*\bbottom-nav\b[^"]*"[^>]*>([\s\S]*?)<\/nav>/) || [])[1] || '';
-assert.deepEqual([...unifiedLeadNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), ['Туры', 'Туристы', 'Финансы', 'Лиды']);
+assert.deepEqual([...unifiedLeadNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1]), ['Туры', 'Туристы', 'Финансы', 'Лиды', 'Чаты']);
 assert.match(unifiedLeadNav, /class="nav-item active"[^>]*data-action="nav" data-view="leads"/);
 assert.doesNotMatch(unifiedWorkspace.root.innerHTML, /● ● ▰|data-action="nav-placeholder"/);
 unifiedWorkspace.click({ action: 'nav', view: 'tours' });
@@ -1177,13 +1215,13 @@ assert.equal(postponedLead.outcomeDate, '2027-02-01');
 
 // All seven Wazzup states are reachable by deep link without a network request.
 const wazzupStates = {
-  'settings-loading': 'Проверяем настройки Wazzup24',
-  'not-configured': 'Wazzup24 не настроен',
+  'settings-loading': 'Проверяем, сохранён ли ключ Wazzup24',
+  'not-configured': 'Ключ Wazzup24 не сохранён',
   'no-contact': 'Контактные данные не указаны',
-  loading: 'Загрузка чата',
-  error: 'Ошибка загрузки чата',
-  'not-loaded': 'Чат не загружен',
-  loaded: 'Чат',
+  loading: 'Wazzup загружает внешний чат',
+  error: 'Ошибка канала Wazzup',
+  'not-loaded': 'Внешний чат не загружен',
+  loaded: 'Wazzup · внешний канал',
 };
 Object.entries(wazzupStates).forEach(([state, copy]) => {
   const wazzup = loadPrototype('mobile-leads.js', '#app', `?lead=lead-1042&tab=chat&wazzup=${state}`);
@@ -1715,10 +1753,11 @@ const activeFiles = [
   'mock-crm-data.js',
   'mobile-leads.html', 'mobile-leads.css', 'mobile-leads.js',
   'tour-operations.html', 'tour-operations.css', 'tour-operations.js',
+  'mobile-chats.css', 'mobile-chats.js',
   'mobile-leads-tz.html', 'mobile-leads-tz.css',
 ];
 const activeSource = activeFiles.map((file) => fs.readFileSync(file, 'utf8')).join('\n');
-const activeJs = fs.readFileSync('mock-crm-data.js', 'utf8') + fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
+const activeJs = fs.readFileSync('mock-crm-data.js', 'utf8') + fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('mobile-chats.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
 assert.doesNotMatch(activeSource, /@import\s+url\(|url\(["']?https?:|<script[^>]+https?:|<link[^>]+https?:/i);
 assert.doesNotMatch(activeJs, /(?:fetch\s*\(|new\s+XMLHttpRequest|new\s+WebSocket|new\s+EventSource|sendBeacon\s*\(|\/api\/)/);
 assert.match(fs.readFileSync('tour-operations.js', 'utf8'), /label: 'Финансы'/, 'the unified prototype must include the working-app Finance entry point');
@@ -1729,8 +1768,8 @@ const commercialHtml = fs.readFileSync('commercial-proposal.html', 'utf8');
 const commercialCss = fs.readFileSync('commercial-proposal.css', 'utf8');
 assert.ok(fs.existsSync('.nojekyll'), 'GitHub Pages must serve the static branch without Jekyll processing');
 assert.match(fs.readFileSync('index.html', 'utf8'), /tour-operations\.html/);
-assert.equal((commercialHtml.match(/<article class="work-card /g) || []).length, 6, 'commercial proposal contains six priced deliverables');
-assert.equal((commercialHtml.match(/<b>[^<]*&nbsp;₽<\/b><\/li>/g) || []).length, 32, 'commercial proposal decomposes the six blocks into thirty-two priced tasks');
+assert.equal((commercialHtml.match(/<article class="work-card /g) || []).length, 5, 'commercial proposal contains five priced deliverables');
+assert.equal((commercialHtml.match(/<b>[^<]*&nbsp;₽<\/b><\/li>/g) || []).length, 31, 'commercial proposal decomposes the five blocks into thirty-one priced tasks');
 const commercialTaskAmounts = [...commercialHtml.matchAll(/<b>([\d]+(?:&nbsp;[\d]+)*)&nbsp;₽<\/b><\/li>/g)]
   .map((match) => Number(match[1].replaceAll('&nbsp;', '')));
 assert.equal(commercialTaskAmounts.reduce((sum, amount) => sum + amount, 0), 390_000, 'priced tasks add up to the fixed current-development price');
@@ -1755,6 +1794,8 @@ const specImages = [
   '16-lead-final.png', '17-tour-final.png', '18-tourist-profile-final.png',
   '19-tourist-tour-final.png', '20-summary-final.png', '21-team-final.png', '22-statuses-final.png',
   '23-finance-final.png', '24-tours-data-final.png', '25-guide-final.png',
+  '26-chat-hub-final.png', '27-chat-staff-final.png', '28-chat-client-final.png',
+  '29-chat-wazzup-final.png', '30-chat-wazzup-error-final.png', '31-chat-guide-final.png',
   '11-offline.png', '13-error-state.png', '14-empty-state.png', '15-summary-375.png',
 ];
 specImages.forEach((image) => {

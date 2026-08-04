@@ -39,6 +39,11 @@ const ROUTES = [
   { path: '/tour-operations.html?tourId=china&view=finance&role=manager', expect: ['Финансы', 'Остаток по оплате', 'Плательщик', 'Оплачен'] },
   { path: '/tour-operations.html?tourId=china&view=finance&role=escort', expect: ['Задачи', 'Встреча'], reject: ['Остаток по оплате', 'Финансы'] },
   { path: '/tour-operations.html?tourId=morocco&view=finance&role=escort', expect: ['Финансы', 'Остаток по оплате', 'Плательщик'] },
+  { path: '/tour-operations.html?tourId=china&view=chats&chatScope=staff&role=manager', expect: ['Чаты', 'Команда', 'Клиенты', 'Wazzup', 'Общий чат команды'] },
+  { path: '/tour-operations.html?tourId=china&view=chats&chatScope=staff&chat=staff-tour-china&role=manager', expect: ['Гранд-тур по Китаю', 'Привязан к туру', 'Клиенты не видят сообщения'] },
+  { path: '/tour-operations.html?tourId=china&view=chats&chatScope=client&chat=client-tourist-t1&role=manager', expect: ['Анна Соколова', 'Клиентский чат в приложении', 'Сообщения видят Анна Соколова и сотрудники с доступом'] },
+  { path: '/tour-operations.html?tourId=china&view=chats&chatScope=client&chat=client-tour-china&role=viewer', expect: ['Гранд-тур по Китаю', 'Общий клиентский чат тура', 'Сообщения видят участники тура и сотрудники с доступом'], reject: ['Команда', 'Wazzup'] },
+  { path: '/tour-operations.html?tourId=china&view=leads&lead=lead-1042&tab=chat&role=manager&wazzup=loaded', expect: ['Wazzup · внешний канал', 'WhatsApp', 'Анна Соколова', 'Историю и статусы сообщений показывает Wazzup'] },
   { path: '/tour-operations.html?tourId=china&tourSection=summary&routeCityId=route-shanghai-1&role=viewer', expect: ['Пекин · остановка 1', 'Гид'], reject: ['Шанхай', 'Пекин · остановка 2'] },
   { path: '/tour-operations.html?tourId=china&tourSection=tasks', expect: ['Гранд-тур по Китаю', 'Задачи'] },
   { path: '/tour-operations.html?tourId=china&tourSection=actions', expect: ['Гранд-тур по Китаю', 'Действия'] },
@@ -59,8 +64,8 @@ const ROUTES = [
   { path: '/mobile-leads.html?lead=lead-1042&role=escort', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Соколова', 'anna@example.ru'], minTargets: 3 },
   { path: '/mobile-leads.html?lead=lead-1042&role=superadmin', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Соколова', 'anna@example.ru'], minTargets: 3 },
   { path: '/mobile-leads.html?lead=lead-1051&role=manager', expect: ['Нет доступа к лидам', 'Данные не загружены'], reject: ['Волков', 'denis@example.ru'], minTargets: 4 },
-  { path: '/mobile-leads-tz.html', expect: ['ТЗ MVP', 'Финальный результат', 'Финальные экраны прототипа'], minTargets: 12 },
-  { path: '/commercial-proposal.html', expect: ['Текущая доработка мобильной CRM', '390 000 ₽', 'Шесть результатов', 'ПРОВЕРКА РЫНКОМ'], reject: ['240 000 ₽', '1 488 000 ₽'], minTargets: 8 },
+  { path: '/mobile-leads-tz.html', expect: ['ТЗ: единая мобильная CRM', '30 календарных дней', 'Три контура чатов', 'Финальные экраны прототипа'], reject: ['MVP'], minTargets: 12 },
+  { path: '/commercial-proposal.html', expect: ['Текущая доработка мобильной CRM', '390 000 ₽', 'Пять результатов', 'Интеграция и выпуск', 'ПРОВЕРКА РЫНКОМ'], reject: ['240 000 ₽', '1 488 000 ₽', 'MVP', '05 · Финансы'], minTargets: 8 },
 ];
 
 const contentTypes = {

@@ -43,6 +43,7 @@
     people: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg>',
     finance: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M15.5 8.5c-.7-.7-1.8-1.1-3.1-1.1-1.8 0-3 .8-3 2 0 3.2 6.2 1.2 6.2 4.4 0 1.2-1.2 2.1-3.2 2.1-1.5 0-2.8-.5-3.7-1.4M12 5.5v13"/></svg>',
     leads: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21a8 8 0 0 0-16 0"/><circle cx="12" cy="7" r="4"/></svg>',
+    chats: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a4 4 0 0 1-4 4H8l-5 3V7a4 4 0 0 1 4-4h10a4 4 0 0 1 4 4Z"/></svg>',
   };
 
   let sequence = 60;
@@ -640,7 +641,7 @@
   function bottomNav() {
     const leadAccess = isLeadRole();
     const items = leadAccess
-      ? [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people], ["finance", "Финансы", icons.finance], ["leads", "Лиды", icons.leads]]
+      ? [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people], ["finance", "Финансы", icons.finance], ["leads", "Лиды", icons.leads], ["chats", "Чаты", icons.chats]]
       : [["tours", "Туры", icons.tours], ["tourists", "Туристы", icons.people]];
     return '<nav class="bottom-nav' + (leadAccess ? "" : " restricted-nav") + '" aria-label="Основная навигация">' + items.map(([id, label, icon]) =>
       '<button type="button" class="nav-item ' + (leadAccess && id === "leads" ? "active" : "") + '" data-action="nav" data-view="' + id + '">' + icon + '<span>' + label + "</span></button>"
@@ -653,7 +654,7 @@
   }
 
   function appHeader(title, subtitle, trailing = "") {
-    return '<header class="app-top"><div class="user-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + esc(roleLabels[state.role]) + '</button></div>' +
+    return '<header class="app-top"><div class="user-row"><span class="user-label">UNIQUE · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + esc(roleLabels[state.role]) + '</button></div>' +
       '<div class="tour-row"><span class="tour-mark"></span><div class="tour-title"><strong>' + esc(title) + '</strong><span>' + esc(subtitle) + '</span></div>' + trailing + "</div></header>";
   }
 
@@ -811,16 +812,20 @@
 
   function chatTab(lead) {
     if (!capabilitiesForLead(lead).canSeePrivate) return '<section class="state-card"><strong>Чат недоступен</strong><p>Контактные данные скрыты для текущей роли или неназначенного менеджера.</p></section>';
+    const source = String(lead.source || "").toLowerCase();
+    const messenger = source === "telegram" ? "Telegram" : source === "instagram" ? "Instagram" : source === "max" ? "MAX" : "WhatsApp";
+    const recipient = messenger === "Telegram" && lead.telegram ? lead.telegram : (lead.phone || lead.telegramUserId || "контакт не указан");
+    const channelNotice = '<aside class="channel-notice external-channel"><strong>Wazzup · внешний канал</strong><span>Получатель: ' + esc([messenger, recipient].filter(Boolean).join(" · ")) + '. Историю и статусы сообщений показывает Wazzup; прототип не обращается к внешнему сервису.</span></aside>';
     const requestedState = state.offline ? "error" : ((!lead.phone && !lead.telegramUserId) ? "no-contact" : state.wazzupState);
-    if (requestedState === "settings-loading") return '<section class="state-card"><span class="loader"></span><p>Проверяем настройки Wazzup24…</p></section>';
-    if (requestedState === "not-configured") return '<section class="state-card"><strong>Wazzup24 не настроен</strong><p>Чтобы использовать WhatsApp-чат, настройте интеграцию Wazzup24.</p><button type="button" class="secondary" data-action="wazzup-settings">Перейти в настройки</button></section>';
-    if (requestedState === "no-contact") return '<section class="state-card"><strong>Контактные данные не указаны</strong><p>Для чата нужен телефон или Telegram ID. Заполните телефон во вкладке «Редактировать» и сохраните.</p></section>';
-    if (requestedState === "loading") return '<section class="state-card"><span class="loader"></span><p>Загрузка чата…</p></section>';
-    if (requestedState === "error") return '<section class="state-card error-card"><strong>Ошибка загрузки чата</strong><p>' + (state.offline ? "Нет подключения к интернету" : "Не удалось получить ссылку на чат") + '</p><button type="button" class="secondary" data-action="refresh-chat">Повторить</button></section>';
-    if (requestedState === "not-loaded") return '<section class="state-card"><strong>Чат не загружен</strong><button type="button" class="secondary" data-action="load-chat">Загрузить чат</button></section>';
+    if (requestedState === "settings-loading") return channelNotice + '<section class="state-card"><span class="loader"></span><p>Проверяем, сохранён ли ключ Wazzup24…</p></section>';
+    if (requestedState === "not-configured") return channelNotice + '<section class="state-card"><strong>Ключ Wazzup24 не сохранён</strong><p>Администратор должен настроить интеграцию до открытия внешнего чата.</p><button type="button" class="secondary" data-action="wazzup-settings">Перейти в настройки</button></section>';
+    if (requestedState === "no-contact") return channelNotice + '<section class="state-card"><strong>Контактные данные не указаны</strong><p>Для чата нужен телефон или Telegram ID. Заполните контакт во вкладке «Редактировать» и сохраните.</p></section>';
+    if (requestedState === "loading") return channelNotice + '<section class="state-card"><span class="loader"></span><p>Wazzup загружает внешний чат…</p></section>';
+    if (requestedState === "error") return channelNotice + '<section class="state-card error-card"><strong>Ошибка канала Wazzup</strong><p>' + (state.offline ? "Нет подключения к интернету" : "Не удалось получить ссылку на внешний чат") + '</p><button type="button" class="secondary" data-action="refresh-chat">Повторить</button></section>';
+    if (requestedState === "not-loaded") return channelNotice + '<section class="state-card"><strong>Внешний чат не загружен</strong><button type="button" class="secondary" data-action="load-chat">Загрузить чат</button></section>';
     const messages = lead.messages.length ? lead.messages.map(message => '<div class="message ' + (message.own ? "own" : "") + '"><strong>' + esc(message.author) + '</strong><p>' + esc(message.text) + '</p><span>' + esc(message.time) + "</span></div>").join("") : '<div class="empty compact-empty"><h3>Сообщений нет</h3><p>Начните диалог с клиентом.</p></div>';
     const composer = capabilitiesForLead(lead).canMutateMessages ? '<form id="chat-form" class="composer"><input name="message" placeholder="Сообщение клиенту" required><button aria-label="Отправить">↑</button></form>' : "";
-    return '<div class="chat-caption"><span>Чат ' + esc(optionLabel("source", lead.source) || "WhatsApp") + ' с ' + esc([lead.lastName, lead.firstName].filter(Boolean).join(" ")) + '</span><button type="button" data-action="refresh-chat" aria-label="Обновить чат">↻</button></div><section class="chat-thread">' + messages + "</section>" + composer;
+    return channelNotice + '<div class="chat-caption"><span>' + esc(messenger) + ' · ' + esc([lead.lastName, lead.firstName].filter(Boolean).join(" ")) + '</span><button type="button" data-action="refresh-chat" aria-label="Обновить чат">↻</button></div><section class="chat-thread">' + messages + "</section>" + composer;
   }
 
   function docsTab(lead) {
@@ -1617,7 +1622,7 @@
       const currentLead = activeLead();
       const contextTourId = canAccessLead(currentLead) ? currentLead.eventId : pageParams.get("tourId");
       if (contextTourId) params.set("tourId", contextTourId);
-      if (destination === "tourists" || destination === "finance") params.set("view", destination);
+      if (destination === "tourists" || destination === "finance" || destination === "chats") params.set("view", destination);
       window.location.href = "./tour-operations.html?" + params.toString();
       return;
     }

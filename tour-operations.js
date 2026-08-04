@@ -725,14 +725,14 @@
   var requestedSummarySection = summarySectionMap[initialParams.get('summarySection')];
   var requestedLegacyView = initialParams.get('view') === 'statuses' ? 'work' : initialParams.get('view');
   var initialView = requestedSummarySection && (!requestedTourSection || requestedTourSection === 'summary') ? requestedSummarySection :
-    (tourSectionMap[requestedTourSection] || (['operations', 'tourists', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions', 'finance'].indexOf(requestedLegacyView) !== -1 ? requestedLegacyView : 'tour-info'));
+    (tourSectionMap[requestedTourSection] || (['operations', 'tourists', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions', 'finance', 'chats'].indexOf(requestedLegacyView) !== -1 ? requestedLegacyView : 'tour-info'));
   var initialStage = ['arrival', 'hotel', 'departure'].indexOf(initialParams.get('operation')) !== -1 ? initialParams.get('operation') : 'arrival';
   var rawRequestedRole = initialParams.get('role');
   var requestedRole = rawRequestedRole === 'guide' ? 'viewer' : rawRequestedRole;
   // Keep the authoring demo default, but fail closed for every explicit unknown role.
   var initialRole = !rawRequestedRole ? 'manager' : (['admin', 'manager', 'escort', 'viewer'].indexOf(requestedRole) !== -1 ? requestedRole : 'forbidden');
   var roleAwareInitialView = initialView;
-  if (!requestedTourSection && (!requestedLegacyView || requestedLeadsView) && (initialRole === 'viewer' || initialRole === 'escort')) roleAwareInitialView = 'operations';
+  if (!requestedTourSection && (!requestedLegacyView || requestedLeadsView || (requestedLegacyView === 'chats' && !initialParams.get('chat'))) && (initialRole === 'viewer' || initialRole === 'escort')) roleAwareInitialView = 'operations';
   var initialOffline = initialParams.get('offline') === '1';
   var initialTourist = tourists.find(function (tourist) { return tourist.id === initialTouristId; });
   var initialSelectedTourId = initialParams.get('tourId') || (initialTourist && initialTourist.tourId) || 'china';
@@ -824,7 +824,7 @@
     params.set('role', state.role);
     params.set('offline', state.offline ? '1' : '0');
     if (view === 'leads') params.set('view', 'leads');
-    else if (view === 'finance' || view === 'tourists') params.set('view', view);
+    else if (view === 'finance' || view === 'tourists' || view === 'chats') params.set('view', view);
     else if (view === 'operations') params.set('tourSection', 'summary');
     if (view !== 'leads' && currentCity()) params.set('routeCityId', currentCity().id);
     if (view === 'operations') params.set('operation', state.stage);
@@ -866,6 +866,7 @@
     state.overlay = null;
     if (destination === 'tourists') state.view = 'tourists';
     if (destination === 'finance' && canViewFinance()) state.view = 'finance';
+    if (destination === 'chats' && (state.role === 'admin' || state.role === 'manager')) state.view = 'chats';
     if ((state.role === 'viewer' || state.role === 'escort') && destination === 'tours') state.view = 'operations';
     if (tourDebugApi) window.__prototypeDebug = tourDebugApi;
     syncPrototypeUrl(state.view);
@@ -1825,9 +1826,11 @@
   }
 
   function topBar(title, subtitle) {
-    return '<div class="app-top"><div class="user-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + h(roleLabels[state.role]) + '</button></div>' +
+    var chatUnread = window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.unreadForTour === 'function' ? window.UNIQUE_MOBILE_CHATS.unreadForTour(state.selectedTourId) : 0;
+    var chatButton = state.role === 'forbidden' ? '' : '<button type="button" class="icon-button header-chat-button" data-action="open-tour-chat" aria-label="Открыть чат тура">' + icon('chat') + (chatUnread ? '<span class="nav-badge">' + h(chatUnread > 99 ? '99+' : chatUnread) + '</span>' : '') + '</button>';
+    return '<div class="app-top"><div class="user-row"><span class="user-label">UNIQUE · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + h(roleLabels[state.role]) + '</button></div>' +
       '<div class="tour-row"><span class="tour-mark"></span><button type="button" class="tour-title tour-select" data-action="open-tours"><strong>' + h(title) + '</strong><span>' + h(subtitle) + '</span></button>' +
-      '<button type="button" class="icon-button" data-action="tour-menu" aria-label="Настройки тура">' + icon('more') + '</button></div></div>';
+      chatButton + '<button type="button" class="icon-button" data-action="tour-menu" aria-label="Настройки тура">' + icon('more') + '</button></div></div>';
   }
 
   function workspaceTabs() {
@@ -2435,7 +2438,9 @@
     }).join('');
     var edit = capabilities().canManageTour && !state.offline ? '<button type="button" class="add-button" data-action="edit-tour">' + icon('edit') + 'Изменить</button>' : '';
     var teamDetails = state.role === 'viewer' ? '<div class="form-note">Показаны только гиды назначенных вам позиций маршрута.</div>' : '<section class="info-card details-card"><div><span>Сопровождающий</span><strong>' + h(directoryUserName(tour.escortUserId)) + '</strong></div><div><span>Администраторы чата</span><strong>' + h((tour.chatAdminIds || []).map(directoryUserName).join(', ') || 'Не назначены') + '</strong></div></section>';
-    return statusBar() + topBar(tour.name, 'Команда и доступы') + workspaceTabs() + '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Гиды по городам</strong><span>Назначение привязано к позиции маршрута</span></div>' + edit + '</div><section class="info-card team-list">' + guideRows + '</section>' + teamDetails + '</main>';
+    var tourChatUnread = window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.unreadForTour === 'function' ? window.UNIQUE_MOBILE_CHATS.unreadForTour(tour.id) : 0;
+    var tourChatCard = '<button type="button" class="tour-chat-entry" data-action="open-tour-chat"><span class="tour-chat-entry-icon">' + icon('chat') + '</span><span><strong>Общий чат с туристами</strong><small>Сообщения видят участники этого тура</small></span>' + (tourChatUnread ? '<em>' + h(tourChatUnread) + '</em>' : '') + '<b>›</b></button>';
+    return statusBar() + topBar(tour.name, 'Команда и доступы') + workspaceTabs() + '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Гиды по городам</strong><span>Назначение привязано к позиции маршрута</span></div>' + edit + '</div><section class="info-card team-list">' + guideRows + '</section>' + teamDetails + tourChatCard + '</main>';
   }
 
   function tourTasksView() {
@@ -2501,6 +2506,44 @@
     return statusBar() + topBar(selectedTourName(), 'Финансы · остатки по оплате') + roleBanner() + cityContext + '<main class="scroll finance-scroll"><div class="section-row"><div class="section-copy"><strong>Финансы</strong><span>Остаток по оплате</span></div></div>' + note + (totals ? '<div class="finance-totals">' + totals + '</div>' : '') + (cards || '<div class="empty-state"><strong>Нет данных по остаткам оплаты</strong><span>Для выбранной позиции маршрута нет заявок.</span></div>') + '</main>';
   }
 
+  function chatEnvironment() {
+    return {
+      role: state.role,
+      offline: state.offline,
+      selectedTourId: state.selectedTourId,
+      selectedTourName: selectedTourName(),
+      render: render,
+      showToast: showToast,
+      openLead: function (leadId) { activateLeadsWorkspace({ leadId: leadId, detailTab: 'chat' }); },
+      openTourist: function (touristId) {
+        var tourist = touristById(touristId);
+        if (!tourist) return;
+        state.view = 'tourists';
+        state.overlay = { kind: 'tourist-detail', touristId: tourist.id, expanded: new Set(), detailTab: 'profile' };
+        render();
+      },
+      openTour: function (tourId) {
+        if (!canViewTourId(tourId)) return;
+        state.selectedTourId = tourId;
+        state.view = state.role === 'viewer' || state.role === 'escort' ? 'operations' : 'tour-info';
+        state.overlay = null;
+        render();
+      },
+      closeContext: function (returnView) {
+        state.view = returnView || (state.role === 'viewer' || state.role === 'escort' ? 'operations' : 'chats');
+        syncPrototypeUrl(state.view);
+        render();
+      }
+    };
+  }
+
+  function chatsView() {
+    if (!window.UNIQUE_MOBILE_CHATS || typeof window.UNIQUE_MOBILE_CHATS.renderHub !== 'function') {
+      return statusBar() + '<main class="scroll"><div class="empty-state">' + icon('alert') + '<strong>Чаты не загружены</strong><span>Обновите страницу прототипа.</span></div></main>';
+    }
+    return statusBar() + window.UNIQUE_MOBILE_CHATS.renderHub(chatEnvironment());
+  }
+
   function unsupportedTourView() {
     var tour = selectedTour();
     var members = currentTourists().map(function (tourist) {
@@ -2509,11 +2552,11 @@
     }).join('');
     var memberSection = members ? '<section class="info-card"><div class="section-row"><div class="section-copy"><strong>Туристы</strong><span>' + touristCount(currentTourists().length) + ' в сохранённых данных</span></div></div>' + members + '</section>' : '<div class="form-note">В локальных данных пока нет туристов этого тура.</div>';
     return statusBar() + topBar(tour.name, 'Сводная · режим просмотра') +
-      '<main class="scroll"><div class="empty-state">' + icon('alert') + '<strong>Сводная тура ещё не подготовлена в MVP</strong><span>Маршрут и операции этого тура не загружены. Китайские mock-данные не используются и изменения недоступны.</span><button type="button" class="secondary-button empty-state-action" data-action="open-tours">Вернуться к списку туров</button></div>' + memberSection + '</main>';
+      '<main class="scroll"><div class="empty-state">' + icon('alert') + '<strong>Сводная тура ещё не подготовлена</strong><span>Маршрут и операции этого тура не загружены. Китайские mock-данные не используются и изменения недоступны.</span><button type="button" class="secondary-button empty-state-action" data-action="open-tours">Вернуться к списку туров</button></div>' + memberSection + '</main>';
   }
 
   function unauthorizedTourView() {
-    return statusBar() + '<div class="app-top"><div class="user-row"><span class="user-label">MVP · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + h(roleLabels[state.role]) + '</button></div>' +
+    return statusBar() + '<div class="app-top"><div class="user-row"><span class="user-label">UNIQUE · мобильная CRM</span><button type="button" class="role-badge" data-action="role-menu">' + h(roleLabels[state.role]) + '</button></div>' +
       '<div class="tour-row"><span class="tour-mark"></span><div class="tour-title"><strong>Недоступный тур</strong><span>Доступ к туру ограничен</span></div></div></div>' +
       '<main class="scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Тур не назначен текущей роли</strong><span>Персональные данные и операции скрыты. Выберите доступный тур или смените роль в mock-сценарии.</span><button type="button" class="secondary-button empty-state-action" data-action="open-tours">Выбрать доступный тур</button></div></main>';
   }
@@ -2526,13 +2569,15 @@
     ];
     if (canViewFinance()) items.push({ id: 'finance', label: 'Финансы', icon: 'finance' });
     if (state.role === 'admin' || state.role === 'manager') items.push({ id: 'leads', label: 'Лиды', icon: 'leads' });
+    if (state.role === 'admin' || state.role === 'manager') items.push({ id: 'chats', label: 'Чаты', icon: 'chat' });
+    var chatUnread = window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.unreadTotal === 'function' ? window.UNIQUE_MOBILE_CHATS.unreadTotal() : 0;
     return '<nav class="bottom-nav" aria-label="Основная навигация">' + items.map(function (item) {
       var tourViews = ['operations', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions'];
       var active = (item.id === 'tour-info' && tourViews.indexOf(state.view) !== -1) ||
         (item.id === 'operations' && ['operations', 'work', 'program'].indexOf(state.view) !== -1) || item.id === state.view;
       var action = item.id === 'leads' ? 'open-leads' : 'nav';
       return '<button type="button" class="nav-item ' + (active ? 'active' : '') + '" data-action="' + action + '" data-view="' + item.id + '">' +
-        icon(item.icon) + '<span>' + item.label + '</span></button>';
+        icon(item.icon) + '<span>' + item.label + '</span>' + (item.id === 'chats' && chatUnread ? '<em class="nav-badge">' + h(chatUnread > 99 ? '99+' : chatUnread) + '</em>' : '') + '</button>';
     }).join('') + '</nav>';
   }
 
@@ -2966,7 +3011,7 @@
 
     var guideDetailCity = guideMockDetail ? currentGuideOperationalCity() : null;
     var statusSummary = guideMockDetail && guideDetailCity ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(guideDetailCity.name) + '</span></div>' + guideTouristStatusGrid(tourist, guideDetailCity) :
-      (tourHasOperationalModel(state.selectedTourId) ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(cityLabel(currentCity())) + '</span></div><div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Заселение</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены в MVP.</div>');
+      (tourHasOperationalModel(state.selectedTourId) ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(cityLabel(currentCity())) + '</span></div><div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Заселение</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены.</div>');
     var detailTabs = '<div class="profile-tabs"><button type="button" class="' + (detailTab === 'profile' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="profile">Профиль</button><button type="button" class="' + (detailTab === 'tour' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="tour">В туре</button></div>';
     var profileSections = section('personal', 'Личные данные', personal.label, personalContent, true) +
       (limitedPrivacy ? '' : section('citizenship', 'Гражданство', tourist.citizenship || 'Не заполнено', citizenshipContent, true)) +
@@ -3275,15 +3320,16 @@
       'tour-team': tourTeamView,
       'tour-tasks': tourTasksView,
       'tour-actions': tourActionsView,
-      finance: financeView
+      finance: financeView,
+      chats: chatsView
     };
     var tourVisible = canViewSelectedTour();
     var nonOperationalViews = ['tour-info', 'tour-team', 'tour-actions', 'finance'];
     var guideMockViews = { operations: guideOperationalView, program: guideOperationalProgramView, tourists: guideOperationalTouristsView };
     var guideMockView = guideMockViews[state.view];
-    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || tourInfoView) :
+    var view = state.view === 'chats' ? chatsView : (!tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || tourInfoView) :
       (usesGuideOperationalMock() && guideMockView ? guideMockView :
-        (nonOperationalViews.indexOf(state.view) !== -1 ? (views[state.view] || tourInfoView) : unsupportedTourView)));
+        (nonOperationalViews.indexOf(state.view) !== -1 ? (views[state.view] || tourInfoView) : unsupportedTourView))));
     var overlaySafeWithoutTour = state.overlay && ['role-menu', 'tours'].indexOf(state.overlay.kind) !== -1;
     root.innerHTML = '<div class="app">' + view() +
       bottomNav() + (tourVisible || overlaySafeWithoutTour ? renderOverlay() : '') + (state.toast ? '<div class="toast ' + h(state.toastKind) + '" role="status" aria-live="polite">' + icon(state.toastKind === 'error' ? 'alert' : 'success') + '<span>' + h(state.toast) + '</span></div>' : '') + '</div>';
@@ -3643,6 +3689,11 @@
 
   root.addEventListener('input', function (event) {
     if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
+    var chatInput = event.target && event.target.matches && event.target.matches('[data-chat-search], [data-chat-composer], [data-chat-create-title], [data-chat-create-members]');
+    if (chatInput && window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.handleInput === 'function') {
+      window.UNIQUE_MOBILE_CHATS.handleInput(event.target, chatEnvironment());
+      return;
+    }
     if (event.target.dataset.touristSearch !== undefined) {
       state.touristQuery = event.target.value;
       render();
@@ -3728,6 +3779,11 @@
 
   root.addEventListener('submit', function (event) {
     if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
+    if (event.target && event.target.matches && event.target.matches('[data-chat-form]') && window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.handleSubmit === 'function') {
+      event.preventDefault();
+      window.UNIQUE_MOBILE_CHATS.handleSubmit(event.target, chatEnvironment());
+      return;
+    }
     event.preventDefault();
     var form = event.target;
     var formData = new FormData(form);
@@ -3911,9 +3967,24 @@
 
   root.addEventListener('click', function (event) {
     if (window.UNIQUE_MOBILE_LEADS && window.UNIQUE_MOBILE_LEADS.isActive()) return;
+    var chatButton = event.target.closest('[data-chat-action]');
+    if (chatButton && chatButton.dataset && chatButton.dataset.chatAction && window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.handleAction === 'function') {
+      window.UNIQUE_MOBILE_CHATS.handleAction(chatButton.dataset.chatAction, chatButton, chatEnvironment());
+      return;
+    }
     var button = event.target.closest('[data-action]');
     if (!button || button.disabled) return;
     var action = button.dataset.action;
+
+    if (action === 'open-tour-chat') {
+      if (!window.UNIQUE_MOBILE_CHATS || typeof window.UNIQUE_MOBILE_CHATS.openContext !== 'function') return;
+      var returnTourChatView = state.view;
+      window.UNIQUE_MOBILE_CHATS.openContext({ contour: 'client', kind: 'tour', tourId: state.selectedTourId, returnView: returnTourChatView });
+      state.view = 'chats';
+      syncPrototypeUrl('chats', { chat: 'client-tour-' + state.selectedTourId });
+      render();
+      return;
+    }
 
     if (action === 'route-up' || action === 'route-down' || action === 'route-remove' || action === 'route-add') {
       if (!state.overlay || state.overlay.kind !== 'tour-form') return;
@@ -4042,6 +4113,7 @@
       if (['admin', 'manager', 'escort', 'viewer'].indexOf(selectedRole) === -1) selectedRole = 'forbidden';
       state.role = selectedRole;
       if (state.view === 'finance' && !canViewFinance()) state.view = 'tour-info';
+      if (state.view === 'chats' && state.role !== 'admin' && state.role !== 'manager') state.view = 'operations';
       if ((state.role === 'viewer' || state.role === 'escort') && state.view === 'tour-info') state.view = 'operations';
       var scopedLeadTouristAfterRoleChange = state.scopeLead && currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead; });
       if (!canSeeSourceLeadFor(scopedLeadTouristAfterRoleChange)) state.scopeLead = null;
@@ -4186,7 +4258,15 @@
         return;
       }
       var contactValue = contactTourist && contactTourist.phone ? contactTourist.phone : 'номер не заполнен';
-      showToast(action === 'call-tourist' ? 'Звонок: ' + contactValue : action === 'message-tourist' ? 'Чат: ' + contactValue : 'Контакт скопирован: ' + contactValue);
+      if (action === 'message-tourist' && window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.openContext === 'function') {
+        var returnPersonalChatView = state.view;
+        window.UNIQUE_MOBILE_CHATS.openContext({ contour: 'client', kind: 'tourist', touristId: contactTourist.id, contactId: contactTourist.contactId, tourId: contactTourist.tourId, returnView: returnPersonalChatView });
+        state.view = 'chats';
+        syncPrototypeUrl('chats', { chat: 'client-tourist-' + contactTourist.id });
+        render();
+        return;
+      }
+      showToast(action === 'call-tourist' ? 'Звонок: ' + contactValue : (action === 'message-tourist' ? 'Чат: ' + contactValue : 'Контакт скопирован: ' + contactValue));
       return;
     }
     if (action === 'jump-profile-operation') {
@@ -4534,7 +4614,7 @@
       state.selectedTourId = taskTourId;
       if (!tourHasOperationalModel(state.selectedTourId)) {
         state.overlay = null;
-        showToast('Задачи этого тура ещё не подготовлены в MVP');
+        showToast('Задачи этого тура ещё не подготовлены');
         return;
       }
       state.overlay = null;
@@ -4665,7 +4745,7 @@
     }
     if (action === 'delete-tour') {
       if (mutationBlocked(state.role === 'admin', 'Удаление тура доступно только администратору')) return;
-      showToast('В MVP удаление показано как защищённое действие; данные mock-тура сохранены');
+      showToast('В прототипе удаление показано как защищённое действие; данные mock-тура сохранены');
       return;
     }
     if (action === 'add-tour-task') {
@@ -4782,6 +4862,10 @@
     if (action === 'nav') {
       if (button.dataset.view === 'finance' && !canViewFinance()) {
         showToast('Финансы недоступны для этой роли', 'error');
+        return;
+      }
+      if (button.dataset.view === 'chats' && state.role !== 'admin' && state.role !== 'manager') {
+        showToast('Раздел «Чаты» доступен менеджеру и администратору', 'error');
         return;
       }
       state.view = button.dataset.view;
@@ -5286,6 +5370,16 @@
     }
   };
   window.__prototypeDebug = tourDebugApi;
+
+  if (state.view === 'chats' && window.UNIQUE_MOBILE_CHATS && typeof window.UNIQUE_MOBILE_CHATS.openContext === 'function') {
+    var requestedChatId = initialParams.get('chat');
+    var requestedChatScope = initialParams.get('chatScope');
+    window.UNIQUE_MOBILE_CHATS.openContext({
+      threadId: requestedChatId || null,
+      contour: requestedChatScope || null,
+      returnView: requestedChatId ? ((state.role === 'admin' || state.role === 'manager') ? 'chats' : 'operations') : null
+    });
+  }
 
   render();
 }());
