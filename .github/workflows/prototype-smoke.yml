@@ -14,11 +14,15 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
       - run: node --check mobile-leads.js
       - run: node --check tour-operations.js
       - run: node --check prototype-smoke-test.js
+      - run: node --check prototype-viewport-test.js
+      - run: node --check capture-prototype-screenshots.js
+      - run: sh -n build-mobile-spec.sh
       - run: node prototype-smoke-test.js
+      - run: node prototype-viewport-test.js
       - name: Verify isolated mock adapter
         run: |
           if grep -En 'fetch[[:space:]]*\(|new[[:space:]]+XMLHttpRequest|new[[:space:]]+WebSocket|new[[:space:]]+EventSource|sendBeacon[[:space:]]*\(|/api/' mobile-leads.js tour-operations.js; then
@@ -46,6 +50,17 @@ jobs:
           test -s assets/spec/13-error-state.png
           test -s assets/spec/14-empty-state.png
           test -s assets/spec/15-summary-375.png
+          test -s assets/spec/16-lead-final.png
+          test -s assets/spec/17-tour-final.png
+          test -s assets/spec/18-tourist-profile-final.png
+          test -s assets/spec/19-tourist-tour-final.png
+          test -s assets/spec/20-summary-final.png
+          test -s assets/spec/21-team-final.png
+          test -s assets/spec/22-statuses-final.png
+          test -s mobile-leads-tz-template.html
+          test -s build-mobile-spec.sh
+          test -s capture-prototype-screenshots.js
+          test -s prototype-viewport-test.js
           test -f index.html
           test -s tour-operations.html
           test -s tour-operations.css

@@ -4,13 +4,13 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta name="spec-source" content="mobile-leads-tz.md">
-  <meta name="spec-sha256" content="b0daf52f209fbf0cb19da46586fcd9fc1d178945e5109fa353961cdeb0ac1767">
+  <meta name="spec-sha256" content="e314e0db54aded3c0588f3d923e7da1d1fef11779d1d1dda60eedf458ee35877">
   <meta name="theme-color" content="#14171a">
-  <meta name="description" content="Визуальное ТЗ MVP мобильной CRM: сводная тура, карточка туриста, группировка и справочник.">
-  <title>Визуальное ТЗ · MVP мобильной CRM</title>
+  <meta name="description" content="Финальное визуальное ТЗ MVP мобильной CRM: лиды, туристы, туры и сводная.">
+  <title>ТЗ MVP: мобильные лиды, туристы и сводная тура</title>
   <link rel="stylesheet" href="mobile-leads-tz.css">
 </head>
-<body>
+<body class="generated-spec">
   <a class="skip-link" href="#main-content">Перейти к содержанию</a>
   <header class="site-header">
     <a class="brand" href="index.html">UNIQUE</a>
@@ -21,889 +21,2375 @@
     </nav>
   </header>
 
-  <main id="main-content">
-    <section class="hero">
-      <p class="eyebrow">Этап MVP · каноническое ТЗ</p>
-      <h1>Единая мобильная сводная и карточка туриста</h1>
-      <p class="lead">MVP мобильной CRM проверяет веб-логику участника тура, индивидуальную логистику и независимые общие записи вокруг раздела «Туры». Рабочее приложение, API и база на этом этапе не меняются.</p>
-      <div class="meta"><span>Этап: MVP</span><span>Статус: прототип к проверке</span><span>Обновлено: 4 августа 2026</span><span>Источник: mobile-leads-tz.md</span></div>
-      <div class="hero-facts" aria-label="Коротко о масштабе MVP">
-        <div class="hero-fact"><strong>10</strong><span>основных сценариев веб-сводной</span></div>
-        <div class="hero-fact"><strong>4</strong><span>роли с разными правами</span></div>
-        <div class="hero-fact"><strong>3</strong><span>операции в каждом городе</span></div>
-        <div class="hero-fact"><strong>2</strong><span>независимых уровня группировки</span></div>
-        <div class="hero-fact"><strong>1</strong><span>каноническая карточка туриста</span></div>
-      </div>
-    </section>
+  <section class="hero spec-hero" aria-labelledby="spec-title">
+    <p class="eyebrow">Этап MVP · финальный ориентир</p>
+    <h1 id="spec-title">ТЗ MVP: мобильные лиды, туристы и сводная
+тура</h1>
+    <p class="lead">Финальный ориентир для кликабельного прототипа и
+последующего переноса в рабочее приложение. Состав полей и бизнес-логика
+берутся из веб-версии, компоновка адаптируется под телефон.</p>
+    <div class="meta">
+      <span>Статус: финальное ТЗ прототипа</span>
+      <span>Дата: 4 августа 2026</span>
+      <span>Источник: mobile-leads-tz.md</span>
+    </div>
+    <div class="hero-actions">
+      <a class="hero-primary" href="tour-operations.html?tourId=china&amp;tourSection=overview&amp;role=manager">Открыть финальный прототип</a>
+      <a class="hero-secondary" href="#final-product">Посмотреть состав MVP</a>
+    </div>
+    <div class="hero-facts" aria-label="Состав финального MVP">
+      <div class="hero-fact"><strong>3</strong><span>отдельных раздела: туры, туристы и лиды</span></div>
+      <div class="hero-fact"><strong>4</strong><span>канонических вкладки карточки лида</span></div>
+      <div class="hero-fact"><strong>6</strong><span>частей итоговой карточки тура</span></div>
+      <div class="hero-fact"><strong>3</strong><span>операции в каждой позиции маршрута</span></div>
+      <div class="hero-fact"><strong>1</strong><span>рабочая версия после переноса</span></div>
+    </div>
+  </section>
 
-    <div class="story-layout">
-      <aside class="story-nav" aria-label="Оглавление визуального ТЗ">
-        <strong>Как читать ТЗ</strong>
-        <a href="#product-map">01 · Карта продукта</a>
-        <a href="#manager-path">02 · Путь менеджера</a>
-        <a href="#mobile-summary">03 · Мобильная сводная</a>
-        <a href="#grouping-logic">04 · Группы и конфликты</a>
-        <a href="#tourist-card">05 · Карточка туриста</a>
-        <a href="#roles-directory">06 · Роли и справочник</a>
-        <a href="#mvp-acceptance">07 · Границы и приёмка</a>
-        <a href="#requirements">138 требований</a>
-      </aside>
-
-      <div class="story-content">
-        <section class="chapter" id="product-map">
-          <span class="chapter-number">01 · КАРТА ПРОДУКТА</span>
-          <h2>Вместо широкой таблицы — понятный маршрут работы</h2>
-          <p class="chapter-intro">Веб-версия показывает сразу много строк и колонок. На телефоне менеджер идёт по тому же набору данных последовательно: выбирает тур, остановку маршрута и нужную операцию.</p>
-
-          <div class="path-map" role="img" aria-label="Путь от лида или тура к остановке маршрута и трём операциям">
-            <div class="path-node">
-              <strong>Лид или тур</strong>
-              <span>Два разных раздела, один набор туристов</span>
-            </div>
-            <div class="path-arrow" aria-hidden="true">›</div>
-            <div class="path-node blue">
-              <strong>Остановка маршрута</strong>
-              <span>Например, «Пекин · остановка 1». Повторный город остаётся отдельной позицией.</span>
-            </div>
-            <div class="path-arrow" aria-hidden="true">›</div>
-            <div class="path-node dark">
-              <strong>Рабочая операция</strong>
-              <span>Данные открываются без горизонтальной прокрутки</span>
-            </div>
-          </div>
-
-          <h3>Как веб-таблица превращается в мобильные карточки</h3>
-          <p class="diagram-caption">Это схема структуры, а не снимок данных CRM. Строка туриста и колонка операции не исчезают — мобильный интерфейс просто показывает их по одной выбранной остановке.</p>
-          <div class="web-mobile-bridge" role="img" aria-label="Сопоставление широкой веб-сводной и вертикальной мобильной сводной">
-            <div class="bridge-panel web-panel">
-              <span class="bridge-label">Веб · обзор всего тура</span>
-              <div class="mock-browser"><i></i><i></i><i></i><b>Сводная таблица</b></div>
-              <div class="mock-table" aria-hidden="true">
-                <div class="mock-head">Турист</div><div class="mock-head">Пекин · прибытие</div><div class="mock-head">Пекин · отель</div><div class="mock-head">Пекин · отъезд</div>
-                <div class="mock-person">Анна</div><div class="mock-cell filled">SU 204</div><div class="mock-cell shared">Regent</div><div class="mock-cell">—</div>
-                <div class="mock-person">Илья</div><div class="mock-cell filled">SU 204</div><div class="mock-cell shared">Regent</div><div class="mock-cell filled">G89</div>
-              </div>
-              <small>Строка = турист · колонка = операция в позиции маршрута</small>
-            </div>
-            <div class="bridge-arrow" aria-hidden="true"><span>те же данные</span>→</div>
-            <div class="bridge-panel mobile-panel">
-              <span class="bridge-label">Мобилка · одна рабочая задача</span>
-              <div class="mock-phone" aria-hidden="true">
-                <div class="mock-phone-head">Китай · сентябрь</div>
-                <div class="mock-city">Пекин <b>1 остановка</b></div>
-                <div class="mock-tabs"><b>Прибытие</b><span>Отель</span><span>Отъезд</span></div>
-                <div class="mock-record"><strong>SU 204 · общая запись</strong><span>Анна + Илья · 2 туриста</span></div>
-                <div class="mock-coverage"><span>Анна</span><i>✓</i><i>✓</i><i>+</i></div>
-              </div>
-              <small>Тур → остановка → операция; «Покрытие» возвращает обзор</small>
-            </div>
-          </div>
-
-          <div class="operation-triad" aria-label="Три независимые операции">
-            <div class="operation-chip arrival">Прибытие</div>
-            <div class="operation-chip hotel">Отель</div>
-            <div class="operation-chip departure">Отъезд</div>
-          </div>
-
-          <div class="key-message">
-            <b>!</b>
-            <span><strong>Главное правило</strong>Мобильная сводная не создаёт вторую версию данных. Она показывает те же индивидуальные записи туристов и те же общие связи, что веб-сводная.</span>
-          </div>
-
-          <h3>Что остаётся раздельным</h3>
-          <ul class="plain-list">
-            <li><strong>«Лиды»</strong> — работа с заявкой, контактом, сообщениями, документами и задачами.</li>
-            <li><strong>«Туры»</strong> — работа со всем составом тура, маршрутом, логистикой и фактическими статусами.</li>
-            <li><strong>«Туристы»</strong> — быстрый вход в единую карточку конкретного участника.</li>
-          </ul>
-        </section>
-
-        <section class="chapter" id="manager-path">
-          <span class="chapter-number">02 · ОСНОВНОЙ СЦЕНАРИЙ</span>
-          <h2>Как менеджер готовит тур с телефона</h2>
-          <p class="chapter-intro">Сценарий повторяет ежедневную работу в веб-сводной, но разбит на пять коротких решений. На каждом шаге видно, что пользователь делает и что система сохраняет.</p>
-
-          <div class="steps" aria-label="Пять шагов подготовки тура">
-            <div class="step"><b>1</b><strong>Открывает лид</strong><span>Проверяет заявку и состав туристов.</span></div>
-            <div class="step"><b>2</b><strong>Переходит в сводную</strong><span>Тур открывается с областью «Этот лид».</span></div>
-            <div class="step"><b>3</b><strong>Выбирает город</strong><span>Работает с одной позицией маршрута.</span></div>
-            <div class="step"><b>4</b><strong>Заполняет операции</strong><span>Прибытие, отель и отъезд независимы.</span></div>
-            <div class="step"><b>5</b><strong>Проверяет покрытие</strong><span>Видит пробелы по каждому туристу.</span></div>
-          </div>
-
-          <div class="screens-grid">
-            <article class="screen-story">
-              <h3>Из карточки лида</h3>
-              <figure class="annotated-shot" aria-describedby="lead-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/01-lead-to-summary.png" aria-label="Открыть полноразмерный скриншот карточки лида">
-                    <img src="assets/spec/01-lead-to-summary.png" width="780" height="1688" loading="lazy" alt="Карточка лида Соколовых, прокрученная до блока перехода в сводную тура">
-                  </a>
-                  <span aria-hidden="true" class="marker" style="--x:17%;--y:74%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:82%;--y:84%">2</span>
-                  <span aria-hidden="true" class="marker" style="--x:16%;--y:93%">3</span>
-                </div>
-                <figcaption id="lead-shot-caption">Лид остаётся самостоятельной карточкой. Сводная открывается как рабочее пространство всего тура.</figcaption>
-              </figure>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Точка перехода</strong>Блок «Сводная по туру» находится в деталях заявки.</span></li>
-                <li><b>2</b><span><strong>Явное действие</strong>Кнопка открывает тур, связанный с лидом.</span></li>
-                <li><b>3</b><span><strong>Объяснение области</strong>Пользователь заранее понимает, что логистика хранится в туре.</span></li>
-              </ol>
-            </article>
-
-            <article class="screen-story">
-              <h3>В рабочей сводной тура</h3>
-              <figure class="annotated-shot" aria-describedby="summary-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/02-tour-summary.png" aria-label="Открыть полноразмерный скриншот мобильной сводной">
-                    <img src="assets/spec/02-tour-summary.png" width="780" height="1688" loading="lazy" alt="Мобильная сводная тура: Пекин, прибытие и карточка индивидуального рейса">
-                  </a>
-                  <span aria-hidden="true" class="marker" style="--x:18%;--y:29%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:20%;--y:39%">2</span>
-                  <span aria-hidden="true" class="marker" style="--x:80%;--y:52%">3</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:72%;--y:65%">4</span>
-                  <span aria-hidden="true" class="marker" style="--x:50%;--y:86%">5</span>
-                </div>
-                <figcaption id="summary-shot-caption">На экране одновременно видны выбранный город, операция и карточка записи. Это мобильный эквивалент выбранной ячейки веб-таблицы.</figcaption>
-              </figure>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Позиция маршрута</strong>У города есть номер остановки и свои даты.</span></li>
-                <li><b>2</b><span><strong>Три операции</strong>Прибытие, отель и отъезд переключаются независимо.</span></li>
-                <li><b>3</b><span><strong>Область работы</strong>«Весь тур» можно заменить конкретным лидом.</span></li>
-                <li><b>4</b><span><strong>Тип записи</strong>Сразу видно: индивидуальная или общая.</span></li>
-                <li><b>5</b><span><strong>Действия</strong>Изменить данные, создать общую запись или сменить статус.</span></li>
-              </ol>
-            </article>
-
-          </div>
-        </section>
-
-        <section class="chapter" id="mobile-summary">
-          <span class="chapter-number">03 · МОБИЛЬНАЯ СВОДНАЯ</span>
-          <h2>Два режима отвечают на два разных вопроса</h2>
-          <p class="chapter-intro"><strong>«По операциям»</strong> нужен для редактирования конкретной записи. <strong>«Покрытие»</strong> показывает, у кого и в каком городе не заполнено прибытие, размещение или отъезд.</p>
-
-          <div class="screens-grid">
-            <article class="screen-story">
-              <h3>Режим «По операциям»</h3>
-              <div class="key-message">
-                <b>1</b>
-                <span><strong>Пользователь делает</strong>Выбирает остановку и одну операцию, затем редактирует одну или несколько записей.</span>
-              </div>
-              <ul class="plain-list">
-                <li>Карточки группируются по фактической общей записи.</li>
-                <li>У каждой карточки виден состав, источник и заполненность.</li>
-                <li>Повторяющиеся города не смешиваются: у каждого свой <code>routeCityId</code>.</li>
-              </ul>
-            </article>
-
-            <article class="screen-story">
-              <h3>Режим «Покрытие»</h3>
-              <figure class="annotated-shot" aria-describedby="coverage-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/03-tour-coverage.png" aria-label="Открыть полноразмерный скриншот покрытия">
-                    <img src="assets/spec/03-tour-coverage.png" width="780" height="1688" loading="lazy" alt="Покрытие по туристам: матрица городов и трёх операций в мобильной карточке">
-                  </a>
-                  <span aria-hidden="true" class="marker" style="--x:76%;--y:32%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:22%;--y:46%">2</span>
-                  <span aria-hidden="true" class="marker" style="--x:73%;--y:63%">3</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:73%;--y:85%">4</span>
-                </div>
-                <figcaption id="coverage-shot-caption">Компактная матрица сохраняет смысл веб-таблицы, но не требует горизонтальной прокрутки.</figcaption>
-              </figure>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Переключатель режима</strong>Редактирование и контроль полноты разделены.</span></li>
-                <li><b>2</b><span><strong>Сводные числа</strong>Количество мест, подтверждений и общих записей.</span></li>
-                <li><b>3</b><span><strong>Три колонки</strong>Рейс, отель и отъезд видны рядом только внутри карточки туриста.</span></li>
-                <li><b>4</b><span><strong>Пробелы</strong>«+» открывает форму нужного города и операции.</span></li>
-              </ol>
-            </article>
-          </div>
-
-          <div class="key-message">
-            <b>✓</b>
-            <span><strong>Система сохраняет</strong>Индивидуальные значения туристов, источник общей записи, независимые статусы и точную позицию маршрута. Смена режима ничего не записывает.</span>
-          </div>
-        </section>
-
-        <section class="chapter" id="grouping-logic">
-          <span class="chapter-number">04 · ГРУППЫ, КОНФЛИКТЫ, РАЗЪЕДИНЕНИЕ</span>
-          <h2>Группа туристов и общая запись — не одно и то же</h2>
-          <p class="chapter-intro">Группа тура отвечает на вопрос «кто путешествует вместе». Общая запись отвечает на вопрос «у кого совпадает конкретная операция в конкретном городе».</p>
-
-          <div class="grouping-diagram" role="img" aria-label="Четыре туриста одной группы имеют общий отель, два общих прибытия и четыре индивидуальных отъезда">
-            <div class="people-row">
-              <div class="person-node"><i>АС</i><strong>Анна</strong><span>лид 1042</span></div>
-              <div class="person-node"><i>ИС</i><strong>Илья</strong><span>лид 1042</span></div>
-              <div class="person-node"><i>МО</i><strong>Марина</strong><span>лид 1048</span></div>
-              <div class="person-node"><i>ДВ</i><strong>Денис</strong><span>лид 1048</span></div>
-            </div>
-            <div class="tour-group-bar">Одна группа туристов на уровне тура · groupId</div>
-            <div class="operation-lane">
-              <span class="lane-label">Отель</span>
-              <span class="lane-group hotel">Одна общая запись на 4</span>
-            </div>
-            <div class="operation-lane">
-              <span class="lane-label">Прибытие</span>
-              <span class="lane-group arrival-a">Рейс A · 2</span>
-              <span class="lane-group arrival-b">Рейс B · 2</span>
-            </div>
-            <div class="operation-lane">
-              <span class="lane-label">Отъезд</span>
-              <span class="lane-group departure">Своя</span>
-              <span class="lane-group departure">Своя</span>
-              <span class="lane-group departure">Своя</span>
-              <span class="lane-group departure">Своя</span>
-            </div>
-            <p class="diagram-note"><strong>Разъединение прибытия</strong> не меняет общий отель, отъезд или состав группы тура.</p>
-          </div>
-
-          <div class="screens-grid">
-            <article class="screen-story">
-              <h3>1. Выбор участников группы тура</h3>
-              <figure class="annotated-shot" aria-describedby="group-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/04-tourist-group-selection.png" aria-label="Открыть полноразмерный скриншот выбора туристов">
-                    <img src="assets/spec/04-tourist-group-selection.png" width="780" height="1688" loading="lazy" alt="Экран объединения туристов: два выбранных участника из разных лидов">
-                  </a>
-                  <span aria-hidden="true" class="marker purple" style="--x:18%;--y:9%">1</span>
-                  <span aria-hidden="true" class="marker" style="--x:80%;--y:14%">2</span>
-                  <span aria-hidden="true" class="marker purple" style="--x:17%;--y:25%">3</span>
-                  <span aria-hidden="true" class="marker" style="--x:14%;--y:46%">4</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:76%;--y:96%">5</span>
-                </div>
-                <figcaption id="group-shot-caption">Свободного туриста можно добавить в существующую группу. Две уже созданные группы не сливаются автоматически.</figcaption>
-              </figure>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Уровень тура</strong>Эта группа действует на всём маршруте.</span></li>
-                <li><b>2</b><span><strong>Счётчик</strong>Сразу виден выбранный состав.</span></li>
-                <li><b>3</b><span><strong>Правило безопасности</strong>Интерфейс объясняет запрет слияния двух групп.</span></li>
-                <li><b>4</b><span><strong>Контекст</strong>У каждого туриста видны текущая группа и исходный лид.</span></li>
-                <li><b>5</b><span><strong>Применение</strong>Действие доступно только после выбора минимум двоих.</span></li>
-              </ol>
-            </article>
-
-            <article class="screen-story">
-              <h3>2. Сверка конфликтующих записей</h3>
-              <figure class="annotated-shot" aria-describedby="conflict-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/05-conflict-review.png" aria-label="Открыть полноразмерный скриншот сверки данных">
-                    <img src="assets/spec/05-conflict-review.png" width="780" height="1688" loading="lazy" alt="Экран сверки двух разных рейсов перед созданием общей записи">
-                  </a>
-                  <span aria-hidden="true" class="marker amber" style="--x:17%;--y:14%">1</span>
-                  <span aria-hidden="true" class="marker" style="--x:80%;--y:27%">2</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:11%;--y:34%">3</span>
-                  <span aria-hidden="true" class="marker amber" style="--x:83%;--y:48%">4</span>
-                  <span aria-hidden="true" class="marker" style="--x:72%;--y:96%">5</span>
-                </div>
-                <figcaption id="conflict-shot-caption">До выбора источника общая запись не создаётся. Личные записи обоих туристов остаются сохранёнными.</figcaption>
-              </figure>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Причина остановки</strong>Система нашла разные значения.</span></li>
-                <li><b>2</b><span><strong>Обязательный выбор</strong>Источник нельзя назначить автоматически.</span></li>
-                <li><b>3</b><span><strong>Основная запись</strong>Менеджер выбирает, что будет отображаться группе.</span></li>
-                <li><b>4</b><span><strong>Сравнение</strong>Различающиеся поля показаны рядом.</span></li>
-                <li><b>5</b><span><strong>Защищённое применение</strong>Кнопка заблокирована, пока источник не выбран.</span></li>
-              </ol>
-            </article>
-
-            <article class="screen-story wide feature-shot">
-              <div class="feature-copy">
-                <span class="feature-kicker">3. Разъединение одной операции</span>
-                <h3>Менеджер выбирает, кого отделить</h3>
-                <p>Экран состава относится только к выбранной общей записи: например, к прибытию в первой остановке Пекина.</p>
-                <ol class="callouts">
-                  <li><b>1</b><span><strong>Точный контекст</strong>В заголовке указаны операция и позиция маршрута.</span></li>
-                  <li><b>2</b><span><strong>Источник</strong>Видно, чья запись сейчас отображается группе.</span></li>
-                  <li><b>3</b><span><strong>Состав</strong>Галочками выбираются только отделяемые участники.</span></li>
-                  <li><b>4</b><span><strong>Без побочных изменений</strong>Отель, отъезд и <code>groupId</code> остаются прежними.</span></li>
-                </ol>
-              </div>
-              <figure class="annotated-shot compact-shot" aria-describedby="split-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/08-split-operation.png" aria-label="Открыть полноразмерный скриншот разъединения операции">
-                    <img src="assets/spec/08-split-operation.png" width="780" height="1688" loading="lazy" alt="Экран состава общей записи прибытия с выбором туристов для отделения">
-                  </a>
-                  <span aria-hidden="true" class="marker purple" style="--x:18%;--y:7%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:76%;--y:18%">2</span>
-                  <span aria-hidden="true" class="marker" style="--x:15%;--y:38%">3</span>
-                  <span aria-hidden="true" class="marker amber" style="--x:73%;--y:96%">4</span>
-                </div>
-                <figcaption id="split-shot-caption">После подтверждения отделённый турист снова показывает собственные сохранённые данные этой операции.</figcaption>
-              </figure>
-            </article>
-          </div>
-
-          <div class="key-message">
-            <b>↺</b>
-            <span><strong>Что происходит при разъединении</strong>Турист снова видит свою сохранённую индивидуальную запись. Остальные операции и группа тура не меняются.</span>
-          </div>
-        </section>
-
-        <section class="chapter" id="tourist-card">
-          <span class="chapter-number">05 · ЕДИНАЯ КАРТОЧКА ТУРИСТА</span>
-          <h2>Один турист — одна карточка из любого раздела</h2>
-          <p class="chapter-intro">Открытие из лида, списка туристов, документа или операции ведёт к одному <code>touristId</code>. Возврат сохраняет тур, город, операцию, фильтр и положение списка.</p>
-
-          <div class="value-flow" aria-label="Логика личного и отображаемого значения">
-            <div class="value-node"><strong>ownValues</strong><span>Личная запись туриста. Не удаляется при объединении.</span></div>
-            <div class="value-arrow" aria-hidden="true">+</div>
-            <div class="value-node shared"><strong>sourceVisitId</strong><span>Источник общей записи, выбранный менеджером.</span></div>
-            <div class="value-arrow" aria-hidden="true">→</div>
-            <div class="value-node visible"><strong>effectiveValues</strong><span>То, что сейчас отображается в сводной.</span></div>
-          </div>
-
-          <div class="screens-grid">
-            <article class="screen-story">
-              <h3>Логистика внутри карточки</h3>
-              <figure class="annotated-shot" aria-describedby="tourist-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/06-tourist-logistics.png" aria-label="Открыть полноразмерный скриншот логистики туриста">
-                    <img src="assets/spec/06-tourist-logistics.png" width="780" height="1688" loading="lazy" alt="Карточка туриста с маршрутными остановками, личными и общими операциями">
-                  </a>
-                  <span aria-hidden="true" class="marker" style="--x:16%;--y:6%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:18%;--y:16%">2</span>
-                  <span aria-hidden="true" class="marker purple" style="--x:72%;--y:27%">3</span>
-                  <span aria-hidden="true" class="marker" style="--x:72%;--y:37%">4</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:72%;--y:56%">5</span>
-                </div>
-                <figcaption id="tourist-shot-caption">По каждой остановке рядом показаны данные операции и её источник: «Индивидуальная запись» или «Общая запись».</figcaption>
-              </figure>
-            </article>
-
-            <article class="screen-story">
-              <h3>Что находится на экране</h3>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Контекст туриста</strong>ФИО и исходный лид всегда остаются в заголовке.</span></li>
-                <li><b>2</b><span><strong>Остановка маршрута</strong>Город, даты и порядковый номер не смешиваются с повторным посещением.</span></li>
-                <li><b>3</b><span><strong>Источник данных</strong>Пользователь видит, индивидуальная запись или общая.</span></li>
-                <li><b>4</b><span><strong>Независимость операций</strong>Общий отъезд не делает прибытие или отель общими.</span></li>
-                <li><b>5</b><span><strong>Следующий город</strong>У каждой позиции маршрута собственные три операции.</span></li>
-              </ol>
-              <div class="key-message">
-                <b>i</b>
-                <span><strong>Редактирование личной записи</strong>Меняет только <code>ownValues</code>. Пока турист состоит в общей записи, сводная продолжает показывать выбранный источник.</span>
-              </div>
-              <h3>Другие разделы карточки</h3>
-              <ul class="plain-list">
-                <li>личные данные и контакты;</li>
-                <li>паспорт РФ, загранпаспорт, сканы и OCR;</li>
-                <li>связи с лидом и группой тура;</li>
-                <li>комментарий для гида и внутренняя заметка;</li>
-                <li>готовность профиля и документов.</li>
-              </ul>
-            </article>
-          </div>
-        </section>
-
-        <section class="chapter" id="roles-directory">
-          <span class="chapter-number">06 · РОЛИ И СПРАВОЧНИК</span>
-          <h2>Интерфейс показывает только разрешённую работу</h2>
-          <p class="chapter-intro">Права проверяются не только видимостью кнопки, но и перед каждой mock-записью. В offline-режиме данные доступны для чтения, изменения заблокированы.</p>
-
-          <div class="role-grid" aria-label="Роли MVP">
-            <div class="role-card admin"><b>Администратор</b><span>Все действия, удаление, управление турами и справочником.</span></div>
-            <div class="role-card manager"><b>Менеджер</b><span>Профиль и документы назначенных лидов; логистика и группы всего доступного тура.</span></div>
-            <div class="role-card escort"><b>Сопровождающий</b><span>Разрешённые поля и операционные статусы всего назначенного тура.</span></div>
-            <div class="role-card guide"><b>Гид</b><span>Read-only профиль и статусы только назначенных городов.</span></div>
-          </div>
-
-          <div class="screens-grid">
-            <article class="screen-story">
-              <h3>Справочник городов и точек</h3>
-              <figure class="annotated-shot" aria-describedby="directory-shot-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/07-city-directory.png" aria-label="Открыть полноразмерный скриншот справочника">
-                    <img src="assets/spec/07-city-directory.png" width="780" height="1688" loading="lazy" alt="Административный справочник городов, аэропортов и вокзалов">
-                  </a>
-                  <span aria-hidden="true" class="marker" style="--x:18%;--y:7%">1</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:18%;--y:15%">2</span>
-                  <span aria-hidden="true" class="marker" style="--x:14%;--y:24%">3</span>
-                  <span aria-hidden="true" class="marker blue" style="--x:78%;--y:35%">4</span>
-                  <span aria-hidden="true" class="marker" style="--x:74%;--y:96%">5</span>
-                </div>
-                <figcaption id="directory-shot-caption">На этапе прототипа справочник сохраняется в этом браузере. В рабочей версии администрирование будет в веб-настройках CRM.</figcaption>
-              </figure>
-            </article>
-
-            <article class="screen-story">
-              <h3>Логика выбора точки</h3>
-              <ol class="callouts">
-                <li><b>1</b><span><strong>Отдельный экран</strong>Справочник находится в меню тура.</span></li>
-                <li><b>2</b><span><strong>Прозрачный режим</strong>Пользователь видит, где сохраняются mock-изменения.</span></li>
-                <li><b>3</b><span><strong>Поиск</strong>Город находится по названию, стране или альтернативному имени.</span></li>
-                <li><b>4</b><span><strong>Покрытие точками</strong>Карточка показывает количество аэропортов и вокзалов.</span></li>
-                <li><b>5</b><span><strong>Административное действие</strong>Добавление доступно только администратору.</span></li>
-              </ol>
-              <ul class="plain-list">
-                <li>Самолёт показывает только аэропорты выбранного города.</li>
-                <li>Поезд показывает ж/д вокзалы, автобус — автовокзалы.</li>
-                <li>Одна активная точка предзаполняется только в пустое поле.</li>
-                <li>Если точки нет, разрешён ручной ввод с явной отметкой.</li>
-                <li>Используемую точку можно архивировать, но нельзя удалить.</li>
-              </ul>
-              <figure class="annotated-shot compact-shot point-picker-shot" aria-describedby="point-picker-caption">
-                <div class="shot-frame">
-                  <a href="assets/spec/12-point-picker.png" aria-label="Открыть полноразмерный скриншот выбора аэропорта">
-                    <img src="assets/spec/12-point-picker.png" width="780" height="1688" loading="lazy" alt="Поисковый экран выбора аэропорта, отфильтрованного по выбранному городу Пекин">
-                  </a>
-                  <span aria-hidden="true" class="marker blue" style="--x:20%;--y:75%">1</span>
-                  <span aria-hidden="true" class="marker" style="--x:78%;--y:84%">2</span>
-                  <span aria-hidden="true" class="marker amber" style="--x:78%;--y:93%">3</span>
-                </div>
-                <figcaption id="point-picker-caption"><strong>1 — поиск по названию или коду</strong>, <strong>2 — только аэропорты Пекина</strong>, <strong>3 — стабильный код точки</strong>. Ручной ввод появляется в отдельном пустом результате, если совпадений нет.</figcaption>
-              </figure>
-            </article>
-          </div>
-
-          <h3 class="section-kicker">Как меняется экран для полевой команды</h3>
-          <div class="state-gallery" aria-label="Ролевые и системные состояния мобильного прототипа">
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/09-guide-readonly.png" aria-label="Открыть экран туриста в роли гида">
-                  <img src="assets/spec/09-guide-readonly.png" width="780" height="1688" loading="lazy" alt="Карточка туриста в роли гида с доступными для чтения полями">
-                </a>
-                <span aria-hidden="true" class="marker purple" style="--x:78%;--y:6%">1</span>
-                <span aria-hidden="true" class="marker blue" style="--x:77%;--y:47%">2</span>
-              </div>
-              <figcaption><strong>Гид · read-only.</strong> 1 — роль всегда видна; 2 — персональные и логистические данные показаны без кнопок редактирования.</figcaption>
-            </figure>
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/10-work-status.png" aria-label="Открыть экран выбора рабочего статуса">
-                  <img src="assets/spec/10-work-status.png" width="780" height="1688" loading="lazy" alt="Экран работы по туру и явный выбор статуса встречи туриста">
-                </a>
-                <span aria-hidden="true" class="marker blue" style="--x:23%;--y:17%">1</span>
-                <span aria-hidden="true" class="marker" style="--x:77%;--y:75%">2</span>
-              </div>
-              <figcaption><strong>Факт выполнения.</strong> 1 — город и операция; 2 — статус выбирается явно, без циклического переключения.</figcaption>
-            </figure>
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/11-offline.png" aria-label="Открыть сводную в offline-режиме">
-                  <img src="assets/spec/11-offline.png" width="780" height="1688" loading="lazy" alt="Мобильная сводная без подключения с предупреждением и заблокированными изменениями">
-                </a>
-                <span aria-hidden="true" class="marker amber" style="--x:50%;--y:13%">1</span>
-                <span aria-hidden="true" class="marker" style="--x:78%;--y:62%">2</span>
-              </div>
-              <figcaption><strong>Offline.</strong> 1 — постоянное предупреждение; 2 — данные читаются, а изменяющие действия скрыты или заблокированы.</figcaption>
-            </figure>
-          </div>
-        </section>
-
-        <section class="chapter" id="mvp-acceptance">
-          <span class="chapter-number">07 · ГРАНИЦЫ MVP И ПРИЁМКА</span>
-          <h2>Что проверяем сейчас, а что оставляем следующему этапу</h2>
-          <p class="chapter-intro">MVP отвечает на продуктовый вопрос: сможет ли команда перенести ежедневную работу со сводной веб-таблицей на телефон без потери данных и контроля.</p>
-
-          <div class="scope-bands">
-            <div class="scope-band mvp">
-              <strong>Сейчас · MVP</strong>
-              <span>Кликабельный прототип</span>
-              <ul>
-                <li>единая сводная и карточка туриста;</li>
-                <li>индивидуальная и групповая логистика;</li>
-                <li>конфликты и разъединение;</li>
-                <li>роли, состояния и mock-справочник.</li>
-              </ul>
-            </div>
-            <div class="scope-band next">
-              <strong>Следующий этап</strong>
-              <span>Рабочая мобильная версия</span>
-              <ul>
-                <li>production API и транзакции;</li>
-                <li>серверные capabilities;</li>
-                <li>база городов и точек;</li>
-                <li>идемпотентные preview/apply/split.</li>
-              </ul>
-            </div>
-            <div class="scope-band backlog">
-              <strong>Бэклог</strong>
-              <span>Не входит в MVP</span>
-              <ul>
-                <li>виза, страховка, анкета;</li>
-                <li>центральный чат и внешние каналы;</li>
-                <li>единый CRM-канбан;</li>
-                <li>прочие административные модули.</li>
-              </ul>
-            </div>
-          </div>
-
-          <h3>Главный приёмочный маршрут</h3>
-          <div class="acceptance-route" aria-label="Сценарий приёмки группировки">
-            <span>4 туриста</span><i>›</i><span>2 лида</span><i>›</i><span>1 группа тура</span><i>›</i><span>отель на 4</span><i>›</i><span>прибытия 2 + 2</span><i>›</i><span>разные отъезды</span><i>›</i><span>отделить одного</span>
-          </div>
-          <ul class="plain-list">
-            <li>После отделения у туриста снова видны его личные данные.</li>
-            <li>Общий отель, другие прибытия и группа тура не меняются.</li>
-            <li>Конфликт не применяется без выбранного источника.</li>
-            <li>Повторный Пекин хранит отдельные операции.</li>
-            <li>На 375×812 и 390×844 нет горизонтальной прокрутки, действия не меньше 44×44 px.</li>
-            <li>Прототип не выполняет production или внешние запросы.</li>
-          </ul>
-
-          <h3 class="section-kicker">Состояния, которые входят в приёмку</h3>
-          <div class="state-gallery acceptance-gallery" aria-label="Ошибочное, пустое и адаптивное состояния прототипа">
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/13-error-state.png" aria-label="Открыть экран ошибки загрузки">
-                  <img src="assets/spec/13-error-state.png" width="780" height="1688" loading="lazy" alt="Экран ошибки загрузки сводной с объяснением и кнопкой повторной попытки">
-                </a>
-              </div>
-              <figcaption><strong>Ошибка.</strong> Объясняет проблему и предлагает одно понятное действие «Повторить».</figcaption>
-            </figure>
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/14-empty-state.png" aria-label="Открыть пустое состояние тура">
-                  <img src="assets/spec/14-empty-state.png" width="780" height="1688" loading="lazy" alt="Пустой тур без туристов с объяснением следующего действия">
-                </a>
-              </div>
-              <figcaption><strong>Пустой тур.</strong> Не выглядит как ошибка: объясняет, почему списка нет и что делать дальше.</figcaption>
-            </figure>
-            <figure class="mini-screen">
-              <div class="shot-frame">
-                <a href="assets/spec/15-summary-375.png" aria-label="Открыть сводную на ширине 375 пикселей">
-                  <img src="assets/spec/15-summary-375.png" width="750" height="1624" loading="lazy" alt="Мобильная сводная на экране 375 на 812 пикселей без горизонтальной прокрутки">
-                </a>
-              </div>
-              <figcaption><strong>375×812.</strong> Навигация, карточка операции и действия помещаются без горизонтальной прокрутки; кликабельные зоны — от 44 px.</figcaption>
-            </figure>
-          </div>
-
-          <div class="scenario-launcher">
-            <div>
-              <span class="feature-kicker">Проверить прототип самостоятельно</span>
-              <h3>Готовые точки входа</h3>
-              <p>Конфликт: «Общая запись» → выбрать участников → «Далее» → «Проверить» → выбрать источник → «Создать общую запись». Разъединение: «Состав · N» → «Отделить» → выбрать туриста → «Отделить от записи». Справочник и тестовые состояния находятся в меню тура.</p>
-              <details class="reset-note">
-                <summary>Как начать с чистых mock-данных</summary>
-                <p>Откройте прототип в приватном окне. Альтернатива для тестировщика: удалите из Local Storage только ключи <code>unique-guide-tourists-v2</code>, <code>unique-guide-leads-v1</code>, <code>unique-guide-directory-v1</code> и <code>unique-guide-tourists-v2-mobile-migrated</code>, затем обновите страницу.</p>
-              </details>
-            </div>
-            <div class="scenario-links">
-              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=operations">Сводная менеджера <span>→</span></a>
-              <a href="tour-operations.html?tourId=china&amp;role=guide&amp;view=tourists&amp;tourist=t1">Карточка для гида <span>→</span></a>
-              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=work">Рабочие статусы <span>→</span></a>
-              <a href="tour-operations.html?tourId=china&amp;role=manager&amp;view=operations&amp;offline=1">Offline-сценарий <span>→</span></a>
-            </div>
-          </div>
-        </section>
-
-        <details class="requirements-drawer" id="requirements">
-          <summary>
-            <span><strong>Полный каталог требований</strong>138 проверяемых пунктов, будущий контракт, non-goals и способы проверки. Это нормативное приложение к визуальным сценариям.</span>
-            <b aria-hidden="true">+</b>
-          </summary>
-          <div class="requirements-catalog">
-    <section class="section" id="scope">
-      <h2>1. Цель и границы</h2>
-      <p>Веб-сводная работает с участником конкретного тура. Мобильный прототип должен заменить несколько несовместимых карточек и логик одной канонической моделью.</p>
+  <div class="spec-layout">
+    <aside class="spec-toc" aria-label="Оглавление ТЗ">
+      <strong>Содержание</strong>
       <ul>
-        <li class="req"><strong>SCOPE-01.</strong> Прототип не обращается к production API и внешним ресурсам. Все изменения выполняются в памяти или <code>localStorage</code>.</li>
-        <li class="req"><strong>SCOPE-02.</strong> Нижняя навигация содержит только «Туры», «Туристы» и «Лиды». Отдельный раздел с оплатами в задачу не входит.</li>
-        <li class="req"><strong>SCOPE-03.</strong> «Лиды» и «Туры» остаются разными разделами. Из лида можно открыть сводную тура с фильтром по этому лиду.</li>
-        <li class="req"><strong>SCOPE-04.</strong> Прежнее ТЗ, старый прототип и рабочие приложения не изменяются.</li>
-        <li class="req"><strong>SCOPE-05.</strong> Markdown-файл является единственным источником требований текущей задачи.</li>
+      <li><a href="#как-читать-это-тз" id="toc-как-читать-это-тз">Как
+      читать это ТЗ</a></li>
+      <li><a href="#финальный-результат-после-объединения"
+      id="toc-финальный-результат-после-объединения">Финальный результат
+      после объединения</a></li>
+      <li><a href="#финальные-экраны-прототипа"
+      id="toc-финальные-экраны-прототипа">Финальные экраны
+      прототипа</a></li>
+      <li><a href="#1-цель-и-границы" id="toc-1-цель-и-границы">1. Цель
+      и границы</a></li>
+      <li><a href="#11-этап-mvp-и-основные-пользовательские-сценарии"
+      id="toc-11-этап-mvp-и-основные-пользовательские-сценарии">1.1.
+      Этап MVP и основные пользовательские сценарии</a></li>
+      <li><a href="#12-передача-mvp-без-слияния"
+      id="toc-12-передача-mvp-без-слияния">1.2. Передача MVP без
+      слияния</a></li>
+      <li><a href="#2-каноническая-модель-участника-тура"
+      id="toc-2-каноническая-модель-участника-тура">2. Каноническая
+      модель участника тура</a></li>
+      <li><a href="#3-информационная-архитектура"
+      id="toc-3-информационная-архитектура">3. Информационная
+      архитектура</a></li>
+      <li><a href="#4-карточки-лида-и-тура"
+      id="toc-4-карточки-лида-и-тура">4. Карточки лида и тура</a></li>
+      <li><a href="#5-единая-карточка-туриста"
+      id="toc-5-единая-карточка-туриста">5. Единая карточка
+      туриста</a></li>
+      <li><a href="#6-готовность-и-статусы"
+      id="toc-6-готовность-и-статусы">6. Готовность и статусы</a></li>
+      <li><a href="#7-мобильная-сводная" id="toc-7-мобильная-сводная">7.
+      Мобильная сводная</a></li>
+      <li><a href="#8-два-независимых-уровня-группировки"
+      id="toc-8-два-независимых-уровня-группировки">8. Два независимых
+      уровня группировки</a></li>
+      <li><a href="#9-список-туристов-и-документы"
+      id="toc-9-список-туристов-и-документы">9. Список туристов и
+      документы</a></li>
+      <li><a href="#10-роли-и-права" id="toc-10-роли-и-права">10. Роли и
+      права</a></li>
+      <li><a href="#11-справочник-городов-и-точек"
+      id="toc-11-справочник-городов-и-точек">11. Справочник городов и
+      точек</a></li>
+      <li><a href="#12-системные-состояния-и-мобильная-геометрия"
+      id="toc-12-системные-состояния-и-мобильная-геометрия">12.
+      Системные состояния и мобильная геометрия</a></li>
+      <li><a href="#13-будущий-контракт-рабочей-версии"
+      id="toc-13-будущий-контракт-рабочей-версии">13. Будущий контракт
+      рабочей версии</a></li>
+      <li><a href="#14-приоритеты" id="toc-14-приоритеты">14.
+      Приоритеты</a></li>
+      <li><a href="#15-acceptance-criteria"
+      id="toc-15-acceptance-criteria">15. Acceptance criteria</a></li>
+      <li><a href="#16-non-goals" id="toc-16-non-goals">16.
+      Non-goals</a></li>
+      <li><a href="#17-бэклог" id="toc-17-бэклог">17. Бэклог</a></li>
+      <li><a href="#18-проверка" id="toc-18-проверка">18.
+      Проверка</a></li>
+      <li><a href="#19-файлы-текущей-задачи"
+      id="toc-19-файлы-текущей-задачи">19. Файлы текущей задачи</a></li>
       </ul>
-    </section>
-
-    <section class="section" id="mvp">
-      <h2>1.1. Этап MVP и пользовательские сценарии</h2>
-      <p>Текущая разработка — MVP мобильной CRM. На кликабельном прототипе проверяется основная ежедневная работа веб-«Сводной таблицы» до переноса в рабочее приложение и подключения production API.</p>
-      <p class="priority">MVP готов к следующему этапу, если менеджер может подготовить один тур целиком с телефона, а гид или сопровождающий — безопасно получить разрешённые данные и отметить фактическое выполнение операций.</p>
+    </aside>
+    <main id="main-content" class="spec-content">
       <table>
-        <thead><tr><th>Сценарий веб-версии</th><th>Роль</th><th>Мобильный путь и результат</th></tr></thead>
-        <tbody>
-          <tr><td>Подготовить логистику тура</td><td>Manager / Admin</td><td>«Туры» → тур → «Сводная» → остановка → операция; видны участники и покрытие трёх операций.</td></tr>
-          <tr><td>Исправить одного туриста</td><td>Manager / Admin</td><td>Карточка → «Маршрут и логистика» → личная запись; меняются только <code>ownValues</code>.</td></tr>
-          <tr><td>Создать общие записи</td><td>Manager / Admin</td><td>Туристы из разных лидов образуют группу тура, а прибытие, отель и отъезд группируются независимо.</td></tr>
-          <tr><td>Разрешить конфликт</td><td>Manager / Admin</td><td>Сверка → выбор источника → применение; личные данные остальных сохраняются.</td></tr>
-          <tr><td>Разъединить участников</td><td>Manager / Admin</td><td>Отделение возвращает личную логистику и не меняет несвязанные операции.</td></tr>
-          <tr><td>Дозаполнить профиль</td><td>Manager / Admin</td><td>Карточка или документы → секционное редактирование и OCR → пересчёт готовности.</td></tr>
-          <tr><td>Работать из лида</td><td>Manager</td><td>Лид → «Сводная по туру» открывает область «Этот лид» и сохраняет контекст возврата.</td></tr>
-          <tr><td>Отметить выполнение</td><td>Manager / Guide / Escort</td><td>«Работа» → явный статус встречи, заселения или отъезда в разрешённом городе.</td></tr>
-          <tr><td>Обслужить справочник</td><td>Admin</td><td>«Города и точки» обновляет mock-справочник, который сразу используют формы.</td></tr>
-          <tr><td>Проверить данные в поле</td><td>Guide / Escort</td><td>Read-only доступ только к назначенному туру, городам и разрешённым полям.</td></tr>
-        </tbody>
+      <thead>
+      <tr>
+      <th>Параметр</th>
+      <th>Значение</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Статус</td>
+      <td>Финальное ТЗ MVP для согласования прототипа</td>
+      </tr>
+      <tr>
+      <td>Этап</td>
+      <td>Сначала кликабельный прототип на mock-данных, затем отдельный
+      перенос в рабочее мобильное приложение</td>
+      </tr>
+      <tr>
+      <td>Канонический документ</td>
+      <td><code>mobile-leads-tz.md</code></td>
+      </tr>
+      <tr>
+      <td>Прототип</td>
+      <td><code>mobile-leads.html</code>,
+      <code>tour-operations.html</code> и связанные mock-файлы</td>
+      </tr>
+      <tr>
+      <td>Рабочее приложение</td>
+      <td><code>client/src/pages/guide-mobile</code> после отдельного
+      согласования</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>HTML-страница собирается из этого Markdown и должна иметь
+      совпадающую контрольную сумму источника. Прежнее ТЗ приложения
+      гида не изменяется.</p>
+      <div class="prototype-note"><p><strong>Это документ, на который ориентируется разработка.</strong> Если подпись в прототипе, старом описании или обсуждении расходится с этим ТЗ, сначала исправляется ТЗ и только затем интерфейс. Самовольное изменение порядка web-полей не допускается.</p></div>
+
+      <section id="как-читать-это-тз" class="level2">
+      <h2>Как читать это ТЗ</h2>
+      <p>Документ состоит из двух частей:</p>
+      <ol type="1">
+      <li>Визуальный сценарий объясняет, как менеджер, администратор,
+      сопровождающий и пользователь с ролью <code>viewer</code>,
+      подписанной в интерфейсе «Гид», работают с мобильной CRM.</li>
+      <li>Полный каталог требований ниже фиксирует проверяемое
+      поведение, ограничения и следующий этап.</li>
+      </ol>
+      <p>Текущая разработка — <strong>MVP кликабельного
+      прототипа</strong>. Она проверяет мобильный способ работы с теми
+      же туристами, остановками маршрута и логистическими записями,
+      которые в веб-версии находятся в «Сводной таблице». Production
+      API, база и рабочее мобильное приложение на этом этапе не
+      меняются.</p>
+      <p>Канонические технические роли:
+      <code>admin | manager | escort | viewer</code>. Интерфейс
+      показывает роль <code>viewer</code> под понятной пользователю
+      подписью «Гид». Значение <code>guide</code> не является
+      production-ролью; статический прототип может принять
+      <code>role=guide</code> только как legacy URL alias и обязан
+      преобразовать его в <code>viewer</code> до выбора данных и
+      вычисления capabilities. Далее слово «Гид» означает роль
+      <code>viewer</code>, если речь идёт о подписи интерфейса.</p>
+      <p><span id="final-product"></span></p>
+      </section>
+      <section id="финальный-результат-после-объединения"
+      class="level2">
+      <h2>Финальный результат после объединения</h2>
+      <div class="final-map" role="img" aria-label="Рабочая мобильная основа и web-контракт складываются в одну финальную мобильную CRM">
+        <article><strong>Текущая GuideMobile</strong><span>Авторизация, роли, API-клиент, кэш, loading/error, safe-area и действующее нижнее меню.</span></article>
+        <article><strong>Этот MVP-прототип</strong><span>Полные Lead, Tourist и Tour surfaces, вертикальная сводная, группы, конфликты и карточные формы.</span></article>
+        <article><strong>Финальная версия</strong><span>Одна рабочая GuideMobile на production-данных. Отдельного второго приложения и дублирующих карточек не будет.</span></article>
+      </div>
+
+      <table>
+      <thead>
+      <tr>
+      <th>Остаётся из текущего приложения</th>
+      <th>Заменяется при переносе</th>
+      <th>Появляется в финальной версии</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Авторизация, server capabilities, API-клиент, query cache,
+      состояния загрузки и нижняя навигация</td>
+      <td>Mock-массивы, тестовые роли, статические HTML-страницы и
+      <code>localStorage</code></td>
+      <td>Полноэкранные карточки лида, туриста и тура с точным
+      web-порядком разделов и полей</td>
+      </tr>
+      <tr>
+      <td>Сущности <code>leads</code>, <code>leadTourists</code>,
+      <code>contacts</code>, <code>deals</code>, <code>groups</code>,
+      <code>cityVisits</code>, <code>columnSubGroups</code></td>
+      <td>Вычисление групп по совпавшему тексту и копирование общих
+      значений в личные записи</td>
+      <td>Авторитетные <code>groupId/subgroupId</code>, mobile DTO
+      <code>ownValues/effectiveValues</code>, preview/apply/split</td>
+      </tr>
+      <tr>
+      <td>Действующие desktop Leads, EventCard, EditEventDialog и
+      EventSummary</td>
+      <td>Широкая таблица как способ мобильного отображения</td>
+      <td>Выбор одной остановки и операции, «Покрытие», сохранение
+      контекста возврата</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Desktop-интерфейсы не заменяются и визуально не меняются. После
+      согласования прототипа перенос оформляется отдельной high-risk
+      задачей в <code>develop</code>; текущая ветка прототипа в
+      приложение автоматически не сливается.</p>
+      <section
+      id="что-именно-изменится-в-рабочем-приложении-после-согласования"
+      class="level3">
+      <h3>Что именно изменится в рабочем приложении после
+      согласования</h3>
+      <ol type="1">
+      <li><code>GuideMobile.tsx</code> останется оболочкой авторизации и
+      навигации, а Lead/Tour/Tourist/Summary будут вынесены в отдельные
+      mobile-компоненты.</li>
+      <li>Три текущих варианта карточки туриста будут сведены к одному
+      profile adapter и одному полноэкранному экрану с режимами «Профиль
+      / В туре».</li>
+      <li>Вычисление групп по совпавшим подписям будет удалено. UI
+      начнёт доверять только <code>deal.groupId</code> и subgroup-связям
+      сервера.</li>
+      <li>Массовая логистика перестанет копировать общие значения
+      участникам. Client будет получать личное <code>ownValues</code> и
+      вычисленное <code>effectiveValues</code>.</li>
+      <li>В карточке тура появятся шесть согласованных разделов;
+      существующая программа и операционные статусы будут встроены без
+      дублирования данных.</li>
+      <li>В карточке лида останутся web-поля и четыре вкладки, а переход
+      в сводную откроет тот же production-тур с областью текущего
+      лида.</li>
+      <li>Mock/localStorage исчезнут. Все записи пройдут через текущие
+      API или отдельный mobile facade с транзакциями, идемпотентностью и
+      server capabilities.</li>
+      </ol>
+      <ul>
+      <li><strong>MERGE-01.</strong> После переноса пользователь видит
+      одно мобильное приложение, а не «старую» и «новую» редакции
+      рядом.</li>
+      <li><strong>MERGE-02.</strong> Desktop Leads и Event Summary не
+      получают визуальных изменений из этой задачи.</li>
+      <li><strong>MERGE-03.</strong> Переход на новые экраны не создаёт
+      второй master-record лида, туриста, тура или визита.</li>
+      </ul>
+      </section>
+      <section id="карта-продукта" class="level3">
+      <h3>Карта продукта</h3>
+      <pre class="text"><code>Лид или тур
+      ↓
+Остановка маршрута · routeCityId
+      ↓
+Прибытие | Отель | Отъезд
+      ↓
+Индивидуальная или общая запись</code></pre>
+      <p>Для admin и manager «Лиды» и «Туры» остаются разными пунктами
+      меню:</p>
+      <ul>
+      <li>в «Лидах» менеджер работает с заявкой, контактом, сообщениями,
+      документами и задачами;</li>
+      <li>в «Турах» менеджер работает со всем составом, маршрутом,
+      логистикой и фактическими статусами;</li>
+      <li>из карточки лида можно открыть тот же тур с областью «Этот
+      лид», не создавая копию данных.</li>
+      </ul>
+      <section id="как-читается-одна-и-та-же-информация" class="level4">
+      <h4>Как читается одна и та же информация</h4>
+      <table>
+      <thead>
+      <tr>
+      <th>Веб-«Сводная таблица»</th>
+      <th>Мобильная сводная</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Строка — турист</td>
+      <td>Сначала выбирается тур или турист</td>
+      </tr>
+      <tr>
+      <td>Группа колонок — позиция города</td>
+      <td>Затем выбирается остановка маршрута</td>
+      </tr>
+      <tr>
+      <td>Ячейка — прибытие, отель или отъезд</td>
+      <td>На экране открывается одна из трёх операций</td>
+      </tr>
+      <tr>
+      <td>Вся матрица видна одновременно</td>
+      <td>Общую картину показывает режим «Покрытие»</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Это разные представления одних данных. Мобильный интерфейс не
+      создаёт копию веб-сводной и не меняет модель хранения.</p>
+      </section>
+      </section>
+      <section id="основной-путь-менеджера" class="level3">
+      <h3>Основной путь менеджера</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Шаг</th>
+      <th>Пользователь делает</th>
+      <th>Система сохраняет</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>1</td>
+      <td>Открывает лид и проверяет состав</td>
+      <td>Связь заявки с каноническими туристами</td>
+      </tr>
+      <tr>
+      <td>2</td>
+      <td>Нажимает «Открыть сводную тура»</td>
+      <td>Тур, область «Этот лид» и контекст возврата</td>
+      </tr>
+      <tr>
+      <td>3</td>
+      <td>Выбирает остановку маршрута</td>
+      <td>Точный <code>routeCityId</code>, включая повторный город</td>
+      </tr>
+      <tr>
+      <td>4</td>
+      <td>Заполняет прибытие, отель и отъезд</td>
+      <td>Три независимые операции и их источники</td>
+      </tr>
+      <tr>
+      <td>5</td>
+      <td>Открывает «Покрытие»</td>
+      <td>Режим ничего не меняет, только показывает пробелы</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><img src="assets/spec/16-lead-final.png"
+      alt="Карточка лида с переходом в сводную" /></p>
+      <p>На карточке лида блок «Сводная по туру» объясняет, что
+      логистика хранится на уровне тура. Кнопка открывает весь связанный
+      тур с фильтром по участникам текущего лида.</p>
+      <p><img src="assets/spec/20-summary-final.png"
+      alt="Основной экран мобильной сводной" /></p>
+      <p>На основном экране одновременно видны выбранная остановка
+      маршрута, одна из трёх операций, область «Этот лид / Весь тур» и
+      тип каждой записи. Это мобильный эквивалент работы с выбранной
+      ячейкой веб-таблицы.</p>
+      </section>
+      <section id="два-режима-сводной" class="level3">
+      <h3>Два режима сводной</h3>
+      <ul>
+      <li><strong>«По операциям»</strong> нужен для заполнения и
+      изменения конкретного рейса, отеля или отъезда.</li>
+      <li><strong>«Покрытие»</strong> показывает по каждому туристу и
+      каждой доступной остановке, какие из трёх операций уже
+      заполнены.</li>
+      </ul>
+      <p>Покрытие сохраняет смысл широкой веб-таблицы, но помещает
+      данные одного туриста в вертикальную карточку. Незаполненная
+      ячейка открывает форму нужного города и операции.</p>
+      </section>
+      <section id="два-независимых-уровня-группировки" class="level3">
+      <h3>Два независимых уровня группировки</h3>
+      <pre class="text"><code>Анна        Илья        Марина       Денис
+  └──────── одна группа туристов на весь тур ────────┘
+
+Отель       └────────── общая запись на 4 ──────────┘
+Прибытие    └── рейс A · 2 ──┘ └── рейс B · 2 ─────┘
+Отъезд      личный      личный      личный      личный</code></pre>
+      <ul>
+      <li><code>groupId</code> отвечает за состав группы туристов на
+      уровне тура;</li>
+      <li><code>subgroupId</code> отвечает только за одну операцию в
+      одной позиции маршрута;</li>
+      <li>отделение от прибытия не меняет отель, отъезд или группу
+      тура;</li>
+      <li>объединение не копирует данные источника в индивидуальные
+      записи участников.</li>
+      </ul>
+      <p><img src="assets/spec/04-tourist-group-selection.png"
+      alt="Выбор туристов для группы тура" /></p>
+      <p>Свободного туриста можно добавить в одну существующую группу.
+      Две существующие группы не сливаются автоматически: сначала одну
+      из них нужно разъединить.</p>
+      <p><img src="assets/spec/05-conflict-review.png"
+      alt="Сверка конфликтующих рейсов" /></p>
+      <p>Если выбранные туристы имеют разные данные, система
+      останавливает применение. Менеджер сравнивает поля и явно выбирает
+      основную запись. До этого момента ничего не меняется;
+      индивидуальные данные остальных туристов сохраняются.</p>
+      <p><img src="assets/spec/08-split-operation.png"
+      alt="Разъединение участников одной общей операции" /></p>
+      <p>Разъединение выполняется в составе конкретной общей записи.
+      Менеджер видит операцию, позицию маршрута, источник и участников,
+      выбирает отделяемых туристов и подтверждает действие. Их личные
+      данные снова становятся видимыми; общий отель, другие прибытия,
+      отъезды и группа тура не изменяются.</p>
+      </section>
+      <section id="единая-карточка-туриста" class="level3">
+      <h3>Единая карточка туриста</h3>
+      <pre class="text"><code>ownValues + sourceVisitId → effectiveValues
+личное       источник        отображается в сводной</code></pre>
+      <p>Из лида, списка туристов, документов и операции открывается
+      одна карточка по стабильному <code>touristId</code>. В ней собраны
+      профиль, паспорта, сканы и OCR, маршрут, логистика, связи, группы
+      и комментарии.</p>
+      <p><img src="assets/spec/19-tourist-tour-final.png"
+      alt="Маршрут и логистика в карточке туриста" /></p>
+      <p>Для каждого города рядом показаны данные операции и её
+      источник. Изменение личной записи меняет только
+      <code>ownValues</code>. Если турист находится в общей записи,
+      сводная продолжает показывать выбранный источник до
+      разъединения.</p>
+      </section>
+      <section id="роли-и-справочник" class="level3">
+      <h3>Роли и справочник</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Роль</th>
+      <th>Основная работа в MVP</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Администратор</td>
+      <td>Все действия, удаление, управление турами и справочником</td>
+      </tr>
+      <tr>
+      <td>Менеджер</td>
+      <td>Профиль и документы назначенных лидов; логистика и группы
+      всего доступного тура</td>
+      </tr>
+      <tr>
+      <td>Сопровождающий</td>
+      <td>Разрешённые поля и операционные статусы назначенного тура</td>
+      </tr>
+      <tr>
+      <td><code>viewer</code>, подпись «Гид»</td>
+      <td>Read-only профиль и статусы только назначенных городов</td>
+      </tr>
+      </tbody>
+      </table>
+      <p><img src="assets/spec/07-city-directory.png"
+      alt="Справочник городов и транспортных точек" /></p>
+      <p>В форме самолёта доступны только аэропорты выбранного города,
+      для поезда — ж/д вокзалы, для автобуса — автовокзалы. Одна
+      активная точка предзаполняется только в пустое поле. Используемую
+      точку можно архивировать, но нельзя удалить.</p>
+      <p><img src="assets/spec/12-point-picker.png"
+      alt="Выбор аэропорта внутри выбранного города" /></p>
+      <p>Поисковый экран показывает только точки подходящего типа и
+      выбранного города. Если подходящей точки нет, пользователь может
+      сохранить ручное значение с отметкой «Не из справочника».</p>
+      <section id="ролевые-и-системные-сценарии" class="level4">
+      <h4>Ролевые и системные сценарии</h4>
+      <p>Роль <code>viewer</code> с подписью «Гид» видит назначенный
+      тур, разрешённые города и разрешённые поля карточки без кнопок
+      изменения профиля, документов, логистики и групп.</p>
+      <p>В контексте «Сводная → Статусы» пользователь выбирает статус
+      встречи, заселения или отъезда явным действием. Статус не
+      переключается скрытым циклом и меняется только для выбранного
+      города и операции.</p>
+      <p>Offline-режим оставляет сохранённые данные доступными для
+      чтения, постоянно показывает причину ограничений и блокирует любые
+      mock-записи.</p>
+      </section>
+      </section>
+      <section id="границы-mvp" class="level3">
+      <h3>Границы MVP</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Сейчас: кликабельный MVP</th>
+      <th>Следующий этап</th>
+      <th>Бэклог</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Сводная, карточка туриста, группировка, конфликты, роли,
+      состояния и mock-справочник</td>
+      <td>Production API, транзакции, серверные права, база городов и
+      идемпотентные preview/apply/split</td>
+      <td>Виза, страховка, анкета, центральный чат, единый CRM-канбан и
+      прочие административные модули</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Главный приёмочный сценарий использует выбранных четырёх
+      туристов из двух лидов. В туре могут находиться туристы из других
+      лидов; они не входят в создаваемую группу и не меняются:</p>
+      <p><code>4 туриста → 2 лида → 1 группа тура → общий отель на 4 → прибытия 2 + 2 → разные отъезды → отделение одного туриста</code></p>
+      <p>После отделения должны снова отображаться личные данные
+      туриста. Другие операции и группа тура не меняются.</p>
+      <section id="состояния-и-адаптивность" class="level4">
+      <h4>Состояния и адаптивность</h4>
+      <ul>
+      <li>ошибка объясняет проблему и предлагает действие
+      «Повторить»;</li>
+      <li>пустое состояние объясняет отсутствие данных и следующий
+      шаг;</li>
+      <li>на 375×812 и 390×844 отсутствует горизонтальная прокрутка, а
+      интерактивные области имеют размер не меньше 44×44 px.</li>
+      </ul>
+      </section>
+      <section id="как-воспроизвести-сценарии" class="level4">
+      <h4>Как воспроизвести сценарии</h4>
+      <ol type="1">
+      <li>Чистое состояние: открыть прототип в приватном окне.
+      Альтернатива для тестировщика — удалить из Local Storage только
+      <code>unique-guide-tourists-v2</code>,
+      <code>unique-guide-leads-v1</code>,
+      <code>unique-guide-directory-v1</code> и
+      <code>unique-guide-tourists-v2-mobile-migrated</code>, затем
+      обновить страницу.</li>
+      <li>Основная сводная: открыть
+      <code>tour-operations.html?tourId=china&amp;role=manager&amp;tourSection=summary</code>.</li>
+      <li>Конфликт: в «Прибытии» нажать «Общая запись» на индивидуальной
+      карточке, выбрать минимум ещё одного туриста с другими данными,
+      нажать «Далее», затем «Проверить», явно выбрать запись-источник на
+      экране сверки и нажать «Создать общую запись».</li>
+      <li>Разъединение: после создания общей записи вернуться в
+      «Прибытие», нажать «Состав · N» → «Отделить», выбрать туриста и
+      подтвердить «Отделить от записи». Если отделяется текущий
+      источник, выбрать новый источник для оставшихся участников.</li>
+      <li>Роль <code>viewer</code> с подписью «Гид»: открыть
+      <code>tour-operations.html?tourId=china&amp;role=viewer&amp;view=tourists&amp;tourist=t1</code>.
+      Legacy-ссылка с <code>role=guide</code> допустима только для
+      проверки нормализации в <code>viewer</code> с теми же
+      ограничениями.</li>
+      <li>Рабочие статусы: открыть
+      <code>tour-operations.html?tourId=china&amp;view=statuses</code>,
+      проверить активную цепочку «Сводная → Статусы» и нажать карточку
+      участника.</li>
+      <li>Offline: открыть
+      <code>tour-operations.html?tourId=china&amp;role=manager&amp;tourSection=summary&amp;offline=1</code>.</li>
+      <li>Справочник и состояния: открыть меню тура; выбрать «Города и
+      точки» или «Состояния экрана» в меню роли.</li>
+      </ol>
+      <p><span id="final-screens"></span></p>
+      </section>
+      </section>
+      </section>
+      <section id="финальные-экраны-прототипа" class="level2">
+      <h2>Финальные экраны прототипа</h2>
+      <p>Ниже — актуальные экраны viewport 390×844. Номера поверх
+      интерфейса связывают элемент с подписью. Скриншоты фиксируют
+      мобильную композицию; точный ledger полей задают разделы 4 и
+      5.</p>
+      <div class="screen-board">
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="mobile-leads.html?lead=lead-1042&amp;tab=edit&amp;role=manager"><img src="assets/spec/16-lead-final.png" alt="Карточка лида: вкладки и канонические блоки web-формы"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:19%;--y:12%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:90%;--y:26%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:86%;--y:39%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:19%;--y:68%">4</span>
+          </div>
+          <figcaption><strong>Карточка лида.</strong> 1 — четыре web-вкладки; 2 — проверка связей; 3 — ручное объединение лидов; 4 — точный порядок полей от «Личных данных» к «Туру и оплате».</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;tourSection=overview&amp;role=manager"><img src="assets/spec/17-tour-final.png" alt="Обзор тура с шестью разделами и полями EventCard"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:17%;--y:19%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:87%;--y:32%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:17%;--y:53%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:83%;--y:94%">4</span>
+          </div>
+          <figcaption><strong>Обзор тура.</strong> 1 — шесть частей карточки; 2 — состояние тура; 3 — маршрут, даты, цена и участники в порядке EventCard; 4 — нижнее меню.</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;tourSection=summary&amp;role=manager"><img src="assets/spec/20-summary-final.png" alt="Мобильная сводная: остановка маршрута, операция и карточки записей"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:50%;--y:19%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:91%;--y:39%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:17%;--y:46%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:64%;--y:68%">4</span>
+          </div>
+          <figcaption><strong>Сводная тура.</strong> 1 — вход из карточки тура; 2 — стабильная позиция маршрута; 3 — прибытие, отель или отъезд; 4 — личная либо общая запись.</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;tourist=t1&amp;touristSection=profile&amp;role=manager"><img src="assets/spec/18-tourist-profile-final.png" alt="Базовый профиль туриста с пятью web-разделами"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:75%;--y:12%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:22%;--y:29%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:50%;--y:41%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:91%;--y:51%">4</span>
+          </div>
+          <figcaption><strong>Профиль туриста.</strong> 1 — профиль или контекст тура; 2 — отдельные признаки лида, участия и основного туриста; 3 — готовность и контактные действия; 4 — пять раскрываемых разделов с точным web-порядком.</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;tourist=t1&amp;touristSection=tour&amp;expand=tour-context&amp;role=manager"><img src="assets/spec/19-tourist-tour-final.png" alt="Турист в выбранном туре: связи, статусы, группа и логистика"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:18%;--y:29%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:18%;--y:46%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:18%;--y:66%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:18%;--y:89%">4</span>
+          </div>
+          <figcaption><strong>Турист в конкретном туре.</strong> 1 — выбранный тур; 2 — исходный лид и его статус; 3 — участие и группа; 4 — представитель, основной турист заявки и ограниченный маршрут. Выше карточки показаны отдельные плашки статусов, ниже — фактические статусы и личные/общие записи по остановкам.</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;tourSection=team&amp;role=manager"><img src="assets/spec/21-team-final.png" alt="Команда тура: гиды, город оплаты, сопровождающий и администраторы чата"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:17%;--y:37%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:25%;--y:50%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:17%;--y:67%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:84%;--y:80%">4</span>
+          </div>
+          <figcaption><strong>Команда тура.</strong> 1 — гиды по `routeCityId`; 2 — город сбора оплаты; 3 — сопровождающий; 4 — администраторы чата.</figcaption>
+        </figure>
+
+        <figure class="annotated-shot">
+          <div class="shot-frame">
+            <a href="tour-operations.html?tourId=china&amp;view=statuses&amp;role=manager"><img src="assets/spec/22-statuses-final.png" alt="Операционные статусы участников выбранной остановки маршрута"></a>
+            <span aria-hidden="true" class="marker blue" style="--x:87%;--y:33%">1</span>
+            <span aria-hidden="true" class="marker" style="--x:87%;--y:43%">2</span>
+            <span aria-hidden="true" class="marker purple" style="--x:18%;--y:61%">3</span>
+            <span aria-hidden="true" class="marker amber" style="--x:84%;--y:77%">4</span>
+          </div>
+          <figcaption><strong>Статусы на маршруте.</strong> 1 — четвёртый режим сводной; 2 — конкретный `routeCityId`; 3 — прибытие, заселение и отъезд по участнику; 4 — явный выбор нового статуса без скрытого цикла.</figcaption>
+        </figure>
+      </div>
+
+      <div class="scenario-flow" aria-label="Главный сценарий группировки">
+        <ol>
+          <li><strong>Лид</strong><span>Тур и туристы</span></li>
+          <li><strong>Подтверждение</strong><span><code>status=converted</code></span></li>
+          <li><strong>Сводная</strong><span>Остановка и операция</span></li>
+          <li><strong>Группа тура</strong><span>Один <code>deal.groupId</code></span></li>
+          <li><strong>Общая операция</strong><span>Отель, прибытие или отъезд</span></li>
+          <li><strong>Конфликт</strong><span>Preview → source → apply</span></li>
+          <li><strong>Split</strong><span>Возврат личных <code>ownValues</code></span></li>
+        </ol>
+      </div>
+
+      </section>
+      <section id="1-цель-и-границы" class="level2">
+      <h2>1. Цель и границы</h2>
+      <p>Веб-«Сводная таблица» работает с участником конкретного тура,
+      его индивидуальными данными и независимыми общими записями
+      логистики. В текущей мобильной версии турист и сводная реализованы
+      несколькими несовместимыми способами. Задача прототипа: объединить
+      их вокруг раздела «Туры», одной карточки туриста и одной модели
+      групп.</p>
+      <p>Текущий этап меняет только статический прототип, mock-данные,
+      smoke-тест и это ТЗ. Рабочее мобильное приложение, desktop, API,
+      база данных и серверные права не изменяются.</p>
+      <ul>
+      <li><strong>SCOPE-01.</strong> Прототип не обращается к production
+      API и внешним ресурсам. Все изменения выполняются в памяти или
+      <code>localStorage</code>.</li>
+      <li><strong>SCOPE-02.</strong> Нижняя навигация admin и manager
+      содержит только «Туры», «Туристы» и «Лиды». Роли
+      <code>viewer</code> и <code>escort</code> видят только «Туры» и
+      «Туристы». Отдельный раздел с оплатами в задачу не входит.</li>
+      <li><strong>SCOPE-03.</strong> Для admin и manager «Лиды» и «Туры»
+      остаются разными разделами. Из назначенного и доступного лида
+      можно открыть сводную тура с фильтром по этому лиду.</li>
+      <li><strong>SCOPE-04.</strong> Прежнее ТЗ приложения гида и
+      рабочие приложения не изменяются; меняется только изолированный
+      MVP-прототип текущей задачи.</li>
+      <li><strong>SCOPE-05.</strong> Markdown-файл является единственным
+      источником требований текущей задачи.</li>
+      </ul>
+      </section>
+      <section id="11-этап-mvp-и-основные-пользовательские-сценарии"
+      class="level2">
+      <h2>1.1. Этап MVP и основные пользовательские сценарии</h2>
+      <p>Текущая разработка обозначается как этап <strong>MVP мобильной
+      CRM</strong>. Его задача — проверить на кликабельном прототипе
+      основную ежедневную работу веб-«Сводной таблицы» до переноса в
+      рабочее приложение и подключения production API.</p>
+      <p>MVP считается пригодным для следующего этапа, если менеджер
+      может подготовить один тур целиком с телефона, а viewer с подписью
+      «Гид» или сопровождающий может получить разрешённые данные и
+      отметить фактическое выполнение операций без доступа к лидам и
+      закрытым персональным полям.</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Сценарий веб-версии</th>
+      <th>Роль</th>
+      <th>Мобильный путь</th>
+      <th>Ожидаемый результат</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Создать лид и основной профиль</td>
+      <td>Manager / Admin</td>
+      <td>«Лиды» → «Создать» → анкетные и паспортные блоки</td>
+      <td>Лид и автоматически созданный основной турист используют те же
+      поля, что web LeadForm</td>
+      </tr>
+      <tr>
+      <td>Добавить остальных туристов</td>
+      <td>Manager / Admin</td>
+      <td>Лид → «Редактировать» → «Туристы» → «Добавить»</td>
+      <td>Каждый турист независим и открывается в канонической
+      карточке</td>
+      </tr>
+      <tr>
+      <td>Подготовить логистику тура</td>
+      <td>Manager / Admin</td>
+      <td>«Туры» → тур → «Сводная» → остановка → операция</td>
+      <td>Видны все участники тура и покрытие прибытия, отеля и
+      отъезда</td>
+      </tr>
+      <tr>
+      <td>Исправить данные одного туриста</td>
+      <td>Manager / Admin</td>
+      <td>Карточка туриста → «Маршрут и логистика» → «Изменить личную
+      запись»</td>
+      <td>Меняются только <code>ownValues</code> выбранного туриста</td>
+      </tr>
+      <tr>
+      <td>Создать общие записи</td>
+      <td>Manager / Admin</td>
+      <td>Выбрать туристов из разных лидов → создать группу тура →
+      отдельно объединить операции</td>
+      <td>Общий отель, прибытия и отъезды имеют независимые
+      <code>subgroupId</code></td>
+      </tr>
+      <tr>
+      <td>Разрешить конфликт</td>
+      <td>Manager / Admin</td>
+      <td>Массовое действие → «Сверка данных» → выбрать источник →
+      применить</td>
+      <td>Общая запись ссылается на выбранный
+      <code>sourceVisitId</code>, личные данные остальных
+      сохраняются</td>
+      </tr>
+      <tr>
+      <td>Отделить от одной операции</td>
+      <td>Manager / Admin</td>
+      <td>Общая запись → «Состав» → «Отделить»</td>
+      <td>Личная логистика снова видна; другие операции и
+      <code>groupId</code> не меняются</td>
+      </tr>
+      <tr>
+      <td>Расформировать группу тура</td>
+      <td>Manager / Admin</td>
+      <td>Группа тура → «Расформировать» → подтверждение</td>
+      <td>Зависимые общие связи снимаются, индивидуальные значения
+      сохраняются</td>
+      </tr>
+      <tr>
+      <td>Дозаполнить профиль и документы</td>
+      <td>Manager / Admin</td>
+      <td>«Туристы» или «Документы» → карточка → нужный раздел →
+      OCR/редактирование</td>
+      <td>Готовность пересчитывается, OCR применяет только выбранные
+      поля</td>
+      </tr>
+      <tr>
+      <td>Работать из конкретного лида</td>
+      <td>Manager</td>
+      <td>«Лиды» → лид → «Сводная по туру»</td>
+      <td>Открывается тот же тур с областью «Этот лид» и возвратом в
+      прежний контекст</td>
+      </tr>
+      <tr>
+      <td>Отметить факт выполнения</td>
+      <td>Manager / <code>viewer</code> («Гид») / Escort</td>
+      <td>Тур → «Сводная» → «Статусы» → встреча, заселение или
+      отъезд</td>
+      <td>Меняется только разрешённый операционный статус выбранного
+      города</td>
+      </tr>
+      <tr>
+      <td>Обновить тур, программу и команду</td>
+      <td>Manager / Admin</td>
+      <td>Тур → «Обзор / Программа / Команда / Задачи»</td>
+      <td>Поля, назначения и TaskWidget сохраняют web-порядок и
+      роли</td>
+      </tr>
+      <tr>
+      <td>Перенести стыковку между городами</td>
+      <td>Manager / Admin</td>
+      <td>Сохранить отъезд → открыть следующую остановку</td>
+      <td>Заполняются только пустые соответствующие поля следующего
+      прибытия</td>
+      </tr>
+      <tr>
+      <td>Выгрузить сводную</td>
+      <td>Manager / Admin</td>
+      <td>Тур → «Сводная» → «Excel»</td>
+      <td>Создаётся файл только по доступному составу без изменения
+      CRM</td>
+      </tr>
+      <tr>
+      <td>Обслужить справочник</td>
+      <td>Admin</td>
+      <td>Меню тура → «Города и точки»</td>
+      <td>Изменённые mock-точки сразу используются в формах;
+      используемые записи архивируются</td>
+      </tr>
+      <tr>
+      <td>Проверить данные в поле</td>
+      <td><code>viewer</code> («Гид») / Escort</td>
+      <td>Тур → сводная или карточка туриста</td>
+      <td>Доступны только назначенный тур/города и разрешённые поля без
+      мутаций логистики</td>
+      </tr>
+      </tbody>
       </table>
       <ul>
-        <li class="req"><strong>MVP-01.</strong> Текущая разработка является MVP мобильной CRM и проверяет основные сценарии веб-«Сводной таблицы» в кликабельном прототипе.</li>
-        <li class="req"><strong>MVP-02.</strong> В границы MVP входят единая сводная тура, одна карточка туриста, индивидуальная и групповая логистика, документы, операционные статусы, роли и mock-справочник.</li>
-        <li class="req"><strong>MVP-03.</strong> Рабочее приложение, production API, база данных и серверные права остаются следующим этапом после проверки и согласования MVP.</li>
-        <li class="req"><strong>FLOW-01.</strong> Менеджер открывает «Туры → Тур → Сводная», выбирает позицию маршрута и операцию и видит всех доступных участников и покрытие данных.</li>
-        <li class="req"><strong>FLOW-02.</strong> Менеджер изменяет личную запись одного туриста без изменения общей записи и личных данных других участников.</li>
-        <li class="req"><strong>FLOW-03.</strong> Менеджер объединяет туристов одного тура из разных лидов в группу тура и независимо создаёт общие прибытия, отель и отъезды.</li>
-        <li class="req"><strong>FLOW-04.</strong> При конфликте менеджер сначала сверяет варианты и явно выбирает источник; до подтверждения данные не меняются.</li>
-        <li class="req"><strong>FLOW-05.</strong> Менеджер отделяет туриста от одной операции или группы тура и получает сохранённые личные значения без изменения несвязанных операций.</li>
-        <li class="req"><strong>FLOW-06.</strong> Менеджер открывает единую карточку туриста, дозаполняет профиль и документы, проверяет OCR и видит пересчитанную готовность.</li>
-        <li class="req"><strong>FLOW-07.</strong> Менеджер открывает сводную из лида с областью «Этот лид» и возвращается в тот же раздел, фильтры и позицию прокрутки.</li>
-        <li class="req"><strong>FLOW-08.</strong> Manager, guide или escort меняет разрешённый операционный статус явным выбором только в доступном туре и городе.</li>
-        <li class="req"><strong>FLOW-09.</strong> Администратор управляет mock-справочником городов и точек, а мобильные формы сразу используют актуальные активные записи.</li>
-        <li class="req"><strong>FLOW-10.</strong> Guide и escort просматривают только разрешённые поля назначенного тура и не могут изменить профиль, логистику, группы или документы.</li>
+      <li><strong>MVP-01.</strong> Текущая разработка является MVP
+      мобильной CRM и проверяет основные сценарии веб-«Сводной таблицы»
+      в кликабельном прототипе.</li>
+      <li><strong>MVP-02.</strong> В границы MVP входят единая сводная
+      тура, одна карточка туриста, индивидуальная и групповая логистика,
+      документы, операционные статусы, роли и mock-справочник.</li>
+      <li><strong>MVP-03.</strong> Рабочее приложение, production API,
+      база данных и серверные права остаются следующим этапом после
+      проверки и согласования MVP.</li>
+      <li><strong>FLOW-01.</strong> Менеджер открывает «Туры → Тур →
+      Сводная», выбирает позицию маршрута и операцию и видит всех
+      доступных участников и покрытие данных.</li>
+      <li><strong>FLOW-02.</strong> Менеджер изменяет личную запись
+      одного туриста без изменения общей записи и личных данных других
+      участников.</li>
+      <li><strong>FLOW-03.</strong> Менеджер выбирает ровно четырёх
+      туристов из двух лидов одного тура, объединяет их в группу и
+      независимо создаёт общие прибытия, отель и отъезды. Другие
+      участники этого тура остаются вне выбранной группы и не
+      меняются.</li>
+      <li><strong>FLOW-04.</strong> При конфликте менеджер сначала
+      сверяет варианты и явно выбирает источник; до подтверждения данные
+      не меняются.</li>
+      <li><strong>FLOW-05.</strong> Менеджер отделяет туриста от одной
+      общей операции и получает сохранённые личные значения без
+      изменения других операций или группы тура.</li>
+      <li><strong>FLOW-06.</strong> Менеджер открывает единую карточку
+      туриста, дозаполняет профиль и документы, проверяет OCR и видит
+      пересчитанную готовность.</li>
+      <li><strong>FLOW-07.</strong> Менеджер открывает сводную из лида с
+      областью «Этот лид» и возвращается в тот же раздел, фильтры и
+      позицию прокрутки.</li>
+      <li><strong>FLOW-08.</strong> Manager, viewer или escort меняет
+      разрешённый операционный статус явным выбором только в доступном
+      туре и городе.</li>
+      <li><strong>FLOW-09.</strong> Администратор управляет
+      mock-справочником городов и точек, а мобильные формы сразу
+      используют актуальные активные записи.</li>
+      <li><strong>FLOW-10.</strong> Роли <code>viewer</code> и
+      <code>escort</code> просматривают только разрешённые поля
+      назначенного тура, не видят раздел «Лиды» и не могут изменить
+      профиль, логистику, группы или документы.</li>
+      <li><strong>FLOW-11.</strong> Менеджер полностью расформировывает
+      группу тура; зависимые общие связи снимаются, а индивидуальные
+      данные всех участников сохраняются.</li>
       </ul>
-    </section>
-
-    <section class="section" id="model">
-      <h2>2. Каноническая модель</h2>
-      <pre>LeadTourist → Contact → Deal → CityVisit</pre>
-      <div class="field-grid">
-        <div class="field-card"><strong>leadTouristId</strong><span>Анкета и паспортные данные</span></div>
-        <div class="field-card"><strong>contactId</strong><span>Контакт и чат</span></div>
-        <div class="field-card"><strong>dealId / leadId</strong><span>Участие в туре и исходный лид</span></div>
-        <div class="field-card"><strong>groupId / subgroupId</strong><span>Группа тура и общая запись операции</span></div>
-        <div class="field-card"><strong>routeCityId + cityIdx</strong><span>Однозначная позиция маршрута</span></div>
-      </div>
+      </section>
+      <section id="12-передача-mvp-без-слияния" class="level2">
+      <h2>1.2. Передача MVP без слияния</h2>
+      <p>Текущая разработка хранится только в ветке
+      <code>prototype/mobile-crm-2026-08-03</code>. Этот этап не создаёт
+      PR, не сливается в <code>main</code> и не меняет источник GitHub
+      Pages. Публичная страница из <code>main</code> не считается
+      preview этой ветки.</p>
+      <p>Финальная передача содержит имя ветки, точный commit SHA и
+      preview или архив, собранный из этого SHA. Ссылка только на имя
+      ветки не фиксирует версию, потому что ветка может получить новые
+      коммиты. Контрольная сумма Markdown, сгенерированный HTML,
+      скриншоты и результаты smoke относятся к одному commit SHA.</p>
       <ul>
-        <li class="req"><strong>MODEL-01.</strong> Все входы из «Лидов», «Туристов», «Операций» и «Документов» открывают одну каноническую карточку по стабильному <code>touristId</code>.</li>
-        <li class="req"><strong>MODEL-02.</strong> ФИО, телефон, email, дата рождения, паспортные данные, комментарии и связи имеют один mock-источник и одинаково отображаются во всех разделах.</li>
-        <li class="req"><strong>MODEL-03.</strong> Возврат из карточки сохраняет исходный тур, город, этап, фильтр по лиду и режим списка.</li>
-        <li class="req"><strong>MODEL-04.</strong> Ограниченный маршрут туриста хранится как список <code>routeCityId</code>, а не названий городов.</li>
+      <li><strong>DELIVERY-01.</strong> Все файлы MVP находятся в
+      <code>prototype/mobile-crm-2026-08-03</code>; <code>main</code> и
+      <code>develop</code> не меняются.</li>
+      <li><strong>DELIVERY-02.</strong> Для текущего этапа не создаются
+      PR, merge и GitHub Pages deployment.</li>
+      <li><strong>DELIVERY-03.</strong> Передача указывает точный commit
+      SHA и даёт неизменяемый preview или архив этого коммита.</li>
+      <li><strong>DELIVERY-04.</strong> HTML, скриншоты и результаты
+      проверок воспроизводятся из указанного SHA без незакоммиченных
+      файлов.</li>
       </ul>
-    </section>
-
-    <section class="section" id="ia">
-      <h2>3. Структура</h2>
-      <pre>Тур
-├─ Сводная: Операции / Туристы / Документы
-├─ Работа: Встреча / Заселение / Отъезд
-└─ Программа</pre>
+      </section>
+      <section id="2-каноническая-модель-участника-тура" class="level2">
+      <h2>2. Каноническая модель участника тура</h2>
+      <p>Участник тура собирается из цепочки:</p>
+      <p><code>LeadTourist → Contact → Deal → CityVisit</code></p>
       <ul>
-        <li class="req"><strong>IA-01.</strong> В «Сводной» доступны вкладки «Операции», «Туристы» и «Документы».</li>
-        <li class="req"><strong>IA-02.</strong> Для сводной доступны области «Весь тур» и «Этот лид». Область меняет только видимый состав.</li>
-        <li class="req"><strong>IA-03.</strong> Позиция маршрута выбирается одной кнопкой, открывающей полноэкранный список городов.</li>
-        <li class="req"><strong>IA-04.</strong> Горизонтальная таблица и длинная горизонтальная лента городов не используются.</li>
-        <li class="req"><strong>IA-05.</strong> Повторяющийся город подписывается номером остановки и датами. Его операции не смешиваются с другой остановкой.</li>
-        <li class="req"><strong>IA-06.</strong> В меню тура доступны сведения о туре, задачи, программа и mock-справочник городов и точек.</li>
+      <li><code>leadTouristId</code> хранит анкету и паспортные
+      данные.</li>
+      <li><code>contactId</code> связывает контакт и чат.</li>
+      <li><code>dealId</code> связывает участие в туре, группу и
+      операционные статусы.</li>
+      <li><code>leadId</code> указывает исходный лид.</li>
+      <li><code>groupId</code> обозначает группу туристов на уровне
+      тура.</li>
+      <li><code>routeCityId + cityIdx</code> однозначно обозначают
+      позицию маршрута.</li>
+      <li><code>subgroupId</code> обозначает общую запись одной операции
+      в одной позиции маршрута.</li>
       </ul>
-    </section>
-
-    <section class="section" id="lead-tour">
+      <p>Технические поля <code>order</code>,
+      <code>isAutoCreated</code>, даты создания и внутренние ID не
+      показываются в обычной карточке.</p>
+      <ul>
+      <li><strong>MODEL-01.</strong> Все входы из «Лидов», «Туристов»,
+      «Операций» и «Документов» открывают одну каноническую карточку по
+      стабильному <code>touristId</code>.</li>
+      <li><strong>MODEL-02.</strong> ФИО, телефон, email, дата рождения,
+      паспортные данные, комментарии и связи имеют один mock-источник и
+      одинаково отображаются во всех разделах.</li>
+      <li><strong>MODEL-03.</strong> Возврат из карточки сохраняет
+      исходный тур, город, этап, фильтр по лиду и режим списка.</li>
+      <li><strong>MODEL-04.</strong> Ограниченный маршрут туриста
+      хранится как список <code>routeCityId</code>, а не названий
+      городов.</li>
+      </ul>
+      </section>
+      <section id="3-информационная-архитектура" class="level2">
+      <h2>3. Информационная архитектура</h2>
+      <pre class="text"><code>Нижнее меню
+├─ Туры
+│  └─ Карточка тура
+│     ├─ Обзор
+│     ├─ Сводная
+│     │  ├─ Операции
+│     │  ├─ Туристы
+│     │  ├─ Документы
+│     │  └─ Статусы
+│     ├─ Программа
+│     ├─ Команда
+│     ├─ Задачи
+│     └─ Действия
+├─ Туристы
+│  └─ Единая карточка
+│     ├─ Профиль
+│     └─ В туре
+└─ Лиды [только admin / manager]
+   └─ Карточка лида
+      ├─ Редактировать
+      ├─ Чат
+      ├─ Документы
+      └─ Задачи</code></pre>
+      <p>Для admin и manager «Лиды» и «Туры» остаются самостоятельными
+      пунктами, как в веб-версии. «Туристы» даёт быстрый вход в ту же
+      единую карточку туриста, которая открывается из лида и сводной.
+      Роли <code>viewer</code> и <code>escort</code> не получают пункт
+      «Лиды», список лидов или карточку лида. Отдельной нижней вкладки
+      «Финансы» нет.</p>
+      <ul>
+      <li><strong>IA-01.</strong> Для admin и manager нижнее меню идёт
+      строго <code>Туры → Туристы → Лиды</code>; для viewer и escort оно
+      идёт <code>Туры → Туристы</code> без пункта «Лиды».</li>
+      <li><strong>IA-02.</strong> Карточка тура идёт строго
+      <code>Обзор → Сводная → Программа → Команда → Задачи → Действия</code>.</li>
+      <li><strong>IA-03.</strong> Карточка лида идёт строго
+      <code>Редактировать → Чат → Документы → Задачи</code>.</li>
+      <li><strong>IA-04.</strong> Базовый профиль и контекст конкретного
+      тура — два режима одной карточки туриста, а не две сущности.</li>
+      <li><strong>IA-05.</strong> Для сводной доступны области «Весь
+      тур» и «Этот лид». Область меняет только видимый состав.</li>
+      <li><strong>IA-06.</strong> Позиция маршрута выбирается одной
+      кнопкой, открывающей полноэкранный список городов.</li>
+      <li><strong>IA-07.</strong> Горизонтальная таблица и длинная
+      горизонтальная лента городов не используются.</li>
+      <li><strong>IA-08.</strong> Повторяющийся город подписывается
+      номером остановки и датами. Его операции не смешиваются с другой
+      остановкой.</li>
+      <li><strong>IA-09.</strong> Возврат из лида, туриста или операции
+      сохраняет тур, <code>routeCityId</code>, область, фильтры и
+      позицию прокрутки.</li>
+      <li><strong>IA-10.</strong> Вложенные режимы сводной идут строго
+      <code>Операции → Туристы → Документы → Статусы</code>. Прямая
+      ссылка
+      <code>tour-operations.html?tourId={tourId}&amp;view=statuses</code>
+      открывает карточку тура, активирует «Сводная → Статусы» и
+      сохраняет остальные параметры контекста.</li>
+      </ul>
+      </section>
+      <section id="4-карточки-лида-и-тура" class="level2">
       <h2>4. Карточки лида и тура</h2>
+      <p>Мобильная компоновка может быть вертикальной, полноэкранной или
+      разбитой на раскрывающиеся блоки. Название, смысл и порядок
+      web-разделов и полей менять нельзя.</p>
+      <section id="41-карточка-лида" class="level3">
+      <h3>4.1. Карточка лида</h3>
+      <p>Верхний уровень повторяет <code>LeadEditModal</code>:</p>
+      <ol type="1">
+      <li>«Редактировать»;</li>
+      <li>«Чат»;</li>
+      <li>«Документы»;</li>
+      <li>«Задачи».</li>
+      </ol>
+      <section id="вкладка-редактировать-существующего-лида"
+      class="level4">
+      <h4>Вкладка «Редактировать» существующего лида</h4>
+      <p>Порядок сверху вниз:</p>
+      <ol type="1">
+      <li>«Проверить связи лид–тур» — только для лида с туром и
+      разрешённой роли;</li>
+      <li>«Ручное объединение лидов» — поиск по всем неархивным лидам,
+      направление переноса данных и preview;</li>
+      <li>«Личные данные»;</li>
+      <li>«Тур и оплата»;</li>
+      <li>«Настройки»;</li>
+      <li>«UTM-трекинг» — только для чтения и только при наличии хотя бы
+      одного значения;</li>
+      <li>«Примечание»;</li>
+      <li>«Туристы»;</li>
+      <li>нижние действия web-формы;</li>
+      <li>мобильный переход «Сводная по туру» после канонической
+      формы.</li>
+      </ol>
+      <p>На телефоне вкладка «Редактировать» использует два слоя. Lead
+      Read surface показывает актуальные значения карточками в указанном
+      выше порядке. Кнопка «Изменить» у блока открывает полноэкранный
+      редактор и сразу переводит фокус к выбранному блоку.</p>
+      <p>Полноэкранный редактор использует ту же каноническую форму, а
+      не сокращённую копию. Блоки остаются в web-порядке, поля
+      выбранного блока идут в порядке таблицы ниже, проверки и outcome
+      flow не меняются. Закрытие возвращает пользователя на прежний блок
+      и позицию прокрутки Lead Read surface. Действия «Проверить связи»
+      и «Ручное объединение» остаются перед карточками, footer идёт
+      после «Туристов», а «Сводная по туру» располагается после
+      footer.</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Блок</th>
+      <th>Поля в точном порядке</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Личные данные</td>
+      <td>Фамилия → Имя → Отчество → Телефон → Telegram username → Email
+      → Telegram User ID, только чтение и только при наличии</td>
+      </tr>
+      <tr>
+      <td>Тур и оплата</td>
+      <td>Тур с поиском → позиции маршрута по стабильным
+      <code>routeCityId</code> → стоимость тура → валюта стоимости →
+      аванс → валюта аванса → остаток → валюта остатка → статус оплаты,
+      только чтение → способ оплаты, только чтение → booking ID, только
+      чтение → тип номера → категория отелей → трансферы → питание</td>
+      </tr>
+      <tr>
+      <td>Настройки</td>
+      <td>Категория клиента → статус → источник → ответственный →
+      цветовой индикатор</td>
+      </tr>
+      <tr>
+      <td>UTM-трекинг</td>
+      <td><code>utmSource → utmMedium → utmCampaign → utmTerm → utmContent → pageUrl</code></td>
+      </tr>
+      <tr>
+      <td>Примечание</td>
+      <td><code>notes</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Статусы используют действующий контракт:
+      <code>new=Новый</code>, <code>contacted=Квалифицирован</code>,
+      <code>qualified=Забронирован</code>,
+      <code>converted=Подтверждён</code>, <code>lost=Отложен</code>
+      (<code>lostFilter=Отложен/потерян</code>). Выбор <code>lost</code>
+      открывает отдельный outcome flow: <code>postponed</code> требует
+      дату и причину; <code>failed</code> требует причину потери. Отмена
+      не меняет статус.</p>
+      <p>Нижняя строка формы идёт <code>Удалить лид</code> только
+      администратору → <code>Обновить</code>. Переход «Сводная по туру»
+      не вклинивается между этими действиями.</p>
+      </section>
+      <section id="создание-лида" class="level4">
+      <h4>Создание лида</h4>
+      <p>До первого сохранения используются те же поля, но другой состав
+      блоков:</p>
+      <p><code>Личные данные → Дата рождения → Паспорт РФ → Загранпаспорт → Тур и оплата → Настройки → Примечание → Создать</code>.</p>
+      <p>Дата рождения и оба паспортных блока записываются в
+      автоматически создаваемого основного туриста. Проверка связей,
+      ручное объединение, UTM, четыре вкладки карточки и список туристов
+      появляются только после первого сохранения. Остальных туристов
+      менеджер добавляет затем через «Добавить туриста».</p>
+      </section>
+      <section id="остальные-вкладки-лида" class="level4">
+      <h4>Остальные вкладки лида</h4>
       <ul>
-        <li class="req"><strong>LEAD-01.</strong> Карточка лида показывает ФИО контакта, телефон, email, Telegram, статус, источник, категорию, менеджера, цвет, тур, маршрут, размещение, примечание, туристов, сообщения, документы и задачи.</li>
-        <li class="req"><strong>LEAD-02.</strong> Карточка лида позволяет изменить статус, контактные данные, заявку, маршрут, размещение и примечание; добавить туриста; открыть туриста в канонической карточке; открыть сводную с областью этого лида.</li>
-        <li class="req"><strong>LEAD-03.</strong> Слияние лидов переносит туристов, сообщения, документы, задачи и историю, не создавая вторую карточку туриста.</li>
-        <li class="req"><strong>TOUR-01.</strong> Карточка тура показывает название, даты, маршрут и порядок остановок, вместимость, команду, цвет, страницу и описание.</li>
-        <li class="req"><strong>TOUR-02.</strong> Из карточки тура доступны сводная, работа, программа, туристы, документы и задачи.</li>
-        <li class="req"><strong>TOUR-03.</strong> Отмена или архивирование тура не удаляет туристов, документы и логистику в mock-модели.</li>
+      <li><p>«Чат» воспроизводит семь состояний
+      <code>Wazzup24Chat</code>: не настроен, нет контакта, загрузка,
+      ошибка, пустой URL, iframe готов, сообщение о сохранённом channel
+      ID. Прототип ничего не загружает извне.</p></li>
+      <li><p>«Документы» содержит ровно «Договор» и «Лист бронирования»
+      с действиями подготовки DOCX.</p></li>
+      <li><p>«Задачи» повторяют <code>TaskWidget</code>: счётчики и
+      группы <code>todo → in_progress → done</code>, название, описание,
+      приоритет <code>low | medium | high | urgent</code>, срок,
+      просрочку, карточку изменения и подтверждение удаления. Статуса
+      <code>cancelled</code> нет.</p></li>
+      <li><p>Логистика закрыта до <code>status=converted</code>. После
+      подтверждения «Открыть сводную тура» передаёт <code>tourId</code>,
+      область «Этот лид» и контекст возврата.</p></li>
+      <li><p><strong>LEAD-01.</strong> Четыре вкладки, Lead Read
+      surface, блоки полноэкранного редактора и поля идут в указанном
+      порядке; переход между слоями не переставляет действия и не
+      создаёт вторую модель лида.</p></li>
+      <li><p><strong>LEAD-02.</strong> Create-flow не показывает
+      edit-only блоки и создаёт одного основного туриста из анкетных
+      полей.</p></li>
+      <li><p><strong>LEAD-03.</strong> Тур выбирается поиском, а
+      ограниченный маршрут хранит ID позиций, а не текстовые
+      названия.</p></li>
+      <li><p><strong>LEAD-04.</strong> Ручное объединение не вводит
+      искусственный запрет по разным турам: пользователь выбирает
+      направление и подтверждает preview.</p></li>
+      <li><p><strong>LEAD-05.</strong> Из лида доступны «Добавить
+      туриста», единая карточка туриста и сводная связанного
+      тура.</p></li>
+      <li><p><strong>LEAD-06.</strong> Роли <code>viewer</code> и
+      <code>escort</code> не получают пункт «Лиды», список, карточку или
+      данные лида по прямой ссылке. Manager получает список и карточки
+      только назначенных лидов. Delete доступен только admin.</p></li>
+      <li><p><strong>LEAD-07.</strong> Прямой URL запрещённого лида
+      открывает экран <code>forbidden</code> без ФИО, контактов,
+      туристов и других данных лида; запрет нельзя обойти программным
+      кликом.</p></li>
       </ul>
-    </section>
-
-    <section class="section" id="card">
+      </section>
+      </section>
+      <section id="42-карточка-тура" class="level3">
+      <h3>4.2. Карточка тура</h3>
+      <p>Web не имеет одной формы с названием «карточка тура». Mobile
+      aggregator сохраняет контракты трёх действующих поверхностей:
+      <code>EventCard</code>, <code>EditEventDialog</code> и
+      <code>EventSummary</code>.</p>
+      <section id="список-и-обзор" class="level4">
+      <h4>Список и «Обзор»</h4>
+      <p>Порядок <code>EventCard</code>:</p>
+      <ol type="1">
+      <li>цветовой индикатор, если включён;</li>
+      <li>название, заполненность логистики, тип тура и системные плашки
+      архива/отмены;</li>
+      <li>страна и города;</li>
+      <li>даты и базовая цена с валютой, если роль вправе видеть;</li>
+      <li>забронированные места и лимит, затем подтверждённые,
+      ожидающие, отменённые и плашка заполнения;</li>
+      <li>описание;</li>
+      <li>сайт, если роль вправе видеть;</li>
+      <li>действия
+      <code>Сводная → открыть сводную в новой вкладке → копировать → изменить → удалить</code>
+      с учётом права и переданного handler.</li>
+      </ol>
+      <p>Роль <code>viewer</code> с подписью «Гид» видит даты только
+      назначенных позиций маршрута. Для <code>viewer</code> и
+      <code>escort</code> цена и сайт скрыты.</p>
+      </section>
+      <section id="полноэкранное-изменение-тура" class="level4">
+      <h4>Полноэкранное изменение тура</h4>
+      <p>Порядок <code>EditEventDialog</code>:</p>
+      <ol type="1">
+      <li>название;</li>
+      <li>описание;</li>
+      <li>URL сайта;</li>
+      <li>страна;</li>
+      <li>тип тура;</li>
+      <li>позиции маршрута <code>routeCities</code> в сохранённом
+      порядке: добавление, удаление и перемещение;</li>
+      <li>гид каждой позиции по <code>routeCityId</code> и признак
+      города сбора оплаты;</li>
+      <li>сопровождающий;</li>
+      <li>администраторы чата;</li>
+      <li>дата начала;</li>
+      <li>дата окончания;</li>
+      <li>лимит участников;</li>
+      <li>базовая цена;</li>
+      <li>валюта;</li>
+      <li>цвет;</li>
+      <li>контекстные действия lifecycle и
+      <code>Отмена → Сохранить</code>.</li>
+      </ol>
+      <p>Пользовательские селекторы работают по существующим user ID,
+      поддерживают поиск и повторяют доступные web-роли. Team —
+      read-only проекция тех же назначений, а не второй набор
+      данных.</p>
+      </section>
+      <section id="остальные-разделы-тура" class="level4">
+      <h4>Остальные разделы тура</h4>
+      <ul>
+      <li>«Сводная» содержит участников, лиды, группы, логистику,
+      покрытие и фактические статусы.</li>
+      <li>«Программа» хранит
+      <code>dayNumber → date → city → cityIdx → description</code>.
+      <code>dayNumber</code> и <code>date</code> read-only;
+      редактируются только город и описание. Произвольного
+      добавления/удаления дня и поля <code>title</code> нет. Доступны
+      генерация каркаса, повторная генерация, очистка с подтверждением и
+      шаблоны описаний.</li>
+      <li>«Команда» показывает гидов по позициям маршрута, город сбора
+      оплаты, сопровождающего и администраторов чата.</li>
+      <li>«Задачи» используют тот же
+      <code>TaskWidget(entityType=event)</code> с
+      <code>todo | in_progress | done</code>.</li>
+      <li>«Действия» сохраняют порядок <code>EventCard</code> и отдельно
+      показывают разрешённые lifecycle-действия.</li>
+      </ul>
+      <p>Close/reopen доступны admin и manager; archive/unarchive и
+      delete — только admin в мобильном UI. Отменённый тур остаётся в
+      фильтре «Архив» и может быть открыт повторно. Архивирование
+      запоминает предыдущее состояние: черновик после восстановления
+      остаётся черновиком. Копия любого тура всегда создаётся чистым
+      неархивным черновиком без причины отмены. Все lifecycle-действия
+      сохраняют туристов, документы и логистику и синхронно меняют архив
+      связанных лидов согласно текущему web-поведению.</p>
+      <ul>
+      <li><strong>TOUR-01.</strong> Шесть разделов идут
+      <code>Обзор → Сводная → Программа → Команда → Задачи → Действия</code>.</li>
+      <li><strong>TOUR-02.</strong> Overview и список сохраняют точный
+      порядок <code>EventCard</code>, включая ролевое скрытие цены и
+      сайта.</li>
+      <li><strong>TOUR-03.</strong> Форма изменения сохраняет все поля
+      <code>EditEventDialog</code> от названия до цвета и не добавляет
+      вкладки «Финансы» или «Расходы».</li>
+      <li><strong>TOUR-04.</strong> Программа и задачи используют
+      действующие web-модели без придуманных полей и статусов.</li>
+      <li><strong>TOUR-05.</strong> Lifecycle-действия видны только в
+      разрешённых состоянии и роли; повторное открытие допустимо только
+      из состояния «Отменён», а запрещённый программный клик ничего не
+      меняет.</li>
+      <li><strong>TOUR-06.</strong> Позиция маршрута, её
+      <code>routeCityId</code> и назначенный пользователь сохраняются
+      одной связкой. Пустая промежуточная строка не сдвигает гида
+      следующего города; выбранный город сбора оплаты сохраняется только
+      пока эта позиция остаётся в маршруте.</li>
+      <li><strong>TOUR-07.</strong> Ссылка на публичную страницу тура в
+      прототипе является локальным mock-действием: она объясняет будущее
+      поведение, но не открывает внешний адрес и не создаёт сетевой
+      запрос.</li>
+      </ul>
+      </section>
+      </section>
+      </section>
+      <section id="5-единая-карточка-туриста" class="level2">
       <h2>5. Единая карточка туриста</h2>
-      <p>Полноэкранная карточка показывает ФИО, тип, основной турист, исходный лид, статус участия, группу, готовность, статусы выбранного города и разрешённые действия.</p>
-      <div class="field-grid">
-        <div class="field-card"><strong>Личные данные</strong><span>Фамилия, имя, отчество, дата рождения, гражданство, телефон, email, взрослый/ребёнок/младенец</span></div>
-        <div class="field-card"><strong>Паспорт РФ</strong><span>Серия и номер, кем выдан, адрес регистрации</span></div>
-        <div class="field-card"><strong>Загранпаспорт и сканы</strong><span>ФИО латиницей, номер, годен до, фото, файл, просмотр, удаление, OCR</span></div>
-        <div class="field-card"><strong>Маршрут и логистика</strong><span>Все остановки, три операции, own/effective, тип и источник записи</span></div>
-        <div class="field-card"><strong>Связи и группы</strong><span>Лид, статусы, группа, представитель, основной турист, маршрут</span></div>
-        <div class="field-card"><strong>Комментарии</strong><span>Комментарий для гида и отдельная внутренняя заметка</span></div>
-      </div>
+      <p>Web содержит две близкие поверхности:
+      <code>TouristDialog</code> внутри лида и
+      <code>TouristDetailsDialog</code> в сводной. Mobile не выбирает
+      одну из них и не создаёт третью модель. Он показывает один базовый
+      профиль, а данные участия и логистики добавляет только в контексте
+      конкретного тура.</p>
+      <p>Первый экран содержит только разрешённые конкретной роли данные
+      и действия. Admin и manager назначенного лида видят полный
+      профиль, готовность, контакты и оба независимых признака
+      «основной». Manager доступного тура, которому исходный лид туриста
+      не назначен, видит имя и операционный контекст участия, но не
+      видит исходный лид, контакты, анкету, документы, заметку и
+      признаки основного туриста. Роли <code>viewer</code> и
+      <code>escort</code> получают только закрытый перечень раздела
+      10.</p>
+      <section id="51-профиль-пять-web-разделов" class="level3">
+      <h3>5.1. Профиль: пять web-разделов</h3>
+      <table>
+      <thead>
+      <tr>
+      <th style="text-align: right;">№</th>
+      <th>Раздел</th>
+      <th>Поля в точном порядке</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td style="text-align: right;">1</td>
+      <td>Личные данные</td>
+      <td>Фамилия → Имя → Отчество → Дата рождения → Email →
+      Телефон</td>
+      </tr>
+      <tr>
+      <td style="text-align: right;">2</td>
+      <td>Гражданство</td>
+      <td>Россия / Казахстан</td>
+      </tr>
+      <tr>
+      <td style="text-align: right;">3</td>
+      <td>Паспорт РФ</td>
+      <td>Серия и номер → Кем выдан → Адрес регистрации</td>
+      </tr>
+      <tr>
+      <td style="text-align: right;">4</td>
+      <td>Загранпаспорт и сканы</td>
+      <td>ФИО латиницей → Номер → Годен до → Список сканов →
+      Загрузить/сфотографировать → Просмотреть → Удалить → OCR</td>
+      </tr>
+      <tr>
+      <td style="text-align: right;">5</td>
+      <td>Тип и настройки</td>
+      <td>Взрослый/ребёнок/младенец → Основной турист заявки → Заметка
+      <code>leadTourists.notes</code></td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Для гражданина Казахстана паспорт РФ скрывается, но сохранённые
+      ранее значения не удаляются. Форма сохранения требует только
+      фамилию и имя. Nullable-поля можно оставить пустыми; индикатор
+      готовности показывает, что нужно дозаполнить, но не запрещает
+      сохранить черновик.</p>
+      <p>OCR всегда открывает сверку распознанных и текущих значений.
+      Отмена ничего не меняет. Apply меняет только отмеченные
+      пользователем поля.</p>
+      </section>
+      <section id="52-в-туре-контекст-конкретного-участия"
+      class="level3">
+      <h3>5.2. «В туре»: контекст конкретного участия</h3>
+      <p>Контекст строится по <code>eventId + dealId</code> и идёт в
+      таком порядке:</p>
+      <ol type="1">
+      <li>комментарий для гида <code>guideComment</code>;</li>
+      <li>исходный лид и его статус;</li>
+      <li>выбранный тур и статус участия;</li>
+      <li>группа туристов <code>deal.groupId</code>;</li>
+      <li>представитель группы и
+      <code>deal.isPrimaryInGroup</code>;</li>
+      <li>«Основной турист заявки» <code>leadTourist.isPrimary</code>
+      как отдельный признак;</li>
+      <li>ограниченный маршрут лида <code>selectedCityIds</code>;</li>
+      <li>три фактических статуса: прибытие, заселение, отъезд;</li>
+      <li>логистика по каждой доступной позиции
+      <code>routeCityId</code>: личное значение, отображаемое значение,
+      тип связи и источник общей записи.</li>
+      </ol>
+      <p><code>leadTourist.isPrimary</code> и
+      <code>deal.isPrimaryInGroup</code> нельзя сворачивать в одну
+      плашку: первый относится к заявке, второй — к группе в конкретном
+      туре. Ограниченный маршрут также не становится полем туриста; он
+      читается из текущего лида.</p>
+      </section>
+      <section id="53-переходы-и-действия" class="level3">
+      <h3>5.3. Переходы и действия</h3>
       <ul>
-        <li class="req"><strong>CARD-01.</strong> Все перечисленные поля доступны в одной карточке без дублирующей сокращённой карточки.</li>
-        <li class="req"><strong>CARD-02.</strong> Номер паспорта не показывается в общем списке туристов.</li>
-        <li class="req"><strong>CARD-03.</strong> Изменение раздела сохраняется в каноническом mock-объекте и видно при следующем входе из любого раздела.</li>
-        <li class="req"><strong>CARD-04.</strong> Закрытие изменённой формы требует подтверждения потери черновика.</li>
-        <li class="req"><strong>CARD-05.</strong> OCR никогда не применяет данные автоматически. Отмена не меняет карточку, применение меняет только выбранные поля.</li>
-        <li class="req"><strong>CARD-06.</strong> Сканы доступны для загрузки, просмотра и удаления согласно правам роли.</li>
-        <li class="req"><strong>CARD-07.</strong> Основной турист в заявке только один; последнего основного нельзя снять без выбора другого.</li>
-        <li class="req"><strong>CARD-08.</strong> Последнего туриста лида нельзя удалить. Удаление доступно только администратору.</li>
-        <li class="req"><strong>CARD-09.</strong> Из раздела логистики можно перейти к нужной операции конкретного <code>routeCityId</code>.</li>
-        <li class="req"><strong>CARD-10.</strong> Внутренняя заметка скрыта от гида и сопровождающего; комментарий для гида доступен им для чтения.</li>
+      <li><p>один <code>touristId</code>, открытый из лида, списка,
+      документов, покрытия и операции, показывает один профиль;</p></li>
+      <li><p>tour-context соответствует выбранному
+      <code>dealId/eventId</code>, поэтому один человек может иметь
+      разный контекст в разных турах;</p></li>
+      <li><p>возврат сохраняет исходный тур, остановку, операцию,
+      область, фильтры и прокрутку;</p></li>
+      <li><p>редактируется отдельный раздел, а не бесконечная форма;
+      закрытие изменённого раздела требует подтверждения;</p></li>
+      <li><p>номер паспорта не показывается в общем списке;</p></li>
+      <li><p>основной турист заявки только один; снять признак у
+      текущего основного можно только одновременным выбором
+      другого;</p></li>
+      <li><p>удалить туриста может только admin; последнего туриста лида
+      удалять нельзя.</p></li>
+      <li><p><strong>CARD-01.</strong> Базовый профиль содержит ровно
+      пять разделов в указанном порядке; гражданство и тип не
+      переносятся в «Личные данные».</p></li>
+      <li><p><strong>CARD-02.</strong> Tour-context не дублирует анкету
+      и появляется только при конкретном участии.</p></li>
+      <li><p><strong>CARD-03.</strong> Изменение профиля сохраняется в
+      одном mock-источнике и видно при следующем входе из любого
+      раздела.</p></li>
+      <li><p><strong>CARD-04.</strong> OCR и dirty-confirmation защищают
+      текущие значения от неявного изменения.</p></li>
+      <li><p><strong>CARD-05.</strong> Сканы доступны для загрузки,
+      просмотра, OCR и удаления только по capability.</p></li>
+      <li><p><strong>CARD-06.</strong> В карточке явно различены
+      основной турист заявки и представитель группы тура.</p></li>
+      <li><p><strong>CARD-07.</strong> Из логистики туриста можно
+      перейти в нужную операцию конкретного
+      <code>routeCityId</code>.</p></li>
+      <li><p><strong>CARD-08.</strong> <code>notes</code> скрыта от
+      viewer/escort, а <code>guideComment</code> доступен им только в
+      разрешённом tour-context.</p></li>
+      <li><p><strong>CARD-09.</strong> Роли <code>viewer</code> и
+      <code>escort</code> видят имя одной строкой
+      <code>displayName</code>; отдельные поля фамилии, имени и отчества
+      не выводятся в раскрытом разделе, DOM, экспорте или параметрах
+      перехода.</p></li>
       </ul>
-    </section>
-
-    <section class="section" id="readiness">
+      </section>
+      </section>
+      <section id="6-готовность-и-статусы" class="level2">
       <h2>6. Готовность и статусы</h2>
+      <p>Сохранение и готовность — разные проверки.
+      <code>insertLeadTouristSchema</code> требует только фамилию и имя.
+      Остальные поля nullable. Готовность — подсказка менеджеру, а не
+      запрет сохранить промежуточную анкету.</p>
+      <p>Статусы не объединяются в одну плашку:</p>
       <ul>
-        <li class="req"><strong>READY-01.</strong> Личные данные готовы при наличии фамилии, имени и даты рождения. Для основного туриста также нужны отчество, email и телефон.</li>
-        <li class="req"><strong>READY-02.</strong> Паспорт РФ основного гражданина России готов при наличии серии/номера и органа выдачи. Для неосновного пустой раздел может иметь статус «Не требуется».</li>
-        <li class="req"><strong>READY-03.</strong> Загранпаспорт готов только при наличии ФИО латиницей, номера, срока действия и минимум одного скана.</li>
-        <li class="req"><strong>READY-04.</strong> Проблема срока действия показывается отдельно от отсутствующего документа.</li>
-        <li class="req"><strong>STATUS-01.</strong> Операционный статус изменяется через явный action sheet. Циклического переключения одной кнопкой нет.</li>
-        <li class="req"><strong>STATUS-02.</strong> Изменение статуса не меняет данные прибытия, отеля или отъезда.</li>
+      <li><p>статус лида;</p></li>
+      <li><p>статус участия в туре;</p></li>
+      <li><p>прибытие: <code>expected | arrived</code>;</p></li>
+      <li><p>отель: <code>pending | checked_in</code>;</p></li>
+      <li><p>отъезд: <code>pending | departed</code>;</p></li>
+      <li><p>готовность личных данных;</p></li>
+      <li><p>готовность документов.</p></li>
+      <li><p><strong>READY-01.</strong> Личные данные готовы при наличии
+      фамилии, имени и даты рождения. Для основного туриста также нужны
+      отчество, email и телефон.</p></li>
+      <li><p><strong>READY-02.</strong> Паспорт РФ основного гражданина
+      России готов при наличии серии/номера и органа выдачи. Для
+      неосновного пустой раздел может иметь статус «Не
+      требуется».</p></li>
+      <li><p><strong>READY-03.</strong> Загранпаспорт готов только при
+      наличии ФИО латиницей, номера, срока действия и минимум одного
+      скана.</p></li>
+      <li><p><strong>READY-04.</strong> Проблема срока действия
+      показывается отдельно от отсутствующего документа.</p></li>
+      <li><p><strong>STATUS-01.</strong> Операционный статус изменяется
+      через явный action sheet. Циклического переключения одной кнопкой
+      нет.</p></li>
+      <li><p><strong>STATUS-02.</strong> Изменение статуса не меняет
+      данные прибытия, отеля или отъезда.</p></li>
       </ul>
-    </section>
-
-    <section class="section" id="operations">
-      <h2>7. Операции</h2>
-      <p>После выбора остановки показываются вертикальные карточки «Общая запись», «Индивидуально», «Без данных» и «Конфликт». Карточка содержит реквизиты, участников, группу тура, источник, покрытие и доступные действия.</p>
+      </section>
+      <section id="7-мобильная-сводная" class="level2">
+      <h2>7. Мобильная сводная</h2>
+      <p>Внутри раздела тура «Сводная» доступны рабочие режимы
+      <code>Операции → Туристы → Документы → Статусы</code> в этом
+      порядке. Это вложенные режимы одного раздела, а не отдельные
+      пункты нижнего меню. Deep link
+      <code>tour-operations.html?tourId={tourId}&amp;view=statuses</code>
+      открывает тот же participant aggregate сразу в режиме «Статусы» и
+      оставляет верхний раздел «Сводная» активным.</p>
+      <p>В «Операциях» после выбора остановки пользователь выбирает
+      «Прибытие», «Отель» или «Отъезд». Контент состоит из вертикальных
+      карточек без горизонтальной таблицы.</p>
+      <p>Карточка показывает:</p>
       <ul>
-        <li class="req"><strong>OPS-01.</strong> Прибытие содержит дату, время, транспорт, номер, транспортную точку и трансфер.</li>
-        <li class="req"><strong>OPS-02.</strong> Отель содержит название и номер или тип комнаты.</li>
-        <li class="req"><strong>OPS-03.</strong> Отъезд содержит дату, время, транспорт, номер, транспортную точку и трансфер.</li>
-        <li class="req"><strong>OPS-04.</strong> Индивидуальная запись редактирует только выбранного туриста.</li>
-        <li class="req"><strong>OPS-05.</strong> Общая запись редактирует только выбранную индивидуальную запись-источник. Личные значения остальных участников не меняются.</li>
-        <li class="req"><strong>OPS-06.</strong> Одинаковые отображаемые значения сами по себе не создают общую запись.</li>
-        <li class="req"><strong>OPS-07.</strong> Повторное применение того же действия не создаёт дубликат.</li>
-        <li class="req"><strong>OPS-08.</strong> Экспорт различает повторяющиеся остановки и не раскрывает чувствительные поля read-only ролям.</li>
-        <li class="req"><strong>OPS-09.</strong> В будущей рабочей версии отъезд может заполнить только пустые соответствующие поля следующего прибытия и никогда не перезаписывает заполненные. В текущем прототипе это фиксируется как preview будущего поведения.</li>
-        <li class="req"><strong>OPS-10.</strong> Создание и изменение логистики доступно только участникам подтверждённого лида; неподтверждённый участник остаётся видимым с объяснением ограничения.</li>
+      <li>«Общая запись», «Индивидуально», «Без данных» или
+      «Конфликт»;</li>
+      <li>реквизиты операции;</li>
+      <li>не более двух имён и «Ещё N»;</li>
+      <li>группу туристов;</li>
+      <li>источник общей записи;</li>
+      <li>покрытие участников;</li>
+      <li>действия «Изменить», «Состав», «Добавить туристов», «Отделить»
+      и «Изменить статус» согласно контексту.</li>
       </ul>
-    </section>
-
-    <section class="section" id="groups">
-      <h2>8. Два уровня группировки</h2>
-      <pre>Группа туристов: Анна + Борис + Виктор + Галина
+      <p>Порядок полей соответствует активным ячейкам web-сводной:</p>
+      <table>
+      <thead>
+      <tr>
+      <th>Операция</th>
+      <th>Поля</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Прибытие</td>
+      <td>Дата → Время → Транспорт `самолёт</td>
+      </tr>
+      <tr>
+      <td>Отель</td>
+      <td>Название отеля → Тип номера</td>
+      </tr>
+      <tr>
+      <td>Отъезд</td>
+      <td>Дата → Время → Транспорт `самолёт</td>
+      </tr>
+      </tbody>
+      </table>
+      <ul>
+      <li><strong>OPS-01.</strong> Прибытие содержит дату, время,
+      транспорт, номер, транспортную точку и трансфер.</li>
+      <li><strong>OPS-02.</strong> Отель содержит название и тип номера
+      в этом порядке.</li>
+      <li><strong>OPS-03.</strong> Отъезд содержит дату, время,
+      транспорт, номер, транспортную точку и трансфер.</li>
+      <li><strong>OPS-04.</strong> Индивидуальная запись редактирует
+      только выбранного туриста.</li>
+      <li><strong>OPS-05.</strong> Общая запись редактирует только
+      выбранную индивидуальную запись-источник. Личные значения
+      остальных участников не меняются.</li>
+      <li><strong>OPS-06.</strong> Одинаковые отображаемые значения сами
+      по себе не создают общую запись.</li>
+      <li><strong>OPS-07.</strong> Повторное применение того же действия
+      не создаёт дубликат.</li>
+      <li><strong>OPS-08.</strong> Экспорт различает повторяющиеся
+      остановки и не раскрывает чувствительные поля read-only
+      ролям.</li>
+      <li><strong>OPS-09.</strong> Сохранённое непустое поле отъезда
+      заполняет только пустое соответствующее поле прибытия
+      <code>cityIdx + 1</code>; существующее прибытие не
+      перезаписывается. Прототип выполняет это правило на
+      mock-данных.</li>
+      <li><strong>OPS-10.</strong> Создание и изменение логистики
+      доступно только участникам подтверждённого лида; неподтверждённый
+      участник остаётся видимым с объяснением ограничения.</li>
+      <li><strong>OPS-11.</strong> Экспорт доступной сводной создаёт
+      локальный Excel-совместимый файл в прототипе и не выполняет
+      запись. Production использует действующий XLSX-exporter и
+      системное меню «Поделиться».</li>
+      <li><strong>OPS-12.</strong> «Операции», «Туристы», «Документы» и
+      «Статусы» идут в заданном порядке, открывают тот же participant
+      aggregate и ту же единую карточку, не создавая отдельные
+      данные.</li>
+      <li><strong>OPS-13.</strong> Параметр <code>view=statuses</code>
+      открывает «Сводная → Статусы» напрямую; возврат сохраняет
+      <code>tourId</code>, <code>routeCityId</code>, область и
+      фильтры.</li>
+      </ul>
+      </section>
+      <section id="8-два-независимых-уровня-группировки" class="level2">
+      <h2>8. Два независимых уровня группировки</h2>
+      <p>Пример:</p>
+      <pre class="text"><code>Группа туристов: Анна + Борис + Виктор + Галина
 ├─ Прибытие: Анна+Борис / Виктор+Галина
 ├─ Отель: все четверо
-└─ Отъезд: Анна / Борис+Виктор / Галина</pre>
+└─ Отъезд: Анна / Борис+Виктор / Галина</code></pre>
+      <p><code>groupId</code> связывает участников на уровне тура.
+      <code>subgroupId</code> связывает одну операцию в одной позиции
+      маршрута. Индивидуальные значения всегда сохраняются.</p>
       <ul>
-        <li class="req"><strong>GROUP-01.</strong> В группу туристов можно включить участников одного тура из разных лидов.</li>
-        <li class="req"><strong>GROUP-02.</strong> Свободных туристов можно добавить в существующую группу. Автоматическое слияние двух существующих групп запрещено.</li>
-        <li class="req"><strong>GROUP-03.</strong> Общая запись задаётся комбинацией <code>tourId + routeCityId + operation + subgroupId</code> и явным <code>sourceVisitId</code>.</li>
-        <li class="req"><strong>GROUP-04.</strong> Создание общей записи хранит связь и источник, но не копирует значения источника всем участникам.</li>
-        <li class="req"><strong>GROUP-05.</strong> При конфликте до применения открывается сверка. Пока источник не выбран, модель не меняется.</li>
-        <li class="req"><strong>GROUP-06.</strong> Отделение туриста от одной операции восстанавливает его <code>ownValues</code> и не меняет другие операции или <code>groupId</code>.</li>
-        <li class="req"><strong>GROUP-07.</strong> Отделение текущего источника при двух и более оставшихся участниках требует выбрать новый источник.</li>
-        <li class="req"><strong>GROUP-08.</strong> Расформирование группы туристов меняет только <code>groupId</code>. Общие записи операций остаются без изменений.</li>
-        <li class="req"><strong>GROUP-09.</strong> Расформирование общей записи сохраняет все индивидуальные данные и не меняет группу туристов.</li>
-        <li class="req"><strong>GROUP-10.</strong> Один турист не может одновременно входить в две общие записи одной комбинации <code>routeCityId + operation</code>.</li>
-        <li class="req"><strong>GROUP-11.</strong> Нельзя объединить участников разных туров или разных позиций маршрута одной операцией.</li>
-        <li class="req"><strong>GROUP-12.</strong> В интерфейсе различаются подписи «Группа тура», «Общая запись» и «Индивидуально».</li>
+      <li><strong>GROUP-01.</strong> Новая группа создаётся из двух или
+      более свободных сделок одного тура, в том числе из разных лидов.
+      Первый выбранный участник становится представителем. Интерфейс
+      строит стартовую подпись из фамилий первых двух выбранных
+      участников; эта подпись не является идентификатором группы и не
+      записывается в <code>ownValues</code>.</li>
+      <li><strong>GROUP-02.</strong> Новая группа получает
+      <code>sharedHotel=true</code>, <code>sharedArrival=false</code>,
+      <code>sharedDeparture=false</code>. Если выбранные туристы имеют
+      разные непустые отели, до изменения <code>groupId</code>
+      открывается preview выбора источника. Apply одной транзакцией
+      создаёт группу и общую запись отеля, не перезаписывая личные
+      значения.</li>
+      <li><strong>GROUP-03.</strong> Свободных туристов можно добавить в
+      одну существующую группу. Выбор участников из двух существующих
+      групп блокируется без изменения данных.</li>
+      <li><strong>GROUP-04.</strong> Общая операция разрешена только
+      участникам с одним и тем же непустым <code>deal.groupId</code> и
+      задаётся комбинацией
+      <code>tourId + routeCityId + operation + subgroupId</code> и явным
+      <code>sourceVisitId</code>.</li>
+      <li><strong>GROUP-05.</strong> Создание общей записи хранит связь
+      и источник, но не копирует значения источника всем
+      участникам.</li>
+      <li><strong>GROUP-06.</strong> При конфликте до применения
+      открывается сверка. Пока источник не выбран, модель не меняется.
+      Правило действует при создании общей операции и при добавлении
+      участника в существующую общую операцию.</li>
+      <li><strong>GROUP-07.</strong> Отделение туриста от одной операции
+      восстанавливает его <code>ownValues</code> и не меняет другие
+      операции или <code>groupId</code>.</li>
+      <li><strong>GROUP-08.</strong> Отделение текущего источника при
+      двух и более оставшихся участниках требует выбрать новый
+      источник.</li>
+      <li><strong>GROUP-09.</strong> Расформирование общей записи
+      сохраняет индивидуальные данные и не меняет группу туристов.</li>
+      <li><strong>GROUP-10.</strong> Полное расформирование группы тура
+      снимает зависящие от неё общие связи, но сохраняет все
+      индивидуальные <code>ownValues</code>.</li>
+      <li><strong>GROUP-11.</strong> Один турист не может одновременно
+      входить в две общие записи одной комбинации
+      <code>routeCityId + operation</code>.</li>
+      <li><strong>GROUP-12.</strong> Нельзя объединить участников разных
+      туров, разных <code>groupId</code> или разных позиций маршрута
+      одной операцией.</li>
+      <li><strong>GROUP-13.</strong> В интерфейсе различаются подписи
+      «Группа тура», «Общая запись» и «Индивидуально».</li>
+      <li><strong>GROUP-14.</strong> При добавлении туриста в
+      существующую общую операцию preview сравнивает его
+      <code>ownValues</code> со значением источника. При различии
+      состав, источник и данные общей операции не меняются до явного
+      выбора и Apply.</li>
+      <li><strong>GROUP-15.</strong> Приёмочный сценарий выбирает
+      четырёх туристов из двух лидов как подмножество тура. Туристы
+      других лидов того же тура не добавляются в группу, общие операции
+      или массовые изменения.</li>
       </ul>
-    </section>
-
-    <section class="section" id="lists-docs">
-      <h2>9. Туристы и документы</h2>
+      </section>
+      <section id="9-список-туристов-и-документы" class="level2">
+      <h2>9. Список туристов и документы</h2>
       <ul>
-        <li class="req"><strong>LIST-01.</strong> Список туристов поддерживает поиск и фильтры по исходному лиду, группе, типу, готовности данных, проблеме с документами и ограниченному маршруту.</li>
-        <li class="req"><strong>LIST-02.</strong> Карточка списка показывает ФИО, тип, признак основного, группу, готовность и состояние трёх операций выбранного города.</li>
-        <li class="req"><strong>LIST-03.</strong> Доступны режимы списка и групп.</li>
-        <li class="req"><strong>DOC-01.</strong> Вкладка «Документы» содержит очереди «Требуют внимания», «Истекают» и «Готовы».</li>
-        <li class="req"><strong>DOC-02.</strong> В текущем прототипе документами являются паспортные поля и сканы. Виза, страховка и анкета не выдаются за готовые данные.</li>
-        <li class="req"><strong>DOC-03.</strong> Read-only роли могут открыть разрешённые сканы, но не могут загружать, запускать OCR или удалять.</li>
+      <li><strong>LIST-01.</strong> Список туристов поддерживает поиск и
+      фильтры по исходному лиду, группе, типу, готовности данных,
+      проблеме с документами и ограниченному маршруту.</li>
+      <li><strong>LIST-02.</strong> Карточка списка показывает ФИО, тип,
+      признак основного, группу, готовность и состояние трёх операций
+      выбранного города.</li>
+      <li><strong>LIST-03.</strong> Доступны режимы списка и групп.</li>
+      <li><strong>DOC-01.</strong> Вкладка «Документы» содержит очереди
+      «Требуют внимания», «Истекают» и «Готовы».</li>
+      <li><strong>DOC-02.</strong> В текущем прототипе документами
+      являются паспортные поля и сканы. Виза, страховка и анкета не
+      выдаются за готовые данные.</li>
+      <li><strong>DOC-03.</strong> Read-only роли могут открыть
+      разрешённые сканы, но не могут загружать, запускать OCR или
+      удалять.</li>
       </ul>
-    </section>
-
-    <section class="section" id="roles">
-      <h2>10. Роли</h2>
+      </section>
+      <section id="10-роли-и-права" class="level2">
+      <h2>10. Роли и права</h2>
       <table>
-        <thead><tr><th>Роль</th><th>Профиль</th><th>Логистика</th><th>Статусы</th></tr></thead>
-        <tbody>
-          <tr><td>Admin</td><td>Все поля, редактирование, удаление</td><td>Все действия</td><td>Все города</td></tr>
-          <tr><td>Manager</td><td>Назначенные лиды</td><td>Доступные туры</td><td>Доступные города</td></tr>
-          <tr><td>Escort</td><td>Ограниченный read-only</td><td>Без группировки</td><td>Сопровождаемый тур</td></tr>
-          <tr><td>Guide</td><td>Ограниченный read-only</td><td>Без группировки</td><td>Назначенные города</td></tr>
-        </tbody>
+      <thead>
+      <tr>
+      <th>Действие</th>
+      <th>Admin</th>
+      <th>Manager</th>
+      <th>Escort</th>
+      <th><code>viewer</code>, подпись «Гид»</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Смотреть / редактировать лид</td>
+      <td>любой / да</td>
+      <td>назначенный / да</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Смотреть профиль</td>
+      <td>все поля</td>
+      <td>назначенные лиды</td>
+      <td>разрешённые поля</td>
+      <td>разрешённые поля</td>
+      </tr>
+      <tr>
+      <td>Редактировать профиль</td>
+      <td>да</td>
+      <td>назначенные лиды</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Логистика и группы</td>
+      <td>да</td>
+      <td>доступные туры</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Операционные статусы</td>
+      <td>все города</td>
+      <td>доступные города</td>
+      <td>сопровождаемый тур</td>
+      <td>назначенные города</td>
+      </tr>
+      <tr>
+      <td>Сканы и OCR</td>
+      <td>да</td>
+      <td>назначенные лиды</td>
+      <td>просмотр разрешённого</td>
+      <td>просмотр разрешённого</td>
+      </tr>
+      <tr>
+      <td>Удалить туриста</td>
+      <td>да</td>
+      <td>нет</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Создать / изменить / копировать тур</td>
+      <td>да</td>
+      <td>да</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Закрыть / снова открыть тур</td>
+      <td>да</td>
+      <td>да</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Архивировать / восстановить / удалить тур</td>
+      <td>да</td>
+      <td>нет</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Экспортировать сводную</td>
+      <td>да</td>
+      <td>доступный тур</td>
+      <td>нет</td>
+      <td>нет</td>
+      </tr>
+      <tr>
+      <td>Справочник</td>
+      <td>да</td>
+      <td>просмотр</td>
+      <td>просмотр</td>
+      <td>просмотр</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Перечень персональных полей <code>viewer</code> и
+      <code>escort</code> закрытый: <code>displayName</code> одной
+      строкой, дата рождения, телефон, тип туриста, поля загранпаспорта,
+      разрешённые сканы и <code>guideComment</code>. В назначенном
+      tour-context им также доступны маршрут, подпись группы, статус
+      участия, фактические статусы и логистика разрешённых позиций
+      маршрута.</p>
+      <p>Роли <code>viewer</code> и <code>escort</code> не получают
+      отдельные поля фамилии, имени и отчества, email, паспорт РФ, кем
+      выдан, адрес регистрации, <code>notes</code>,
+      <code>contactId</code>, <code>leadTouristId</code>,
+      <code>leadId</code>, <code>dealId</code>, признак представителя
+      группы, признак основного туриста заявки, поля оплаты, цену или
+      сайт тура. Кнопка и deep link исходного лида им недоступны.
+      Действие «Написать» использует нейтральную подпись «Чат» и не
+      раскрывает внутреннее поле предпочтительного канала.</p>
+      <p>Для manager правило применяется к каждому туристу отдельно. В
+      назначенном туре можно видеть состав, имя, тип, группу, маршрут,
+      логистику и статусы туриста чужого лида, потому что эти данные
+      нужны для групповой работы. Но профиль, контакты, исходный лид,
+      паспортные данные, сканы, готовность документов, заметки и фильтр
+      по этому лиду скрыты. Подмена кнопки, прямой deep link, поиск по
+      телефону, экспорт или общий <code>localStorage</code> не расширяют
+      доступ.</p>
+      <p>Запрещённые значения не попадают в DOM, экспорт и параметры
+      переходов. Статический mock может хранить тестовые fixture в
+      исходном JavaScript, но интерфейс не должен их показывать.</p>
+      <ul>
+      <li><strong>ROLE-01.</strong> Интерфейс строится из capabilities,
+      а не только из названия роли.</li>
+      <li><strong>ROLE-02.</strong> Запрещённое действие не выполняется
+      даже при программном клике.</li>
+      <li><strong>ROLE-03.</strong> Read-only экран показывает причину
+      ограничения и не использует disabled-поля как способ
+      просмотра.</li>
+      <li><strong>ROLE-04.</strong> Offline запрещает запись, но
+      сохраняет доступ к уже показанным данным.</li>
+      <li><strong>ROLE-05.</strong> Мобильный клиент не расширяет
+      данные, уже отфильтрованные сервером по назначенному туру или
+      <code>routeCityId</code>.</li>
+      <li><strong>ROLE-06.</strong> Production-контракт использует роль
+      <code>viewer</code>; UI подписывает её «Гид». Legacy
+      <code>role=guide</code> в URL прототипа нормализуется в
+      <code>viewer</code> до выбора данных, capabilities и render.</li>
+      <li><strong>ROLE-07.</strong> Роли <code>viewer</code> и
+      <code>escort</code> не видят «Лиды» и не открывают лид по прямой
+      ссылке. Manager получает список, поиск, канбан и карточки только
+      назначенных лидов.</li>
+      <li><strong>ROLE-08.</strong> Неизвестное значение роли открывает
+      forbidden-состояние и не подменяется на manager, admin или другую
+      роль с более широкими правами.</li>
+      <li><strong>ROLE-09.</strong> Manager получает операционный состав
+      доступного тура, но приватные поля каждого туриста — только если
+      его исходный лид назначен этому manager. Проверка выполняется
+      заново для карточки, документов, контактов, поиска, области лида и
+      экспорта.</li>
+      <li><strong>ROLE-10.</strong> <code>returnLead</code>, область
+      лида, поисковая строка, незавершённый draft и контекст возврата
+      пересчитываются при открытии deep link и каждой смене роли. После
+      понижения прав закрытый <code>leadId</code> не попадает в DOM или
+      URL возврата.</li>
+      </ul>
+      </section>
+      <section id="11-справочник-городов-и-точек" class="level2">
+      <h2>11. Справочник городов и точек</h2>
+      <ul>
+      <li><strong>DIR-01.</strong> Mock-экран «Города и точки» содержит
+      города и транспортные точки.</li>
+      <li><strong>DIR-02.</strong> Город имеет стабильный ID, название,
+      страну, альтернативные названия и активность.</li>
+      <li><strong>DIR-03.</strong> Точка имеет стабильный ID, город, тип
+      <code>airport | railway_station | bus_station</code>, название,
+      код и активность.</li>
+      <li><strong>DIR-04.</strong> В mock-админке доступны создание,
+      изменение, архивирование и удаление. Используемую точку можно
+      только архивировать.</li>
+      <li><strong>DIR-05.</strong> Изменения сохраняются в
+      <code>localStorage</code> и доступны после перезагрузки
+      прототипа.</li>
+      <li><strong>DIR-06.</strong> Самолёт показывает аэропорты, поезд -
+      ж/д вокзалы, автобус - автовокзалы выбранного города.</li>
+      <li><strong>DIR-07.</strong> Одна активная подходящая точка
+      предзаполняется только в пустое поле. Несколько точек открывают
+      поиск.</li>
+      <li><strong>DIR-08.</strong> Если подходящих точек нет, разрешён
+      ручной ввод с отметкой «Не из справочника».</li>
+      <li><strong>DIR-09.</strong> Смена транспорта очищает только
+      несовместимую точку. Существующее ручное или архивное значение
+      автоматически не перезаписывается.</li>
+      <li><strong>DIR-10.</strong> Повторные остановки могут ссылаться
+      на один город справочника, сохраняя разные
+      <code>routeCityId</code>.</li>
+      </ul>
+      </section>
+      <section id="12-системные-состояния-и-мобильная-геометрия"
+      class="level2">
+      <h2>12. Системные состояния и мобильная геометрия</h2>
+      <table>
+      <thead>
+      <tr>
+      <th>Состояние</th>
+      <th>Что видит пользователь</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td>Loading</td>
+      <td>Скелетон сохраняет структуру и не подменяется ложным
+      empty</td>
+      </tr>
+      <tr>
+      <td>Error</td>
+      <td>Назван не загруженный блок, есть «Повторить»</td>
+      </tr>
+      <tr>
+      <td>Empty tour</td>
+      <td>Объяснение, что участников нет, и разрешённый следующий
+      шаг</td>
+      </tr>
+      <tr>
+      <td>Empty filter</td>
+      <td>Предложение сбросить фильтр; текст отличается от пустого
+      тура</td>
+      </tr>
+      <tr>
+      <td>Offline</td>
+      <td>Загруженные данные читаются, действия записи заблокированы с
+      причиной</td>
+      </tr>
+      <tr>
+      <td>Saving</td>
+      <td>Повторное нажатие заблокировано, форма остаётся видимой</td>
+      </tr>
+      <tr>
+      <td>Save error</td>
+      <td>Черновик, выбранные участники и источник не теряются</td>
+      </tr>
+      <tr>
+      <td>Dirty form</td>
+      <td>Назад/закрыть вызывает подтверждение потери изменений</td>
+      </tr>
+      <tr>
+      <td>Conflict</td>
+      <td>Ничего не меняется до выбора источника и apply</td>
+      </tr>
+      <tr>
+      <td>Forbidden</td>
+      <td>Показана причина и безопасный путь назад</td>
+      </tr>
+      </tbody>
       </table>
       <ul>
-        <li class="req"><strong>ROLE-01.</strong> Интерфейс строится из capabilities, а не только из названия роли.</li>
-        <li class="req"><strong>ROLE-02.</strong> Запрещённое действие не выполняется даже при программном клике.</li>
-        <li class="req"><strong>ROLE-03.</strong> Read-only экран показывает причину ограничения и не использует disabled-поля как способ просмотра.</li>
-        <li class="req"><strong>ROLE-04.</strong> Offline запрещает запись, но сохраняет доступ к уже показанным данным.</li>
+      <li><strong>STATE-01.</strong> Есть отдельные состояния loading,
+      error с повтором, empty и ready.</li>
+      <li><strong>STATE-02.</strong> Offline показывает сохранённые
+      данные и запрещает фиктивное успешное сохранение.</li>
+      <li><strong>STATE-03.</strong> Пустой результат фильтра отличается
+      от пустого тура.</li>
+      <li><strong>STATE-04.</strong> Ошибка сохранения не теряет
+      введённый черновик.</li>
+      <li><strong>STATE-05.</strong> Dirty form, conflict и forbidden не
+      закрываются как успешное сохранение.</li>
+      <li><strong>STATE-06.</strong> Loading/error одного блока не
+      скрывает уже доступную безопасную часть карточки.</li>
+      <li><strong>VIS-01.</strong> Прототип проверяется на 375×812 и
+      390×844 без горизонтальной прокрутки контента.</li>
+      <li><strong>VIS-02.</strong> Цели касания имеют размер не меньше
+      44×44 px.</li>
+      <li><strong>VIS-03.</strong> Нижние панели учитывают safe-area и
+      не перекрывают последнее действие.</li>
+      <li><strong>VIS-04.</strong> Значимый вторичный текст имеет размер
+      не меньше 12 px.</li>
       </ul>
-    </section>
-
-    <section class="section" id="directory">
-      <h2>11. Города и транспортные точки</h2>
-      <ul>
-        <li class="req"><strong>DIR-01.</strong> Mock-экран «Города и точки» содержит города и транспортные точки.</li>
-        <li class="req"><strong>DIR-02.</strong> Город имеет стабильный ID, название, страну, альтернативные названия и активность.</li>
-        <li class="req"><strong>DIR-03.</strong> Точка имеет стабильный ID, город, тип <code>airport | railway_station | bus_station</code>, название, код и активность.</li>
-        <li class="req"><strong>DIR-04.</strong> В mock-админке доступны создание, изменение, архивирование и удаление. Используемую точку можно только архивировать.</li>
-        <li class="req"><strong>DIR-05.</strong> Изменения сохраняются в <code>localStorage</code> и доступны после перезагрузки прототипа.</li>
-        <li class="req"><strong>DIR-06.</strong> Самолёт показывает аэропорты, поезд - ж/д вокзалы, автобус - автовокзалы выбранного города.</li>
-        <li class="req"><strong>DIR-07.</strong> Одна активная подходящая точка предзаполняется только в пустое поле. Несколько точек открывают поиск.</li>
-        <li class="req"><strong>DIR-08.</strong> Если подходящих точек нет, разрешён ручной ввод с отметкой «Не из справочника».</li>
-        <li class="req"><strong>DIR-09.</strong> Смена транспорта очищает только несовместимую точку. Существующее ручное или архивное значение автоматически не перезаписывается.</li>
-        <li class="req"><strong>DIR-10.</strong> Повторные остановки могут ссылаться на один город справочника, сохраняя разные <code>routeCityId</code>.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="states">
-      <h2>12. Состояния и геометрия</h2>
-      <ul>
-        <li class="req"><strong>STATE-01.</strong> Есть отдельные состояния loading, error с повтором, empty и ready.</li>
-        <li class="req"><strong>STATE-02.</strong> Offline показывает сохранённые данные и запрещает фиктивное успешное сохранение.</li>
-        <li class="req"><strong>STATE-03.</strong> Пустой результат фильтра отличается от пустого тура.</li>
-        <li class="req"><strong>STATE-04.</strong> Ошибка сохранения не теряет введённый черновик.</li>
-        <li class="req"><strong>VIS-01.</strong> Прототип проверяется на 375×812 и 390×844 без горизонтальной прокрутки контента.</li>
-        <li class="req"><strong>VIS-02.</strong> Цели касания имеют размер не меньше 44×44 px.</li>
-        <li class="req"><strong>VIS-03.</strong> Нижние панели учитывают safe-area и не перекрывают последнее действие.</li>
-        <li class="req"><strong>VIS-04.</strong> Значимый вторичный текст имеет размер не меньше 12 px.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="api">
-      <h2>13. Будущий контракт</h2>
-      <p class="note">Раздел описывает следующий этап и не разрешает менять backend сейчас.</p>
-      <ul>
-        <li class="req"><strong>API-01.</strong> Клиент получает <code>ownValues</code>, <code>effectiveValues</code>, <code>sourceVisitId</code>, авторитетные <code>groupId</code> и <code>subgroupId</code>.</li>
-        <li class="req"><strong>API-02.</strong> Preview возвращает конфликты без записи. Apply и split работают транзакционно.</li>
-        <li class="req"><strong>API-03.</strong> Создание группы, добавление свободных участников и создание общей записи проверяют тур, маршрут, состав и права.</li>
-        <li class="req"><strong>API-04.</strong> Повторный запрос с тем же идемпотентным ключом не создаёт дубликат.</li>
-        <li class="req"><strong>API-05.</strong> Сервер возвращает capabilities для просмотра, профиля, логистики, группировки, документов, статусов и удаления.</li>
-        <li class="req"><strong>API-06.</strong> Viewer, guide и escort не могут менять туристов и паспортные сканы через прямой API-вызов.</li>
-        <li class="req"><strong>API-07.</strong> GuideMobile, MobileLeadsWorkspace и MobileSummaryViews используют один адаптер участника тура.</li>
-        <li class="req"><strong>API-08.</strong> Города и точки поддерживают мягкое удаление используемых записей; <code>city_visits</code> сохраняет старые строковые поля для совместимости.</li>
-      </ul>
-      <p class="priority"><strong>P0:</strong> индивидуальные данные, транзакции, права. <strong>P1:</strong> единая сводная и карточка. <strong>P2:</strong> документы, OCR, фильтры и системный Share.</p>
-    </section>
-
-    <section class="section" id="acceptance">
-      <h2>14. Acceptance criteria</h2>
-      <ul>
-        <li class="req"><strong>AC-01.</strong> «Туры», «Туристы» и «Лиды» открываются реальными кликами; лишней нижней вкладки нет.</li>
-        <li class="req"><strong>AC-02.</strong> Турист <code>t1</code>, открытый из лида и тура, имеет один ID, одну карточку и одинаковые значения.</li>
-        <li class="req"><strong>AC-03.</strong> Карточка показывает все разделы и поля CARD-01; изменение секции сохраняется при повторном открытии.</li>
-        <li class="req"><strong>AC-04.</strong> OCR сначала показывает сверку. Отмена ничего не меняет; применение меняет только выбранные поля.</li>
-        <li class="req"><strong>AC-05.</strong> Admin, manager, escort и guide видят разные доступные действия и чувствительные поля согласно ROLE-01.</li>
-        <li class="req"><strong>AC-06.</strong> Четыре туриста из двух лидов объединяются в одну группу туристов.</li>
-        <li class="req"><strong>AC-07.</strong> Для группы создаются общий отель на четырёх, прибытия 2+2 и разные отъезды.</li>
-        <li class="req"><strong>AC-08.</strong> Конфликт не меняет данные до выбора источника. После выбора <code>ownValues</code> остальных участников не меняются.</li>
-        <li class="req"><strong>AC-09.</strong> Отделение одного туриста только от отеля восстанавливает его личный отель. Прибытия, отъезды и группа туристов не меняются.</li>
-        <li class="req"><strong>AC-10.</strong> Расформирование группы туристов меняет только <code>groupId</code>; общие записи операций сохраняются.</li>
-        <li class="req"><strong>AC-11.</strong> Попытка автоматически объединить две существующие группы блокируется без изменения данных.</li>
-        <li class="req"><strong>AC-12.</strong> Две остановки Пекина имеют разные <code>routeCityId</code> и отдельные операции.</li>
-        <li class="req"><strong>AC-13.</strong> Список туристов, документы и работа со статусами соответствуют LIST, DOC и STATUS.</li>
-        <li class="req"><strong>AC-14.</strong> Справочник проходит сценарии 0/1/несколько точек, смену транспорта, manual, архивирование, удаление и повторную загрузку из <code>localStorage</code>.</li>
-        <li class="req"><strong>AC-15.</strong> Loading, error/retry, empty, offline и dirty-form доступны как кликабельные состояния.</li>
-        <li class="req"><strong>AC-16.</strong> Полный сценарий не создаёт production или external request.</li>
-        <li class="req"><strong>AC-17.</strong> Smoke-тест проверяет модель через read-only snapshot, а CI действительно запускает smoke.</li>
-        <li class="req"><strong>AC-18.</strong> На 375×812 и 390×844 нет горизонтального overflow; видимые действия не меньше 44×44 px.</li>
-        <li class="req"><strong>AC-19.</strong> HTML-версия ТЗ содержит те же requirement ID и смысловой текст, что Markdown.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="limits">
-      <h2>15. Non-goals и бэклог</h2>
-      <ul>
-        <li class="req"><strong>NG-01.</strong> Не менять рабочее мобильное приложение, desktop, API, базу и серверные права.</li>
-        <li class="req"><strong>NG-02.</strong> Не подключать production API, аналитику или внешние ресурсы.</li>
-        <li class="req"><strong>NG-03.</strong> Не менять прежнее ТЗ приложения гида и legacy-файл.</li>
-        <li class="req"><strong>NG-04.</strong> Не реализовывать будущий API-контракт в статическом прототипе.</li>
-        <li class="req"><strong>NG-05.</strong> Не объединять «Лиды» и «Туры» в один пункт меню.</li>
-        <li class="req"><strong>BL-01.</strong> Виза, страховка и анкета после появления полноценной модели и API.</li>
-        <li class="req"><strong>BL-02.</strong> Excel-экспорт через системный Share.</li>
-        <li class="req"><strong>BL-03.</strong> Администрирование туристического портала, шаблонов и уведомлений.</li>
-        <li class="req"><strong>BL-04.</strong> Общие CRM-задачи и единый канбан.</li>
-        <li class="req"><strong>BL-05.</strong> Центральный чат и внешние каналы.</li>
-        <li class="req"><strong>BL-06.</strong> Пользователи, безопасность, интеграции, аудит и прочие справочники.</li>
-      </ul>
-    </section>
-
-    <section class="section" id="verify">
-      <h2>16. Проверка</h2>
-      <ol>
-        <li>Открыть три вкладки сводной и одну карточку t1 из тура и лида.</li>
-        <li>Проверить секционные формы, dirty-confirmation, сканы и OCR.</li>
-        <li>Выполнить 4 туриста / 2 лида → группа → отель 4 → прибытия 2+2 → разные отъезды → split.</li>
-        <li>Проверить независимость groupId и subgroupId, повторный Пекин и роли.</li>
-        <li>Проверить справочник и повторное чтение localStorage.</li>
-        <li>Запустить syntax check и <code>node prototype-smoke-test.js</code>.</li>
-        <li>Проверить 375×812 и 390×844 в браузере.</li>
+      </section>
+      <section id="13-будущий-контракт-рабочей-версии" class="level2">
+      <h2>13. Будущий контракт рабочей версии</h2>
+      <p>Этот раздел не разрешает менять backend в текущей задаче.</p>
+      <p>Финальный перенос выполняется внутри
+      <code>client/src/pages/guide-mobile</code>, а mobile-only фасад
+      размещается в <code>server/routes/guideMobile.ts</code>, когда это
+      не ломает существующие маршруты. Desktop Leads и Event Summary
+      продолжают работать на текущих компонентах.</p>
+      <p>Mobile facade должен уметь:</p>
+      <ol type="1">
+      <li>получить список и карточку лида с туристами;</li>
+      <li>создать или изменить туриста через действующую
+      <code>leadTourists</code>-валидацию;</li>
+      <li>получить агрегат тура, карточку и мобильную сводную;</li>
+      <li>выполнить preview массовой операции без записи;</li>
+      <li>применить общую операцию транзакционно с выбранным
+      источником;</li>
+      <li>отделить участников одной операции транзакционно;</li>
+      <li>создать группу тура или добавить свободных участников в одну
+      существующую группу;</li>
+      <li>удалить участника из группы или полностью расформировать
+      группу с отдельным capability;</li>
+      <li>изменить разрешённый фактический статус;</li>
+      <li>вернуть capabilities и подготовить разрешённый
+      XLSX-export.</li>
       </ol>
-      <p>Файлы задачи: <code>tour-operations.*</code>, <code>mobile-leads.*</code>, <code>mobile-leads-tz.*</code>, <code>prototype-smoke-test.js</code> и workflow smoke-теста.</p>
-    </section>
-          </div>
-        </details>
-      </div>
-    </div>
-  </main>
+      <ul>
+      <li><strong>API-01.</strong> Клиент получает
+      <code>ownValues</code>, <code>effectiveValues</code>,
+      <code>sourceVisitId</code>, авторитетные <code>groupId</code> и
+      <code>subgroupId</code>.</li>
+      <li><strong>API-02.</strong> Preview возвращает конфликты без
+      записи. Apply и split работают транзакционно.</li>
+      <li><strong>API-03.</strong> Создание группы, добавление свободных
+      участников и создание общей записи проверяют тур, маршрут, состав
+      и права.</li>
+      <li><strong>API-04.</strong> Повторный запрос с тем же
+      идемпотентным ключом не создаёт дубликат.</li>
+      <li><strong>API-05.</strong> Сервер возвращает capabilities для
+      просмотра, профиля, логистики, группировки, документов, статусов и
+      удаления.</li>
+      <li><strong>API-06.</strong> Роли <code>viewer</code> и
+      <code>escort</code> не могут менять туристов и паспортные сканы
+      через прямой API-вызов. Production API не принимает
+      <code>guide</code> как отдельную роль.</li>
+      <li><strong>API-07.</strong> GuideMobile, MobileLeadsWorkspace и
+      MobileSummaryViews используют один адаптер участника тура.</li>
+      <li><strong>API-08.</strong> Города и точки поддерживают мягкое
+      удаление используемых записей; <code>city_visits</code> сохраняет
+      старые строковые поля для совместимости.</li>
+      <li><strong>API-09.</strong> Общая операция проверяет одного
+      пользователя, один <code>eventId</code>, один непустой
+      <code>groupId</code>, один <code>routeCityId/cityIdx</code>, одну
+      операцию и подтверждённые лиды.</li>
+      <li><strong>API-10.</strong> <code>sourceVisitId</code>,
+      <code>ownValues</code> и <code>effectiveValues</code> являются
+      mobile-facing DTO. Существующие visit/deal/subgroup ID
+      переиспользуются; новая колонка базы добавляется только если
+      отдельный backend-review докажет необходимость.</li>
+      <li><strong>API-11.</strong> Справочник редактируется в
+      web-настройках CRM; рабочая мобилка читает активные города и
+      точки, но не становится второй админкой.</li>
+      </ul>
+      <section id="131-проверенный-web-контракт" class="level3">
+      <h3>13.1. Проверенный web-контракт</h3>
+      <table>
+      <thead>
+      <tr>
+      <th>Источник</th>
+      <th>Что является каноном для мобильного MVP</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr>
+      <td><code>LeadEditModal.tsx</code></td>
+      <td>Четыре вкладки, reconcile, направление ручного объединения,
+      Chat/Documents/Tasks</td>
+      </tr>
+      <tr>
+      <td><code>LeadForm.tsx</code></td>
+      <td>Разница create/edit, точный порядок полей, туристы внутри
+      лида, footer и outcome flow</td>
+      </tr>
+      <tr>
+      <td><code>Wazzup24Chat.tsx</code></td>
+      <td>Семь состояний чата и сохранение channel ID</td>
+      </tr>
+      <tr>
+      <td><code>TouristDialog</code> в <code>LeadForm.tsx</code></td>
+      <td>Пять базовых разделов профиля, nullable-поля, сканы и OCR</td>
+      </tr>
+      <tr>
+      <td><code>TouristDetailsDialog</code> в
+      <code>EventSummary.tsx</code></td>
+      <td><code>guideComment</code> и контекст конкретного участия</td>
+      </tr>
+      <tr>
+      <td><code>EventCard.tsx</code></td>
+      <td>Порядок сведений и пяти действий, privacy цены/сайта</td>
+      </tr>
+      <tr>
+      <td><code>EditEventDialog.tsx</code></td>
+      <td>Поля тура от названия до цвета, команда, маршрут и
+      lifecycle</td>
+      </tr>
+      <tr>
+      <td><code>TourProgramTab.tsx</code></td>
+      <td><code>dayNumber/date</code> read-only, изменение
+      <code>city/description</code>,
+      generate/regenerate/clear/templates</td>
+      </tr>
+      <tr>
+      <td><code>TaskWidget.tsx</code></td>
+      <td>Поля задачи, приоритеты и только
+      <code>todo/in_progress/done</code></td>
+      </tr>
+      <tr>
+      <td><code>EventSummary.tsx</code></td>
+      <td>Порядок полей трёх операций, <code>groupId</code>, column
+      subgroups, split и экспорт XLSX</td>
+      </tr>
+      <tr>
+      <td><code>EventSummary.tsx</code> group creation</td>
+      <td><code>sharedHotel=true</code>,
+      <code>sharedArrival=false</code>,
+      <code>sharedDeparture=false</code></td>
+      </tr>
+      <tr>
+      <td><code>EventSummary.tsx</code> departure save</td>
+      <td>Перенос непустого отъезда в пустое прибытие
+      <code>cityIdx + 1</code></td>
+      </tr>
+      <tr>
+      <td><code>shared/schema.ts</code></td>
+      <td>Разделение <code>leadTourists</code>, <code>deals</code>,
+      <code>groups</code>, <code>cityVisits</code>,
+      <code>columnSubGroups</code>; обязательны только first/last
+      name</td>
+      </tr>
+      </tbody>
+      </table>
+      <p>Мобильные расширения ограничены вертикальной компоновкой,
+      безопасным <code>preview → source → apply</code>, различением
+      <code>ownValues/effectiveValues</code> и стабильным
+      <code>routeCityId</code> в DTO. Они не меняют значения web-полей,
+      роли и lifecycle.</p>
+      </section>
+      </section>
+      <section id="14-приоритеты" class="level2">
+      <h2>14. Приоритеты</h2>
+      <ul>
+      <li><strong>P0:</strong> сохранность индивидуальных данных,
+      транзакционность групп, права API.</li>
+      <li><strong>P1:</strong> точный паритет карточек лида, туриста и
+      тура; единая сводная; авторитетные группы.</li>
+      <li><strong>P2:</strong> документы, OCR, фильтры готовности,
+      справочник точек и Excel через системный Share.</li>
+      </ul>
+      </section>
+      <section id="15-acceptance-criteria" class="level2">
+      <h2>15. Acceptance criteria</h2>
+      <ul>
+      <li><strong>AC-01.</strong> Нижняя навигация admin и manager
+      содержит «Туры», «Туристы» и «Лиды» в этом порядке; роли
+      <code>viewer</code> и <code>escort</code> видят только «Туры» и
+      «Туристы». Отдельной вкладки «Финансы» нет.</li>
+      <li><strong>AC-02.</strong> Карточка лида содержит
+      «Редактировать», «Чат», «Документы», «Задачи» в этом порядке.</li>
+      <li><strong>AC-03.</strong> Lead Read surface существующего лида
+      идёт: проверка связей → ручное объединение → личные данные → тур и
+      оплата → настройки → UTM при наличии → примечание → туристы →
+      footer → переход в сводную. Полноэкранный редактор открывается с
+      выбранного блока и сохраняет тот же порядок полей, проверки и
+      действия.</li>
+      <li><strong>AC-04.</strong> Личные поля лида идут: фамилия → имя →
+      отчество → телефон → Telegram username → email → read-only
+      Telegram User ID при наличии.</li>
+      <li><strong>AC-05.</strong> «Тур и оплата» показывает все поля из
+      таблицы 4.1 в заданном порядке, включая searchable tour,
+      <code>routeCityId</code> и read-only сведения внешней оплаты.</li>
+      <li><strong>AC-06.</strong> UTM показывает
+      <code>utmSource → utmMedium → utmCampaign → utmTerm → utmContent → pageUrl</code>
+      и скрывается при полном отсутствии данных.</li>
+      <li><strong>AC-07.</strong> Статусы лида имеют точные коды и
+      подписи; выбор <code>lost</code> открывает outcome flow, а отмена
+      не сохраняет результат.</li>
+      <li><strong>AC-08.</strong> Логистика заблокирована до
+      <code>converted</code> и доступна после подтверждения без копии
+      тура.</li>
+      <li><strong>AC-09.</strong> Create-flow показывает
+      <code>Личные данные → Дата рождения → Паспорт РФ → Загранпаспорт → Тур и оплата → Настройки → Примечание</code>,
+      создаёт основного туриста и заканчивается действием
+      «Создать».</li>
+      <li><strong>AC-10.</strong> Footer существующего лида идёт
+      «Удалить» только admin → «Обновить»; переход в сводную расположен
+      после формы.</li>
+      <li><strong>AC-11.</strong> Chat показывает семь локальных
+      состояний Wazzup24 без внешнего iframe.</li>
+      <li><strong>AC-12.</strong> Documents содержит только «Договор» и
+      «Лист бронирования» с mock-действиями DOCX.</li>
+      <li><strong>AC-13.</strong> Lead TaskWidget повторяет web-поля,
+      приоритеты и цикл <code>todo → in_progress → done → todo</code>;
+      <code>cancelled</code> отсутствует.</li>
+      <li><strong>AC-14.</strong> Переход «Открыть сводную тура»
+      сохраняет <code>tourId</code>, область «Этот лид» и контекст
+      возврата.</li>
+      <li><strong>AC-15.</strong> Один <code>touristId</code>, открытый
+      из разных мест, показывает один базовый профиль; tour-context
+      соответствует выбранному <code>dealId/eventId</code>.</li>
+      <li><strong>AC-16.</strong> Профиль туриста имеет пять разделов в
+      порядке: личные данные → гражданство → паспорт РФ → загранпаспорт
+      и сканы → тип и настройки.</li>
+      <li><strong>AC-17.</strong> Личные поля туриста идут: фамилия →
+      имя → отчество → дата рождения → email → телефон. Сохранение
+      требует только фамилию и имя.</li>
+      <li><strong>AC-18.</strong> Паспорт РФ скрывается для гражданина
+      Казахстана без удаления сохранённых значений.</li>
+      <li><strong>AC-19.</strong> OCR открывает сверку; отмена ничего не
+      меняет, apply меняет только выбранные поля.</li>
+      <li><strong>AC-20.</strong> <code>guideComment</code>, участие,
+      группа, ограниченный маршрут, статусы и логистика показываются
+      только в контексте конкретного тура.</li>
+      <li><strong>AC-21.</strong> Карточка различает
+      <code>leadTourist.isPrimary</code> и
+      <code>deal.isPrimaryInGroup</code> и подписывает их разными
+      терминами.</li>
+      <li><strong>AC-22.</strong> Заметка профиля использует
+      <code>leadTourists.notes</code>; прототип не требует
+      несуществующего production-поля <code>internalNote</code>.</li>
+      <li><strong>AC-23.</strong> Карточка тура идёт
+      <code>Обзор → Сводная → Программа → Команда → Задачи → Действия</code>.</li>
+      <li><strong>AC-24.</strong> Список и Overview повторяют порядок
+      <code>EventCard</code>, включая цену/валюту, ролевое скрытие,
+      заполненность и пять действий.</li>
+      <li><strong>AC-25.</strong> Форма тура показывает поля
+      <code>EditEventDialog</code> строго от названия до цвета, включая
+      routeCity-user assignments, базовую цену и валюту.
+      <code>routeCityId</code>, название позиции и user ID сохраняются
+      одной связкой даже при пустой промежуточной строке.</li>
+      <li><strong>AC-26.</strong> Close/reopen доступны admin/manager;
+      archive/unarchive и delete — только admin в мобильном UI.</li>
+      <li><strong>AC-27.</strong> Program хранит
+      <code>dayNumber → date → city → cityIdx → description</code>, не
+      имеет <code>title</code>, не создаёт произвольные дни и
+      редактирует только <code>city/description</code>.</li>
+      <li><strong>AC-28.</strong> Tour TaskWidget использует
+      <code>entityType=event</code> и тот же контракт
+      <code>todo | in_progress | done</code>.</li>
+      <li><strong>AC-29.</strong> Сводная содержит
+      <code>Операции → Туристы → Документы → Статусы</code> в точном
+      порядке; deep link <code>?tourId={tourId}&amp;view=statuses</code>
+      открывает активную цепочку «Сводная → Статусы». В операциях
+      выбираются область, точный <code>routeCityId</code>, режим
+      просмотра и тип операции без горизонтальной таблицы.</li>
+      <li><strong>AC-30.</strong> Прибытие, отель и отъезд показывают
+      поля в том же порядке, что активные ячейки web-сводной; транспорта
+      «автомобиль» нет.</li>
+      <li><strong>AC-31.</strong> «Покрытие» показывает три независимых
+      состояния для каждого доступного туриста и остановки.</li>
+      <li><strong>AC-32.</strong> Индивидуальное сохранение меняет одну
+      операцию одного туриста.</li>
+      <li><strong>AC-33.</strong> Новая группа создаётся из свободных
+      сделок одного тура с <code>sharedHotel=true</code>,
+      <code>sharedArrival=false</code>,
+      <code>sharedDeparture=false</code>; первый выбранный участник
+      становится представителем, а UI-подпись строится из фамилий и не
+      используется как ID или источник данных.</li>
+      <li><strong>AC-34.</strong> Общая операция принимает только
+      участников с одним непустым <code>deal.groupId</code>; свободные
+      сделки и разные группы отклоняются.</li>
+      <li><strong>AC-35.</strong> Выбранные четыре туриста из двух лидов
+      сначала образуют одну группу, затем общий отель на четырёх,
+      прибытия 2+2 и индивидуальные отъезды. Дополнительные туристы и
+      лиды того же тура остаются вне группы и не меняются.</li>
+      <li><strong>AC-36.</strong> Preview конфликта при создании группы
+      с разными отелями, создании общей операции и добавлении участника
+      в существующую общую операцию не меняет <code>groupId</code>,
+      состав, источник или mock-данные до выбора источника и Apply.</li>
+      <li><strong>AC-37.</strong> Apply сохраняет
+      <code>ownValues</code>, вычисляет <code>effectiveValues</code> и
+      не создаёт дубликат при повторе с тем же ключом.</li>
+      <li><strong>AC-38.</strong> Split одной операции восстанавливает
+      личные значения и не меняет другие операции или
+      <code>deal.groupId</code>; отделение источника требует
+      замену.</li>
+      <li><strong>AC-39.</strong> Полное расформирование группы снимает
+      зависящие общие связи, но сохраняет индивидуальные данные.</li>
+      <li><strong>AC-40.</strong> Выбор участников из двух существующих
+      групп не сливает их и ничего не меняет.</li>
+      <li><strong>AC-41.</strong> Две одноимённые остановки имеют разные
+      <code>routeCityId</code>, разрешаются в разные
+      <code>cityIdx</code> и хранят независимую логистику.</li>
+      <li><strong>AC-42.</strong> Непустое поле отъезда переносится в
+      пустое соответствующее поле прибытия <code>cityIdx + 1</code>;
+      заполненное прибытие не перезаписывается.</li>
+      <li><strong>AC-43.</strong> Admin, manager, escort и viewer видят
+      поля и действия согласно таблице ролей; <code>viewer</code>
+      подписан «Гид», а legacy URL alias <code>guide</code> получает те
+      же capabilities после нормализации. Неизвестная роль не получает
+      права manager. Запрещённый mock-клик завершается отказом.</li>
+      <li><strong>AC-44.</strong> Роли <code>viewer</code> и
+      <code>escort</code> не видят «Лиды», не открывают карточку
+      исходного лида и получают только назначенные туры/города и
+      закрытый перечень персональных полей из раздела 10. Manager видит
+      только назначенные лиды; для туриста чужого лида в доступном туре
+      остаётся только безопасный операционный контекст. Запрещённые поля
+      отсутствуют в DOM, поиске, документах, контактах, экспорте и
+      параметрах перехода даже после гидратации общего
+      <code>localStorage</code>.</li>
+      <li><strong>AC-45.</strong> Операционный статус выбирается явно и
+      меняет только одну разрешённую операцию выбранного города.</li>
+      <li><strong>AC-46.</strong> Архивирование/отмена сохраняют данные
+      и архивируют связанные лиды; отменённый тур остаётся в фильтре
+      «Архив», только отменённый тур можно открыть повторно,
+      восстановление возвращает прежний статус, а копия архивного или
+      отменённого тура становится чистым черновиком.</li>
+      <li><strong>AC-47.</strong> Loading, error/retry, empty tour,
+      empty filter, offline, saving, save error, dirty form, conflict и
+      forbidden доступны для проверки.</li>
+      <li><strong>AC-48.</strong> В offline данные читаются, а
+      mock-запись не показывает ложный успех.</li>
+      <li><strong>AC-49.</strong> На 375×812 и 390×844 нет
+      горизонтального overflow; touch-target не меньше 44×44 px, нижние
+      действия учитывают safe-area.</li>
+      <li><strong>AC-50.</strong> Полный сценарий прототипа, включая
+      кнопку публичного сайта тура, не отправляет production или
+      external request и не уводит пользователя с локального
+      mock-экрана.</li>
+      <li><strong>AC-51.</strong> Справочник сохраняет CRUD на
+      mock-данных, архивирует используемую точку и восстанавливается из
+      <code>localStorage</code>.</li>
+      <li><strong>AC-52.</strong> Самолёт/поезд/автобус фильтруют точки
+      выбранного города; одна точка предзаполняется только в пустое
+      поле, несколько открывают поиск, ноль разрешает manual.</li>
+      <li><strong>AC-53.</strong> Экспорт доступен admin и manager
+      доступного тура, включает только разрешённый состав и не выполняет
+      запись.</li>
+      <li><strong>AC-54.</strong> Smoke проверяет exact IA, deep link
+      «Сводная → Статусы», одну карточку туриста,
+      group/create/reject/preview/apply/split, конфликт общего отеля,
+      добавление участника в общую операцию, next-arrival,
+      <code>viewer</code>/legacy alias, запрет лидов и неизменность
+      несвязанных данных.</li>
+      <li><strong>AC-55.</strong> HTML генерируется из Markdown и
+      содержит совпадающий <code>spec-sha256</code>; ручное расхождение
+      версий считается дефектом.</li>
+      <li><strong>AC-56.</strong> Финальная передача указывает ветку
+      <code>prototype/mobile-crm-2026-08-03</code>, точный commit SHA и
+      неизменяемый preview или архив этого SHA; PR, merge в
+      <code>main</code> и GitHub Pages deployment отсутствуют.</li>
+      </ul>
+      </section>
+      <section id="16-non-goals" class="level2">
+      <h2>16. Non-goals</h2>
+      <ul>
+      <li><strong>NG-01.</strong> Не менять рабочее мобильное
+      приложение, desktop, API, базу и серверные права.</li>
+      <li><strong>NG-02.</strong> Не подключать production API,
+      аналитику или внешние ресурсы.</li>
+      <li><strong>NG-03.</strong> Не менять прежнее ТЗ приложения гида и
+      legacy-файл.</li>
+      <li><strong>NG-04.</strong> Не реализовывать будущий API-контракт
+      в статическом прототипе.</li>
+      <li><strong>NG-05.</strong> Не объединять «Лиды» и «Туры» в один
+      пункт меню.</li>
+      <li><strong>NG-06.</strong> Не добавлять отдельные вкладки
+      «Финансы» и «Расходы». Существующие web-поля оплаты лида и базовой
+      цены тура сохраняются для паритета.</li>
+      <li><strong>NG-07.</strong> Не копировать общие значения в личные
+      <code>cityVisits</code> и не объединять записи по совпавшему
+      тексту.</li>
+      <li><strong>NG-08.</strong> Не разрешать общую операцию между
+      разными или пустыми <code>deal.groupId</code>.</li>
+      <li><strong>NG-09.</strong> Не добавлять <code>ownValues</code>,
+      <code>effectiveValues</code>, <code>sourceVisitId</code> или
+      <code>internalNote</code> в production-схему на этапе
+      прототипа.</li>
+      <li><strong>NG-10.</strong> Не добавлять произвольное создание,
+      удаление, номер или дату дня программы.</li>
+      <li><strong>NG-11.</strong> Не превращать Wazzup24 iframe в новый
+      нативный CRM-мессенджер на этапе MVP.</li>
+      <li><strong>NG-12.</strong> Не выдавать mock/localStorage за
+      production-сохранение.</li>
+      <li><strong>NG-13.</strong> Не ослаблять desktop-права из-за
+      расхождения UI и низкоуровневого route; это отдельная high-risk
+      задача.</li>
+      <li><strong>NG-14.</strong> Не создавать PR, не сливать MVP в
+      <code>main</code> или <code>develop</code> и не публиковать
+      прототип через GitHub Pages на текущем этапе.</li>
+      </ul>
+      </section>
+      <section id="17-бэклог" class="level2">
+      <h2>17. Бэклог</h2>
+      <p>В текущие критерии не входят:</p>
+      <ul>
+      <li><strong>BL-01.</strong> Финансы и расходы за пределами полей
+      web-карточек: прибыль, каталог расходов и отчёты.</li>
+      <li><strong>BL-02.</strong> Виза, страховка, анкета и новые типы
+      документов после появления полноценной модели/API.</li>
+      <li><strong>BL-03.</strong> Расширенные шаблоны экспорта, пакетная
+      выгрузка нескольких туров и фоновые отчёты.</li>
+      <li><strong>BL-04.</strong> Production CRUD полного справочника
+      городов и транспортных точек; текущий этап использует mock.</li>
+      <li><strong>BL-05.</strong> Нативный центр сообщений вместо
+      действующего Wazzup24 iframe.</li>
+      <li><strong>BL-06.</strong> Глобальный канбан задач и
+      административные модули за пределами встроенного TaskWidget.</li>
+      <li><strong>BL-07.</strong> Туристический портал, шаблоны и
+      уведомления.</li>
+      <li><strong>BL-08.</strong> История изменений, аудит массовых
+      операций и административное восстановление.</li>
+      </ul>
+      </section>
+      <section id="18-проверка" class="level2">
+      <h2>18. Проверка</h2>
+      <ol type="1">
+      <li>Создать лид: проверить create-only паспортные блоки,
+      отсутствие edit-only частей и автоматически созданного основного
+      туриста.</li>
+      <li>Открыть существующий лид: проверить четыре вкладки, порядок
+      Lead Read surface, переход в полноэкранный редактор выбранного
+      блока, порядок полей, условный UTM, footer и переход в сводную
+      после формы.</li>
+      <li>Проверить семь состояний Wazzup24, два DOCX-документа и полный
+      цикл задачи <code>todo → in_progress → done → todo</code>.</li>
+      <li>Открыть одного туриста из лида, списка и тура; сравнить ID и
+      пять разделов базового профиля, затем проверить отдельный
+      tour-context.</li>
+      <li>Проверить nullable-поля, dirty-confirmation, сканы и OCR с
+      отменой и выборочным применением.</li>
+      <li>Открыть карточку тура и проверить шесть разделов, порядок
+      EventCard, полную форму EditEventDialog, Team, Program и Tour
+      TaskWidget. Затем открыть
+      <code>?tourId=china&amp;view=statuses</code> и проверить активную
+      цепочку «Сводная → Статусы».</li>
+      <li>Выбрать четырёх туристов из двух лидов и выполнить: одна
+      группа с общим отелем → прибытия 2+2 → индивидуальные отъезды.
+      Сравнить остальных участников тура до и после сценария.</li>
+      <li>Попытаться создать общую операцию из разных
+      <code>groupId</code> и получить отказ без изменения данных.</li>
+      <li>Создать конфликт отелей при создании группы, затем конфликт
+      при добавлении туриста в существующую общую операцию. До Apply
+      сравнить <code>groupId</code>, состав, источник и записи; после
+      выбора источника проверить сохранность
+      <code>ownValues</code>.</li>
+      <li>Отделить туриста от прибытия и проверить, что отель, отъезд и
+      <code>deal.groupId</code> не меняются.</li>
+      <li>Полностью расформировать копию группы и проверить удаление
+      зависимых связей при сохранении личных данных.</li>
+      <li>Сохранить отъезд и проверить автозаполнение только пустых
+      полей следующего прибытия.</li>
+      <li>Проверить повторный Пекин с разными
+      <code>routeCityId/cityIdx</code>.</li>
+      <li>Переключить admin, manager, escort и viewer; проверить
+      закрытый перечень персональных полей, отсутствие «Лидов» у
+      viewer/escort, только назначенные лиды manager и запрещённые
+      действия. Отдельно открыть legacy <code>role=guide</code> и
+      убедиться, что он нормализован в viewer, а неизвестная роль не
+      получает manager.</li>
+      <li>Проверить 0/1/несколько транспортных точек, смену транспорта,
+      manual, архивирование и <code>localStorage</code>.</li>
+      <li>Проверить loading, error, empty tour, empty filter, offline,
+      saving, save error, conflict и forbidden.</li>
+      <li>Выполнить <code>node --check</code> для JavaScript,
+      <code>node prototype-smoke-test.js</code> и
+      <code>node prototype-viewport-test.js</code>.</li>
+      <li>Проверить 375×812 и 390×844 без horizontal overflow и с
+      touch-target от 44 px.</li>
+      <li>Переснять финальные иллюстрации командой
+      <code>node capture-prototype-screenshots.js</code>.</li>
+      <li>Выполнить <code>./build-mobile-spec.sh</code> и сверить
+      <code>spec-sha256</code> HTML с SHA-256 Markdown.</li>
+      <li>Передать ветку <code>prototype/mobile-crm-2026-08-03</code>,
+      точный commit SHA и preview или архив этого SHA. Проверить
+      отсутствие PR, merge в <code>main</code> и GitHub Pages
+      deployment.</li>
+      </ol>
+      </section>
+      <section id="19-файлы-текущей-задачи" class="level2">
+      <h2>19. Файлы текущей задачи</h2>
+      <ul>
+      <li><code>tour-operations.html</code>,
+      <code>tour-operations.css</code>,
+      <code>tour-operations.js</code>;</li>
+      <li><code>mobile-leads.html</code>, <code>mobile-leads.css</code>,
+      <code>mobile-leads.js</code>;</li>
+      <li><code>mobile-leads-tz.md</code>, сгенерированный
+      <code>mobile-leads-tz.html</code>,
+      <code>mobile-leads-tz.css</code>,
+      <code>mobile-leads-tz-template.html</code>;</li>
+      <li><code>build-mobile-spec.sh</code>,
+      <code>capture-prototype-screenshots.js</code>,
+      <code>assets/spec/*</code>;</li>
+      <li><code>prototype-smoke-test.js</code>,
+      <code>prototype-viewport-test.js</code>;</li>
+      <li><code>.github/workflows/prototype-smoke.yml</code>.</li>
+      </ul>
+      <p>Риск текущего этапа низкий: меняются только статические
+      mock-экраны, тест и отдельное ТЗ в прототипной ветке.</p>
+      <p>Будущий перенос затронет
+      <code>client/src/pages/guide-mobile</code> и, при необходимости,
+      <code>server/routes/guideMobile.ts</code>. Любые API, permission
+      или database changes требуют отдельного Issue, review точного SHA
+      и ручного разрешения на merge в <code>develop</code>.</p>
+      </section>
+    </main>
+  </div>
 
-  <footer>UNIQUE · визуальное ТЗ MVP мобильной CRM · 4 августа 2026</footer>
+  <footer>UNIQUE · финальное ТЗ MVP мобильной CRM · 4 августа
+2026</footer>
 </body>
 </html>

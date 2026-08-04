@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="$if(lang)$$lang$$else$ru$endif$">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="spec-source" content="mobile-leads-tz.md">
+  <meta name="spec-sha256" content="$spec-hash$">
+  <meta name="theme-color" content="#14171a">
+  <meta name="description" content="Финальное визуальное ТЗ MVP мобильной CRM: лиды, туристы, туры и сводная.">
+  <title>$if(pagetitle)$$pagetitle$$else$$title$$endif$</title>
+  <link rel="stylesheet" href="mobile-leads-tz.css">
+</head>
+<body class="generated-spec">
+  <a class="skip-link" href="#main-content">Перейти к содержанию</a>
+  <header class="site-header">
+    <a class="brand" href="index.html">UNIQUE</a>
+    <nav aria-label="Навигация прототипа">
+      <a href="mobile-leads.html">Лиды</a>
+      <a href="tour-operations.html">Прототип</a>
+      <a class="active" aria-current="page" href="mobile-leads-tz.html">ТЗ</a>
+    </nav>
+  </header>
+
+  <section class="hero spec-hero" aria-labelledby="spec-title">
+    <p class="eyebrow">Этап MVP · финальный ориентир</p>
+    <h1 id="spec-title">$title$</h1>
+    $if(subtitle)$<p class="lead">$subtitle$</p>$endif$
+    <div class="meta">
+      <span>Статус: финальное ТЗ прототипа</span>
+      <span>Дата: $date$</span>
+      <span>Источник: mobile-leads-tz.md</span>
+    </div>
+    <div class="hero-actions">
+      <a class="hero-primary" href="tour-operations.html?tourId=china&amp;tourSection=overview&amp;role=manager">Открыть финальный прототип</a>
+      <a class="hero-secondary" href="#final-product">Посмотреть состав MVP</a>
+    </div>
+    <div class="hero-facts" aria-label="Состав финального MVP">
+      <div class="hero-fact"><strong>3</strong><span>отдельных раздела: туры, туристы и лиды</span></div>
+      <div class="hero-fact"><strong>4</strong><span>канонических вкладки карточки лида</span></div>
+      <div class="hero-fact"><strong>6</strong><span>частей итоговой карточки тура</span></div>
+      <div class="hero-fact"><strong>3</strong><span>операции в каждой позиции маршрута</span></div>
+      <div class="hero-fact"><strong>1</strong><span>рабочая версия после переноса</span></div>
+    </div>
+  </section>
+
+  <div class="spec-layout">
+    <aside class="spec-toc" aria-label="Оглавление ТЗ">
+      <strong>Содержание</strong>
+      $toc$
+    </aside>
+    <main id="main-content" class="spec-content">
+      $body$
+    </main>
+  </div>
+
+  <footer>UNIQUE · финальное ТЗ MVP мобильной CRM · $date$</footer>
+</body>
+</html>

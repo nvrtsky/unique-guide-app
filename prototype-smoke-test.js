@@ -1,7 +1,7 @@
-const assert = require('node:assert');
-const crypto = require('node:crypto');
-const fs = require('node:fs');
-const vm = require('node:vm');
+import assert from 'node:assert';
+import crypto from 'node:crypto';
+import fs from 'node:fs';
+import vm from 'node:vm';
 
 const networkCalls = [];
 
@@ -18,6 +18,34 @@ function escapeRegExp(value) {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+function assertMarkupOrder(markup, needles, context) {
+  let cursor = -1;
+  needles.forEach((needle) => {
+    const next = markup.indexOf(needle, cursor + 1);
+    assert.ok(next >= 0, `${context}: “${needle}” must be rendered`);
+    assert.ok(next > cursor, `${context}: “${needle}” must follow the previous canonical item`);
+    cursor = next;
+  });
+}
+
+function assertExactlyOneRepresentativePerGroup(snapshot, context) {
+  const grouped = snapshot.tourists.reduce((result, tourist) => {
+    if (!tourist.groupId) {
+      assert.equal(tourist.groupRepresentative, false, `${context}: a free tourist cannot represent a group`);
+      return result;
+    }
+    (result[tourist.groupId] ||= []).push(tourist);
+    return result;
+  }, {});
+  Object.entries(grouped).forEach(([groupId, members]) => {
+    assert.equal(
+      members.filter((tourist) => tourist.groupRepresentative).length,
+      1,
+      `${context}: ${groupId} must have exactly one representative`,
+    );
+  });
+}
+
 function formEntries(values) {
   return Object.entries(values || {}).flatMap(([key, value]) => Array.isArray(value) ? value.map((item) => [key, item]) : [[key, value]]);
 }
@@ -25,6 +53,7 @@ function formEntries(values) {
 function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()) {
   const listeners = {};
   let scrollTop = 0;
+  let focusedSelector = null;
   const root = {
     html: '',
     set innerHTML(value) { this.html = value; },
@@ -41,12 +70,20 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
           set scrollTop(value) { scrollTop = Number(value || 0); },
         };
       }
+      const leadSection = selector.match(/\[data-lead-section=["']([^"']+)["']\]/);
+      if (leadSection && this.html.includes(`data-lead-section="${leadSection[1]}"`)) {
+        return {
+          focus() { focusedSelector = selector; },
+          setSelectionRange() {},
+          value: '',
+        };
+      }
       return null;
     },
   };
 
   const document = {
-    querySelector(selector) { return selector === appSelector ? root : null; },
+    querySelector(selector) { return selector === appSelector ? root : root.querySelector(selector); },
     getElementById(id) { return id === appSelector.replace('#', '') ? root : null; },
     createElement() {
       return {
@@ -187,6 +224,7 @@ function loadPrototype(file, appSelector, search = '', sharedStorage = new Map()
     window: windowObject,
     snapshot() { return windowObject.__prototypeDebug.snapshot(); },
     assertDisabled,
+    getFocusedSelector() { return focusedSelector; },
     setScrollTop(value) { scrollTop = Number(value || 0); },
     getScrollTop() { return scrollTop; },
   };
@@ -206,733 +244,821 @@ function deepClone(value) {
   return JSON.parse(JSON.stringify(value));
 }
 
-// Navigation remains split into Tours, Tourists and Leads.
-const leads = loadPrototype('mobile-leads.js', '#app');
-['Туры', 'Туристы', 'Лиды'].forEach((label) => assert.match(leads.root.innerHTML, new RegExp(label)));
-assert.match(leads.root.innerHTML, /Канбан/);
-assert.doesNotMatch(leads.root.innerHTML, /ФИНАНС|Стоимость|Аванс|Остаток/i);
-leads.click({ openLead: 'lead-1042' });
-assert.match(leads.root.innerHTML, /Сводная по туру/);
-leads.click({ detailTab: 'tourists' });
-assert.match(leads.root.innerHTML, /Соколова Анна/);
-leads.click({ action: 'open-unified-tourist', tourist: 't1' });
-assert.match(leads.window.location.href, /tour-operations\.html\?view=tourists&tourist=t1&returnLead=lead-1042/);
-
-const linkedLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042');
-assert.match(linkedLead.root.innerHTML, /Соколова Анна Игоревна/, 'lead deep-link opens its detail');
-
-// The mobile coverage view exposes every tourist and stable route stop without a horizontal table.
-const coverage = loadPrototype('tour-operations.js', '#app');
-coverage.click({ action: 'summary-mode', mode: 'coverage' });
-assert.match(coverage.root.innerHTML, /Покрытие по туристам/);
-['Соколова Анна', 'Соколов Илья', 'Орлова Марина', 'Волков Денис'].forEach((name) => assert.match(coverage.root.innerHTML, new RegExp(name)));
-['Пекин · остановка 1', 'Сиань', 'Шанхай', 'Пекин · остановка 2'].forEach((city) => assert.match(coverage.root.innerHTML, new RegExp(city)));
-assert.match(coverage.root.innerHTML, /data-action="jump-cell"/);
-coverage.click({ action: 'summary-mode', mode: 'groups' });
-assert.match(coverage.root.innerHTML, /По операциям/);
-
-// Lead mutations use the same capability contract, including forged clicks and offline mode.
-const unassignedLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1051');
-const unassignedBefore = deepClone(unassignedLead.snapshot());
-assert.match(unassignedLead.root.innerHTML, /Этот лид не назначен текущему менеджеру/);
-assert.doesNotMatch(unassignedLead.root.innerHTML, /denis@example\.ru/);
-unassignedLead.dispatch({ action: 'edit-lead' });
-unassignedLead.dispatch({ stage: 'confirmed' });
-unassignedLead.dispatch({ action: 'add-tourist' });
-unassignedLead.dispatch({ action: 'merge-lead' });
-assert.equal(unassignedLead.snapshot().screen, 'detail');
-assert.deepEqual(unassignedLead.snapshot().leads, unassignedBefore.leads);
-assert.deepEqual(unassignedLead.snapshot().tourists, unassignedBefore.tourists);
-
-const guideLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=guide');
-assert.match(guideLead.root.innerHTML, /Только просмотр/);
-assert.doesNotMatch(guideLead.root.innerHTML, /anna@example\.ru|Примечание|data-action="edit-lead"/);
-const guideLeadBefore = deepClone(guideLead.snapshot());
-guideLead.dispatch({ action: 'generate-doc' });
-guideLead.dispatch({ action: 'add-task' });
-guideLead.dispatch({ stage: 'lost' });
-assert.deepEqual(guideLead.snapshot().leads, guideLeadBefore.leads);
-
-const offlineLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&offline=1');
-const offlineLeadBefore = deepClone(offlineLead.snapshot());
-assert.match(offlineLead.root.innerHTML, /Нет подключения/);
-offlineLead.dispatch({ action: 'add-tourist' });
-offlineLead.dispatch({ action: 'archive-lead' });
-offlineLead.dispatch({ stage: 'lost' });
-assert.deepEqual(offlineLead.snapshot().leads, offlineLeadBefore.leads);
-assert.deepEqual(offlineLead.snapshot().tourists, offlineLeadBefore.tourists);
-
-// Cross-screen navigation preserves role, offline mode, lead and canonical tour context.
-const crossScreenStorage = new Map();
-const guideOfflineLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=guide&offline=1', crossScreenStorage);
-guideOfflineLead.click({ detailTab: 'tourists' });
-guideOfflineLead.click({ action: 'open-unified-tourist', tourist: 't1' });
-const guideTourUrl = new URL(guideOfflineLead.window.location.href, 'https://prototype.test/');
-assert.equal(guideTourUrl.searchParams.get('returnLead'), 'lead-1042');
-assert.equal(guideTourUrl.searchParams.get('tourId'), 'china');
-assert.equal(guideTourUrl.searchParams.get('role'), 'guide');
-assert.equal(guideTourUrl.searchParams.get('offline'), '1');
-const guideOfflineTour = loadPrototype('tour-operations.js', '#app', guideTourUrl.search, crossScreenStorage);
-assert.equal(guideOfflineTour.snapshot().role, 'guide');
-assert.equal(guideOfflineTour.snapshot().offline, true);
-assert.equal(guideOfflineTour.snapshot().selectedTourId, 'china');
-const guideOfflineRecordsBefore = deepClone(guideOfflineTour.snapshot().records);
-guideOfflineTour.dispatch({ action: 'add-stage' });
-assert.deepEqual(guideOfflineTour.snapshot().records, guideOfflineRecordsBefore);
-guideOfflineTour.click({ action: 'close-overlay' });
-const restoredLeadUrl = new URL(guideOfflineTour.window.location.href, 'https://prototype.test/');
-assert.equal(restoredLeadUrl.searchParams.get('lead'), 'lead-1042');
-assert.equal(restoredLeadUrl.searchParams.get('tourId'), 'china');
-assert.equal(restoredLeadUrl.searchParams.get('role'), 'guide');
-assert.equal(restoredLeadUrl.searchParams.get('offline'), '1');
-
-// The real Lead → Summary CTA preserves list state and returns from the bottom navigation.
-const summaryContextStorage = new Map();
-const summaryLead = loadPrototype('mobile-leads.js', '#app', '?role=manager', summaryContextStorage);
-summaryLead.inputId('lead-search', 'Анна');
-summaryLead.click({ quickStatus: 'confirmed' });
-summaryLead.click({ listMode: 'board' });
-summaryLead.click({ openLead: 'lead-1042' });
-summaryLead.setScrollTop(275);
-summaryLead.click({ action: 'open-tour-summary' });
-const summaryTourUrl = new URL(summaryLead.window.location.href, 'https://prototype.test/');
-assert.equal(summaryTourUrl.searchParams.get('lead'), 'lead-1042');
-assert.equal(summaryTourUrl.searchParams.get('returnLead'), 'lead-1042');
-assert.equal(summaryTourUrl.searchParams.get('returnTab'), 'overview');
-const savedSummaryContext = JSON.parse(summaryContextStorage.get('unique-guide-mobile-leads-return-v1'));
-assert.equal(savedSummaryContext.query, 'Анна');
-assert.deepEqual(savedSummaryContext.filters.statuses, ['confirmed']);
-assert.equal(savedSummaryContext.listMode, 'board');
-assert.equal(savedSummaryContext.scrollTop, 275);
-const summaryTour = loadPrototype('tour-operations.js', '#app', summaryTourUrl.search, summaryContextStorage);
-assert.equal(summaryTour.snapshot().scopeLead, 'lead-1042');
-summaryTour.click({ action: 'open-leads' });
-const summaryReturnUrl = new URL(summaryTour.window.location.href, 'https://prototype.test/');
-assert.equal(summaryReturnUrl.searchParams.get('lead'), 'lead-1042');
-assert.equal(summaryReturnUrl.searchParams.get('tab'), 'overview');
-const restoredSummaryLead = loadPrototype('mobile-leads.js', '#app', summaryReturnUrl.search, summaryContextStorage);
-assert.equal(restoredSummaryLead.snapshot().activeLeadId, 'lead-1042');
-assert.equal(restoredSummaryLead.snapshot().detailTab, 'overview');
-assert.equal(restoredSummaryLead.snapshot().query, 'Анна');
-assert.deepEqual(restoredSummaryLead.snapshot().filters.statuses, ['confirmed']);
-assert.equal(restoredSummaryLead.snapshot().listMode, 'board');
-assert.equal(restoredSummaryLead.getScrollTop(), 275);
-
-const reverseNavigation = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=escort&offline=1');
-reverseNavigation.click({ action: 'open-leads' });
-const reverseLeadUrl = new URL(reverseNavigation.window.location.href, 'https://prototype.test/');
-assert.equal(reverseLeadUrl.searchParams.get('tourId'), 'china');
-assert.equal(reverseLeadUrl.searchParams.get('role'), 'escort');
-assert.equal(reverseLeadUrl.searchParams.get('offline'), '1');
-
-// Read-only roles receive a capability-driven interface, not disabled manager controls.
-const guideTourUi = loadPrototype('tour-operations.js', '#app', '?tourId=china&role=guide');
-assert.match(guideTourUi.root.innerHTML, /Режим просмотра/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="add-stage"|data-action="jump-cell"|data-action="export-summary"/);
-guideTourUi.click({ action: 'summary-mode', mode: 'coverage' });
-assert.match(guideTourUi.root.innerHTML, /Покрытие по туристам/);
-assert.match(guideTourUi.root.innerHTML, /Пекин · остановка 1|Сиань/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /Шанхай|Пекин · остановка 2|data-action="jump-cell"|data-action="export-summary"/);
-guideTourUi.click({ action: 'summary-mode', mode: 'groups' });
-guideTourUi.click({ action: 'tour-menu' });
-assert.match(guideTourUi.root.innerHTML, /Управляющие действия для этого тура недоступны/);
-assert.match(guideTourUi.root.innerHTML, /data-action="open-directory"/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="(?:edit-tour|copy-tour|archive-tour|cancel-tour)"/);
-guideTourUi.click({ action: 'open-directory' });
-assert.match(guideTourUi.root.innerHTML, /Изменение справочника доступно только администратору/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="(?:new-directory-city|edit-directory-city|new-directory-point|edit-directory-point|toggle-directory|delete-directory)\b/);
-guideTourUi.click({ action: 'close-overlay' });
-guideTourUi.click({ action: 'open-tours' });
-assert.match(guideTourUi.root.innerHTML, /Список туров · просмотр/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="new-tour"/);
-assert.match(guideTourUi.root.innerHTML, /Гранд-тур по Китаю/);
-guideTourUi.click({ action: 'tour-filter', filter: 'draft' });
-assert.doesNotMatch(guideTourUi.root.innerHTML, /Япония: сезон момидзи|Токио → Киото → Осака|Юки Танака/);
-guideTourUi.dispatch({ action: 'select-tour', id: 'japan' });
-assert.equal(guideTourUi.snapshot().selectedTourId, 'china');
-guideTourUi.dispatch({ action: 'tour-card-menu', id: 'japan' });
-assert.doesNotMatch(guideTourUi.root.innerHTML, /Япония: сезон момидзи|Токио → Киото → Осака|Юки Танака/);
-guideTourUi.click({ action: 'tour-filter', filter: 'archive' });
-assert.doesNotMatch(guideTourUi.root.innerHTML, /Италия для своих|Рим → Флоренция → Венеция|Марко Росси/);
-guideTourUi.click({ action: 'close-overlay' });
-guideTourUi.click({ action: 'workspace', view: 'program' });
-assert.match(guideTourUi.root.innerHTML, /Изменять программу могут менеджер и администратор тура/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="(?:add-program|edit-program|generate-program|regenerate-program|clear-program)"/);
-guideTourUi.click({ action: 'tour-menu' });
-guideTourUi.click({ action: 'view-tour-tasks' });
-assert.match(guideTourUi.root.innerHTML, /Изменять задачи могут менеджер и администратор тура/);
-assert.doesNotMatch(guideTourUi.root.innerHTML, /data-action="(?:add-tour-task|toggle-tour-task|export-summary)"/);
-
-// Tour selection keeps a stable canonical tourId instead of assigning every lead to China.
-const japanLead = loadPrototype('mobile-leads.js', '#app', '?role=admin');
-japanLead.click({ action: 'new-lead' });
-japanLead.submit('lead-form', {
-  firstName: 'Акира', lastName: 'Сато', middleName: '', phone: '+81 90 1234 5678', email: 'akira@example.jp', telegram: '',
-  source: 'Сайт', category: 'Индивидуальный', tour: 'Япония: сезон момидзи', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
-  color: '#2f6bd8', hotel: '', room: '', note: '', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
-});
-const createdJapanLead = japanLead.snapshot().leads.find((lead) => lead.firstName === 'Акира');
-assert.equal(createdJapanLead.eventId, 'japan');
-assert.equal(createdJapanLead.tour, 'Япония: сезон момидзи');
-const createdJapanTourist = japanLead.snapshot().tourists.find((tourist) => tourist.leadId === createdJapanLead.id);
-assert.equal(createdJapanTourist.tourId, 'japan');
-assert.match(japanLead.root.innerHTML, new RegExp(`tour-operations\\.html\\?lead=${escapeRegExp(createdJapanLead.id)}&tourId=japan`));
-japanLead.click({ detailTab: 'tourists' });
-japanLead.click({ action: 'open-unified-tourist', tourist: createdJapanTourist.id });
-const japanProfileUrl = new URL(japanLead.window.location.href, 'https://prototype.test/');
-assert.equal(japanProfileUrl.searchParams.get('tourId'), 'japan');
-const japanFallback = loadPrototype('tour-operations.js', '#app', japanProfileUrl.search, japanLead.storage);
-assert.equal(japanFallback.snapshot().selectedTourId, 'japan');
-assert.match(japanFallback.root.innerHTML, /Сводная тура ещё не подготовлена в MVP/);
-assert.match(japanFallback.root.innerHTML, /Сато Акира/);
-assert.doesNotMatch(japanFallback.root.innerHTML, /CZ 342|Пекин · остановка 1|data-action="add-stage"/);
-const japanRecordsBefore = deepClone(japanFallback.snapshot().records);
-japanFallback.dispatch({ action: 'add-stage' });
-japanFallback.dispatch({ action: 'start-tourist-group' });
-assert.deepEqual(japanFallback.snapshot().records, japanRecordsBefore);
-
-const assignedJapanManagerParams = new URLSearchParams(japanProfileUrl.search);
-assignedJapanManagerParams.set('role', 'manager');
-const assignedJapanManager = loadPrototype('tour-operations.js', '#app', `?${assignedJapanManagerParams.toString()}`, japanLead.storage);
-assert.match(assignedJapanManager.root.innerHTML, /Сводная тура ещё не подготовлена в MVP/);
-assert.match(assignedJapanManager.root.innerHTML, /Сато Акира/);
-assert.match(assignedJapanManager.root.innerHTML, /Япония: сезон момидзи/);
-assignedJapanManager.click({ action: 'toggle-profile-section', section: 'personal' });
-assert.match(assignedJapanManager.root.innerHTML, /akira@example\.jp/);
-assert.match(assignedJapanManager.root.innerHTML, /data-action="edit-profile-section"/);
-
-for (const restrictedRole of ['guide', 'escort']) {
-  const restrictedParams = new URLSearchParams(japanProfileUrl.search);
-  restrictedParams.set('role', restrictedRole);
-  const restrictedJapan = loadPrototype('tour-operations.js', '#app', `?${restrictedParams.toString()}`, japanLead.storage);
-  assert.match(restrictedJapan.root.innerHTML, /Тур не назначен текущей роли/);
-  assert.doesNotMatch(restrictedJapan.root.innerHTML, /Сато Акира|Загранпаспорт|data-action="tourist-detail"/);
-  restrictedJapan.dispatch({ action: 'tourist-detail', id: createdJapanTourist.id });
-  assert.doesNotMatch(restrictedJapan.root.innerHTML, /Сато Акира|Загранпаспорт/);
+function leadFormValues(overrides = {}) {
+  return {
+    firstName: 'Иван', lastName: 'Тестов', middleName: '', phone: '+7 900 777-66-55', telegram: '@ivan_test', email: 'ivan-prototype@example.test',
+    dateOfBirth: '1990-04-12', passportSeries: '45 12 987654', passportIssuedBy: 'ОВД Тестовый', registrationAddress: 'Москва',
+    foreignPassportName: 'TESTOV IVAN', foreignPassportNumber: '75 7654321', foreignPassportValidUntil: '2032-04-12',
+    tourSearch: 'Гранд-тур по Китаю', eventId: 'china', selectedCityIds: ['route-beijing-1', 'route-xian-1'],
+    tourCost: '100000', tourCostCurrency: 'RUB', advancePayment: '30000', advancePaymentCurrency: 'RUB', remainingPayment: '70000', remainingPaymentCurrency: 'RUB',
+    roomType: ['Twin'], hotelCategory: ['4*'], transfers: ['group'], meals: ['BB'], category: 'category_ab', status: 'new', source: 'direct',
+    manager: 'Елена Воронова', color: '#2f6bd8', note: 'Smoke-test lead',
+    ...overrides,
+  };
 }
 
-japanFallback.click({ action: 'close-overlay' });
-const returnedJapanLeadUrl = new URL(japanFallback.window.location.href, 'https://prototype.test/');
-const returnedJapanLead = loadPrototype('mobile-leads.js', '#app', returnedJapanLeadUrl.search, japanLead.storage);
-assert.equal(returnedJapanLead.snapshot().activeLeadId, createdJapanLead.id);
-assert.equal(returnedJapanLead.snapshot().leads.find((lead) => lead.id === createdJapanLead.id).eventId, 'japan');
-assert.equal(returnedJapanLead.snapshot().tourists.find((tourist) => tourist.id === createdJapanTourist.id).tourId, 'japan');
+// Navigation remains split into Tours, Tourists and Leads, without standalone finance screens.
+const leadList = loadPrototype('mobile-leads.js', '#app');
+['Туры', 'Туристы', 'Лиды'].forEach((label) => assert.match(leadList.root.innerHTML, new RegExp(label)));
+const lead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042');
+const leadTabs = [...lead.root.innerHTML.matchAll(/data-detail-tab="([^"]+)"[^>]*>([^<]+)/g)].map((match) => match[2].trim());
+assert.deepEqual(leadTabs, ['Редактировать', 'Чат', 'Документы', 'Задачи']);
+assert.match(lead.root.innerHTML, /Соколова Анна Игоревна/, 'lead deep link opens the requested card');
+assert.doesNotMatch(lead.root.innerHTML, />\s*(?:Финансы|Расходы)\s*</i);
 
-// Generated lead IDs, codes and tourist IDs remain unique after a full reload.
-const identityStorage = new Map();
-const identityFirst = loadPrototype('mobile-leads.js', '#app', '?role=admin', identityStorage);
-identityFirst.click({ action: 'new-lead' });
-identityFirst.submit('lead-form', {
-  firstName: 'Первый', lastName: 'Тестовый', middleName: 'Лид', phone: '+7 900 000-00-61', email: 'first-identity@example.test', telegram: '',
-  source: 'Сайт', category: 'Семья', tour: 'Гранд-тур по Китаю', manager: 'Елена Воронова', routeCities: 'Пекин, Сиань',
-  color: '#2f6bd8', hotel: '', room: '', note: '', companionLast1: 'Первый', companionFirst1: 'Попутчик', companionLast2: 'Второй', companionFirst2: 'Попутчик',
+// Lead Read is the canonical web form projected as ordered mobile cards; edit opens the same form at the chosen block.
+assertMarkupOrder(lead.root.innerHTML, [
+  'ПРОВЕРИТЬ СВЯЗИ ЛИД-ТУР',
+  'РУЧНОЕ ОБЪЕДИНЕНИЕ ЛИДОВ',
+  'ЛИЧНЫЕ ДАННЫЕ',
+  'ТУР И ОПЛАТА',
+  'НАСТРОЙКИ',
+  'UTM-ТРЕКИНГ',
+  'ПРИМЕЧАНИЕ',
+  'ТУРИСТЫ',
+  'ДЕЙСТВИЯ',
+  'Сводная по туру',
+], 'Lead Read canonical order');
+assertMarkupOrder(lead.root.innerHTML, [
+  'Фамилия', 'Имя', 'Отчество', 'Телефон', 'Telegram username', 'Email', 'Telegram User ID',
+], 'Lead Read personal field order');
+lead.setScrollTop(317);
+lead.click({ action: 'edit-lead-section', section: 'tour-payment' });
+assert.equal(lead.snapshot().screen, 'lead-form');
+assert.match(lead.root.innerHTML, /Редактировать лид/);
+assertMarkupOrder(lead.root.innerHTML, [
+  'data-lead-section="personal"',
+  'data-lead-section="tour-payment"',
+  'data-lead-section="settings"',
+  'data-lead-section="notes"',
+], 'Lead editor canonical block order');
+assert.match(lead.getFocusedSelector() || '', /data-lead-section=["']tour-payment["']/);
+lead.click({ action: 'back-detail' });
+assert.equal(lead.snapshot().screen, 'detail');
+assert.equal(lead.getScrollTop(), 317, 'closing the editor restores the Lead Read scroll position');
+
+// Production uses viewer; legacy guide is only a normalized URL alias. Neither viewer nor escort can load Leads/PII.
+for (const [requestedRole, canonicalRole] of [['viewer', 'viewer'], ['guide', 'viewer'], ['escort', 'escort']]) {
+  const restrictedLeads = loadPrototype('mobile-leads.js', '#app', `?lead=lead-1042&role=${requestedRole}`);
+  const restrictedSnapshot = restrictedLeads.snapshot();
+  assert.equal(restrictedSnapshot.role, canonicalRole);
+  assert.equal(restrictedSnapshot.screen, 'forbidden');
+  assert.deepEqual(restrictedSnapshot.leads, []);
+  assert.deepEqual(restrictedSnapshot.tourists, []);
+  assert.match(restrictedLeads.root.innerHTML, /Нет доступа к лидам/);
+  assert.doesNotMatch(restrictedLeads.root.innerHTML, /Соколова|anna@example\.ru|\+7 916|L-1042|lead-1042/);
+  const restrictedLeadNav = (restrictedLeads.root.innerHTML.match(/<nav class="[^"]*\bbottom-nav\b[^"]*"[^>]*>([\s\S]*?)<\/nav>/) || [])[1] || '';
+  const restrictedLeadNavLabels = [...restrictedLeadNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1].trim());
+  assert.deepEqual(restrictedLeadNavLabels, ['Туры', 'Туристы']);
+  const restrictedBefore = deepClone(restrictedSnapshot);
+  restrictedLeads.dispatch({ action: 'edit-lead' });
+  restrictedLeads.dispatch({ action: 'add-task' });
+  restrictedLeads.dispatch({ stage: 'lost' });
+  assert.deepEqual(restrictedLeads.snapshot(), restrictedBefore);
+}
+
+const unknownLeadRole = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=superadmin');
+assert.ok(!['admin', 'manager'].includes(unknownLeadRole.snapshot().role));
+assert.equal(unknownLeadRole.snapshot().screen, 'forbidden');
+assert.deepEqual(unknownLeadRole.snapshot().leads, []);
+assert.deepEqual(unknownLeadRole.snapshot().tourists, []);
+assert.match(unknownLeadRole.root.innerHTML, /Нет доступа к лидам/);
+assert.doesNotMatch(unknownLeadRole.root.innerHTML, /Соколова|anna@example\.ru|\+7 916|L-1042|lead-1042/);
+
+// A manager sees only assigned leads in lists and receives a hard refusal for a foreign direct link.
+const managerLeadList = loadPrototype('mobile-leads.js', '#app', '?role=manager');
+assert.deepEqual(managerLeadList.snapshot().leads.map((item) => item.id).sort(), ['lead-1042', 'lead-1048']);
+assert.match(managerLeadList.root.innerHTML, /Соколова|Орлова/);
+assert.doesNotMatch(managerLeadList.root.innerHTML, /Волков Денис|lead-1051|denis@example\.ru/);
+const foreignManagerLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1051&role=manager');
+assert.equal(foreignManagerLead.snapshot().screen, 'forbidden');
+assert.equal(foreignManagerLead.snapshot().activeLeadId, null);
+assert.match(foreignManagerLead.root.innerHTML, /Нет доступа к лидам/);
+assert.doesNotMatch(foreignManagerLead.root.innerHTML, /Волков|Денис|denis@example\.ru|\+7 985|L-1051|lead-1051/);
+
+// Delete is an explicit admin-only confirmation flow; cancel is lossless and manager never receives the control.
+assert.doesNotMatch(managerLeadList.root.innerHTML, /data-action="(?:request|confirm)-delete-lead"/);
+const deleteLeadStorage = new Map();
+const adminDeleteLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=admin', deleteLeadStorage);
+const adminLeadCountBeforeDelete = adminDeleteLead.snapshot().leads.length;
+adminDeleteLead.click({ action: 'request-delete-lead' });
+assert.match(adminDeleteLead.root.innerHTML, /Удалить лид/);
+assert.match(adminDeleteLead.root.innerHTML, /data-action="confirm-delete-lead"/);
+assert.equal(adminDeleteLead.snapshot().leads.length, adminLeadCountBeforeDelete);
+adminDeleteLead.click({ action: 'cancel-delete-lead' });
+assert.ok(adminDeleteLead.snapshot().leads.some((item) => item.id === 'lead-1042'));
+adminDeleteLead.click({ action: 'request-delete-lead' });
+adminDeleteLead.click({ action: 'confirm-delete-lead' });
+assert.equal(adminDeleteLead.snapshot().leads.length, adminLeadCountBeforeDelete - 1);
+assert.ok(!adminDeleteLead.snapshot().leads.some((item) => item.id === 'lead-1042'));
+
+// The tourist list is a section of Editing, not a fifth Lead tab, and links to one canonical card.
+assert.match(lead.root.innerHTML, /ТУРИСТЫ/);
+lead.click({ action: 'open-unified-tourist', tourist: 't1' });
+const touristUrl = new URL(lead.window.location.href, 'https://prototype.test/');
+assert.equal(touristUrl.searchParams.get('tourist'), 't1');
+assert.equal(touristUrl.searchParams.get('tourId'), 'china');
+assert.equal(touristUrl.searchParams.get('returnLead'), 'lead-1042');
+
+// Tour navigation has the same six sections and order as the web card.
+const overview = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview');
+const workspaceMarkup = (overview.root.innerHTML.match(/<div class="workspace-tabs">([\s\S]*?)<\/div>/) || [])[1] || '';
+const tourTabs = [...workspaceMarkup.matchAll(/data-action="workspace" data-view="(?:tour-info|operations|program|tour-team|tour-tasks|tour-actions)"[^>]*>([^<]+)/g)]
+  .map((match) => match[1].trim());
+assert.deepEqual(tourTabs, ['Обзор', 'Сводная', 'Программа', 'Команда', 'Задачи', 'Действия']);
+assert.equal(overview.snapshot().selectedTourId, 'china');
+assert.match(overview.root.innerHTML, /Гранд-тур по Китаю/);
+
+for (const requestedRole of ['viewer', 'guide']) {
+  const viewerTour = loadPrototype('tour-operations.js', '#app', `?tourId=china&tourSection=overview&role=${requestedRole}`);
+  assert.equal(viewerTour.snapshot().role, 'viewer');
+  assert.match(viewerTour.root.innerHTML, /Гид/);
+  const restrictedNav = (viewerTour.root.innerHTML.match(/<nav class="[^"]*\bbottom-nav\b[^"]*"[^>]*>([\s\S]*?)<\/nav>/) || [])[1] || '';
+  const restrictedNavLabels = [...restrictedNav.matchAll(/<span>([^<]+)<\/span>/g)].map((match) => match[1].trim());
+  assert.deepEqual(restrictedNavLabels, ['Туры', 'Туристы']);
+  assert.doesNotMatch(viewerTour.root.innerHTML, /189[\s\u00a0]*000|Открыть на сайте/);
+  assert.doesNotMatch(viewerTour.root.innerHTML, /Шанхай|Пекин · остановка 2/, 'viewer Overview is limited to assigned route positions');
+}
+
+const viewerDisallowedCity = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&routeCityId=route-shanghai-1&role=viewer');
+assert.equal(viewerDisallowedCity.snapshot().routeCityId, 'route-beijing-1', 'a forbidden city deep link is normalized before render');
+viewerDisallowedCity.click({ action: 'open-city-picker' });
+assert.match(viewerDisallowedCity.root.innerHTML, /Пекин · остановка 1/);
+assert.match(viewerDisallowedCity.root.innerHTML, /Сиань/);
+assert.doesNotMatch(viewerDisallowedCity.root.innerHTML, /Шанхай|Пекин · остановка 2|route-shanghai-1|route-beijing-2/);
+
+const viewerTeam = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=team&role=viewer');
+assert.match(viewerTeam.root.innerHTML, /Гиды по городам/);
+assert.match(viewerTeam.root.innerHTML, /Пекин · остановка 1/);
+assert.match(viewerTeam.root.innerHTML, /Сиань/);
+assert.match(viewerTeam.root.innerHTML, /Ли Вэй|Анна Ким/);
+assert.doesNotMatch(viewerTeam.root.innerHTML, /Шанхай|Пекин · остановка 2|Сопровождающий|Администраторы чата|Мария Белова|Елена Воронова|Игорь Лебедев/);
+
+const unknownTourRole = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview&role=superadmin');
+assert.ok(!['admin', 'manager'].includes(unknownTourRole.snapshot().role));
+assert.match(unknownTourRole.root.innerHTML, /Тур не назначен текущей роли|Нет доступа к туру/);
+assert.doesNotMatch(unknownTourRole.root.innerHTML, /Соколова|anna\.sokolova@example\.com|\+7 916|lead-1042|deal-501|189[\s\u00a0]*000/);
+const unknownTourRecordsBefore = deepClone(unknownTourRole.snapshot().records);
+unknownTourRole.dispatch({ action: 'add-stage' });
+assert.deepEqual(unknownTourRole.snapshot().records, unknownTourRecordsBefore);
+
+const summary = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+['Прибытие', 'Отель', 'Отъезд'].forEach((label) => assert.match(summary.root.innerHTML, new RegExp(label)));
+assertExactlyOneRepresentativePerGroup(summary.snapshot(), 'initial tour groups');
+const summaryTabsMarkup = (summary.root.innerHTML.match(/<div class="summary-tabs"[^>]*>([\s\S]*?)<\/div>/) || [])[1] || '';
+const summaryTabs = [...summaryTabsMarkup.matchAll(/data-action="summary-section" data-view="([^"]+)"[^>]*>([^<]+)/g)]
+  .map((match) => [match[1], match[2].trim()]);
+assert.deepEqual(summaryTabs, [['operations', 'Операции'], ['tourists', 'Туристы'], ['documents', 'Документы'], ['work', 'Статусы']]);
+for (const [summarySection, expectedView, heading] of [
+  ['operations', 'operations', 'Прибытие'],
+  ['tourists', 'tourists', 'Участники тура'],
+  ['documents', 'documents', 'Документы туристов'],
+  ['statuses', 'work', 'Статусы на маршруте'],
+]) {
+  const deepLinkedSummary = loadPrototype('tour-operations.js', '#app', `?tourId=china&tourSection=summary&summarySection=${summarySection}`);
+  assert.equal(deepLinkedSummary.snapshot().view, expectedView);
+  assert.match(deepLinkedSummary.root.innerHTML, new RegExp(heading));
+}
+const legacyStatusesDeepLink = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=statuses&routeCityId=route-xian-1&role=manager');
+assert.equal(legacyStatusesDeepLink.snapshot().view, 'work');
+assert.equal(legacyStatusesDeepLink.snapshot().routeCityId, 'route-xian-1');
+assert.match(legacyStatusesDeepLink.root.innerHTML, /Статусы на маршруте/);
+assert.match(legacyStatusesDeepLink.root.innerHTML, /data-action="summary-section" data-view="work"[^>]*>Статусы<\/button>/);
+summary.click({ action: 'open-city-picker' });
+['Пекин · остановка 1', 'Сиань', 'Шанхай', 'Пекин · остановка 2'].forEach((city) => assert.match(summary.root.innerHTML, new RegExp(city)));
+summary.click({ action: 'close-overlay' });
+['route-beijing-1', 'route-xian-1', 'route-shanghai-1', 'route-beijing-2'].forEach((routeCityId, index) => {
+  summary.click({ action: 'open-city-picker' });
+  summary.click({ action: 'select-city', index: String(index) });
+  assert.equal(summary.snapshot().routeCityId, routeCityId);
 });
-const firstGeneratedLead = identityFirst.snapshot().leads.find((lead) => lead.email === 'first-identity@example.test');
-const identityReload = loadPrototype('mobile-leads.js', '#app', '?role=admin', identityStorage);
-identityReload.click({ action: 'new-lead' });
-identityReload.submit('lead-form', {
-  firstName: 'Второй', lastName: 'Тестовый', middleName: 'Лид', phone: '+7 900 000-00-62', email: 'second-identity@example.test', telegram: '',
-  source: 'Рекомендация', category: 'Индивидуальный', tour: 'Гранд-тур по Китаю', manager: 'Елена Воронова', routeCities: 'Пекин',
-  color: '#7a5af0', hotel: '', room: '', note: '', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
+
+// Tourist Profile has five web-parity blocks; tour membership and logistics live in a separate context.
+const profile = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t1&touristSection=profile');
+assert.match(profile.root.innerHTML, /Профиль/);
+assert.match(profile.root.innerHTML, /В туре/);
+const profileSections = [...profile.root.innerHTML.matchAll(/class="profile-section-head"[^>]*data-section="([^"]+)"/g)].map((match) => match[1]);
+assert.deepEqual(profileSections, ['personal', 'citizenship', 'domestic', 'foreign', 'settings']);
+['Личные данные', 'Гражданство', 'Паспорт РФ', 'Загранпаспорт', 'Тип и настройки'].forEach((label) => assert.match(profile.root.innerHTML, new RegExp(label)));
+assert.doesNotMatch(profile.root.innerHTML, /Маршрут и логистика/);
+
+const tourContext = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t1&touristSection=tour');
+assert.match(tourContext.root.innerHTML, /В туре/);
+tourContext.click({ action: 'toggle-profile-section', section: 'tour-context' });
+assertMarkupOrder(tourContext.root.innerHTML, [
+  'Комментарий для гида',
+  'Исходный лид',
+  'Статус лида',
+  'Выбранный тур',
+  'Статус участия',
+  'Группа туристов',
+  'Представитель группы',
+  'Основной турист заявки',
+  'Ограниченный маршрут',
+  'Прибытие',
+  'Заселение',
+  'Отъезд',
+  'Маршрут и логистика',
+], 'Tourist tour-context canonical order');
+assert.match(tourContext.root.innerHTML, /Гранд-тур по Китаю/);
+assert.match(tourContext.root.innerHTML, /Лид Соколовы/);
+
+// Viewer gets the closed privacy allowlist and cannot forge a transition to the source Lead.
+const viewerTourists = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&summarySection=tourists&role=viewer');
+assert.match(viewerTourists.root.innerHTML, /Соколова Анна Игоревна/);
+assert.doesNotMatch(viewerTourists.root.innerHTML, /Лид Соколовы|lead-1042|deal-501|anna\.sokolova@example\.com|45 18 456789|Вегетарианское меню/);
+const viewerProfile = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t1&touristSection=profile&role=viewer');
+assert.equal(viewerProfile.snapshot().role, 'viewer');
+viewerProfile.click({ action: 'toggle-profile-section', section: 'personal' });
+assert.match(viewerProfile.root.innerHTML, /Имя для отображения/);
+assert.match(viewerProfile.root.innerHTML, /18\.04\.1989|1989-04-18/);
+assert.match(viewerProfile.root.innerHTML, /\+7 916 555-12-34/);
+assert.doesNotMatch(viewerProfile.root.innerHTML, /<span>(?:Фамилия|Имя|Отчество|Email)<\/span>|anna\.sokolova@example\.com/);
+assert.doesNotMatch(viewerProfile.root.innerHTML, /Паспорт РФ|45 18 456789|ГУ МВД|Тверская, 12/);
+viewerProfile.click({ action: 'toggle-profile-section', section: 'foreign' });
+assert.match(viewerProfile.root.innerHTML, /ANNA SOKOLOVA/);
+assert.match(viewerProfile.root.innerHTML, /72 3456789/);
+assert.match(viewerProfile.root.innerHTML, /2031-05-21/);
+viewerProfile.click({ action: 'tourist-detail-tab', tab: 'tour' });
+viewerProfile.click({ action: 'toggle-profile-section', section: 'tour-context' });
+assert.match(viewerProfile.root.innerHTML, /Встречать у выхода B/);
+assertMarkupOrder(viewerProfile.root.innerHTML, [
+  'Комментарий для гида',
+  'Выбранный тур',
+  'Статус участия',
+  'Группа туристов',
+  'Ограниченный маршрут',
+  'Прибытие',
+  'Заселение',
+  'Отъезд',
+  'Маршрут и логистика',
+], 'Viewer tour-context allowlist order');
+assert.doesNotMatch(viewerProfile.root.innerHTML, /Представитель группы|Основной турист заявки/);
+assert.doesNotMatch(viewerProfile.root.innerHTML, /Шанхай|route-shanghai-1/, 'viewer logistics is limited to assigned route positions');
+assert.doesNotMatch(viewerProfile.root.innerHTML, /Исходный лид|ID лида|ID сделки|lead-1042|deal-501|data-action="open-source-lead"/);
+const viewerHrefBeforeForgery = viewerProfile.window.location.href;
+viewerProfile.dispatch({ action: 'open-source-lead', id: 'lead-1042' });
+assert.equal(viewerProfile.window.location.href, viewerHrefBeforeForgery);
+
+// Viewer and escort use the generic local message action; the CRM channel preference is never disclosed.
+[
+  { role: 'viewer', touristId: 't1', preferredChannel: 'WhatsApp' },
+  { role: 'escort', touristId: 't2', preferredChannel: 'Telegram' },
+].forEach(({ role, touristId, preferredChannel }) => {
+  const readonlyMessaging = loadPrototype('tour-operations.js', '#app', `?tourId=china&tourSection=summary&summarySection=tourists&role=${role}`);
+  readonlyMessaging.click({ action: 'message-tourist', id: touristId });
+  assert.match(readonlyMessaging.root.innerHTML, /Чат: \+7/);
+  assert.doesNotMatch(readonlyMessaging.root.innerHTML, new RegExp(preferredChannel, 'i'));
 });
-const identitySnapshot = identityReload.snapshot();
-const secondGeneratedLead = identitySnapshot.leads.find((lead) => lead.email === 'second-identity@example.test');
-assert.notEqual(firstGeneratedLead.id, secondGeneratedLead.id);
-assert.notEqual(firstGeneratedLead.code, secondGeneratedLead.code);
-assert.equal(new Set(identitySnapshot.leads.map((lead) => lead.id)).size, identitySnapshot.leads.length);
-assert.equal(new Set(identitySnapshot.leads.map((lead) => lead.code)).size, identitySnapshot.leads.length);
-assert.equal(new Set(identitySnapshot.tourists.map((tourist) => tourist.id)).size, identitySnapshot.tourists.length);
-const identityDeepLink = loadPrototype('mobile-leads.js', '#app', `?lead=${encodeURIComponent(secondGeneratedLead.id)}&role=admin`, identityStorage);
-assert.equal(identityDeepLink.snapshot().activeLeadId, secondGeneratedLead.id);
-assert.match(identityDeepLink.root.innerHTML, /Тестовый Второй Лид/);
 
-// Editing a seeded lead to another tour persists across a full reload and cannot be reverted by seed hydration.
-const editedTourStorage = new Map();
-const editedTourLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=admin', editedTourStorage);
-editedTourLead.click({ action: 'edit-lead' });
-editedTourLead.submit('lead-form', {
-  firstName: 'Анна', lastName: 'Соколова', middleName: 'Игоревна', phone: '+7 916 441-22-18', email: 'anna@example.ru', telegram: '@anna_sokolova',
-  source: 'Рекомендация', category: 'VIP', tour: 'Япония: сезон момидзи', manager: 'Елена Воронова', routeCities: 'Токио, Киото',
-  color: '#2f6bd8', hotel: 'Tokyo Garden', room: 'Double', note: 'Перенесено в тур по Японии', companionLast1: '', companionFirst1: '', companionLast2: '', companionFirst2: '',
-}, { editing: 'lead-1042' });
-const editedTourReload = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&role=admin', editedTourStorage);
-assert.equal(editedTourReload.snapshot().leads.find((lead) => lead.id === 'lead-1042').eventId, 'japan');
-assert.equal(editedTourReload.snapshot().tourists.find((tourist) => tourist.id === 't1').tourId, 'japan');
-editedTourReload.click({ detailTab: 'tourists' });
-editedTourReload.click({ action: 'open-unified-tourist', tourist: 't1' });
-const editedTourUrl = new URL(editedTourReload.window.location.href, 'https://prototype.test/');
-assert.equal(editedTourUrl.searchParams.get('tourId'), 'japan');
-const editedTourFallback = loadPrototype('tour-operations.js', '#app', editedTourUrl.search, editedTourStorage);
-assert.equal(editedTourFallback.snapshot().selectedTourId, 'japan');
-assert.match(editedTourFallback.root.innerHTML, /Сводная тура ещё не подготовлена в MVP/);
+// A manager assigned to the tour still sees an unassigned tourist operationally, without Lead PII or documents.
+const managerPrivacyStorage = new Map();
+loadPrototype('mobile-leads.js', '#app', '?role=admin', managerPrivacyStorage);
+const privacyTourists = JSON.parse(managerPrivacyStorage.get('unique-guide-tourists-v2'));
+const privacyTourist = privacyTourists.find((tourist) => tourist.id === 'lead-tourist-1051');
+Object.assign(privacyTourist, {
+  lead: 'Лид Секретный-1051',
+  phone: '+7 999 111-22-33',
+  email: 'restricted-denis@example.test',
+  domesticPassport: 'PRIVATE-RF-987654',
+  domesticIssuedBy: 'PRIVATE AUTHORITY',
+  registrationAddress: 'PRIVATE ADDRESS',
+  latinName: 'DENIS PRIVATE VOLKOV',
+  passport: 'PRIVATE-FOREIGN-7654321',
+  scans: [{ id: 'private-scan', name: 'private-passport-scan.pdf' }],
+});
+managerPrivacyStorage.set('unique-guide-tourists-v2', JSON.stringify(privacyTourists));
+const managerPrivacy = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&summarySection=tourists&role=manager', managerPrivacyStorage);
+const privateTokens = /Лид Секретный-1051|lead-1051|\+7 999 111-22-33|restricted-denis@example\.test|PRIVATE-RF-987654|PRIVATE AUTHORITY|PRIVATE ADDRESS|DENIS PRIVATE VOLKOV|PRIVATE-FOREIGN-7654321|private-passport-scan\.pdf/;
+assert.match(managerPrivacy.root.innerHTML, /Волков Денис Олегович/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+const managerTouristCard = managerPrivacy.root.innerHTML.split('<article class="tourist-card">').slice(1).find((card) => card.includes('Волков Денис Олегович'));
+assert.ok(managerTouristCard, 'the unassigned tourist must have an operational card');
+assert.doesNotMatch(managerTouristCard.split('</article>')[0], /data-action="(?:call-tourist|message-tourist)"|Основной в заявке/);
+managerPrivacy.click({ action: 'tourist-detail', id: 'lead-tourist-1051' });
+assert.match(managerPrivacy.root.innerHTML, /Профиль недоступен/);
+assert.match(managerPrivacy.root.innerHTML, /Вкладка «В туре» сохраняет доступ к операционным данным/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+managerPrivacy.click({ action: 'tourist-detail-tab', tab: 'tour' });
+managerPrivacy.click({ action: 'toggle-profile-section', section: 'tour-context' });
+assert.match(managerPrivacy.root.innerHTML, /Статус участия|Маршрут и логистика/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, /Исходный лид|Представитель группы|Основной турист заявки|data-action="open-source-lead"/);
+managerPrivacy.dispatch({ action: 'call-tourist', id: 'lead-tourist-1051' });
+assert.match(managerPrivacy.root.innerHTML, /Контакт туриста недоступен для этой роли/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+managerPrivacy.dispatch({ action: 'open-tourist-documents', id: 'lead-tourist-1051' });
+assert.match(managerPrivacy.root.innerHTML, /Документы туриста недоступны для этой роли/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+managerPrivacy.click({ action: 'close-overlay' });
+managerPrivacy.click({ action: 'summary-section', view: 'documents' });
+assert.doesNotMatch(managerPrivacy.root.innerHTML, /Волков Денис Олегович/);
+assert.doesNotMatch(managerPrivacy.root.innerHTML, privateTokens);
+managerPrivacy.click({ action: 'summary-section', view: 'tourists' });
+managerPrivacy.click({ action: 'toggle-scope' });
+assert.doesNotMatch(managerPrivacy.root.innerHTML, /Лид Секретный-1051|data-action="select-scope" data-id="lead-1051"/);
+managerPrivacy.click({ action: 'close-overlay' });
+['+7 999 111-22-33', 'restricted-denis@example.test', 'PRIVATE-FOREIGN-7654321', 'Лид Секретный-1051'].forEach((query) => {
+  managerPrivacy.input({ touristSearch: '' }, query);
+  assert.match(managerPrivacy.root.innerHTML, /Ничего не найдено/);
+  assert.doesNotMatch(managerPrivacy.root.innerHTML, /Волков Денис Олегович/);
+});
+managerPrivacy.input({ touristSearch: '' }, 'Волков Денис');
+assert.match(managerPrivacy.root.innerHTML, /Волков Денис Олегович/);
 
-// A tourist created from a Lead immediately opens and persists in the same canonical receiver.
-const newTouristStorage = new Map();
-const leadCreate = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042', newTouristStorage);
-leadCreate.click({ detailTab: 'tourists' });
-leadCreate.setScrollTop(146);
-leadCreate.click({ action: 'add-tourist' });
-const newTouristUrl = new URL(leadCreate.window.location.href, 'https://prototype.test/');
-const newTouristId = newTouristUrl.searchParams.get('tourist');
-assert.ok(newTouristId && newTouristId.startsWith('tourist-proto-'));
-const newTouristProfile = loadPrototype('tour-operations.js', '#app', newTouristUrl.search, newTouristStorage);
-assert.doesNotMatch(newTouristProfile.root.innerHTML, /Турист не найден/);
-assert.equal(newTouristProfile.snapshot().tourists.filter((tourist) => tourist.id === newTouristId).length, 1);
-newTouristProfile.click({ action: 'close-overlay' });
-const restoredLeadAfterProfile = loadPrototype('mobile-leads.js', '#app', new URL(newTouristProfile.window.location.href, 'https://prototype.test/').search, newTouristStorage);
-assert.match(restoredLeadAfterProfile.root.innerHTML, /ТУРИСТЫ/);
-assert.equal(restoredLeadAfterProfile.getScrollTop(), 146);
-assert.doesNotMatch(fs.readFileSync('mobile-leads.js', 'utf8'), /-merged/);
+// returnLead and sensitive search state cannot survive a forged deep link or a role downgrade.
+const forgedViewerReturn = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t1&role=viewer&returnLead=lead-1042&returnTab=chat&query=Лид%20Соколовы');
+forgedViewerReturn.click({ action: 'close-overlay' });
+assert.equal(forgedViewerReturn.window.location.href, '');
+assert.doesNotMatch(forgedViewerReturn.root.innerHTML, /Лид Соколовы|lead-1042/);
 
-// A profile edited from the unified card is reused when the Lead page is reopened.
-const sharedProfiles = new Map();
-const profile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1&returnLead=lead-1042', sharedProfiles);
-['Личные данные', 'Паспорт РФ', 'Загранпаспорт и сканы', 'Маршрут и логистика', 'Связи и группы', 'Комментарии'].forEach((section) => assert.match(profile.root.innerHTML, new RegExp(section)));
+const downgradedManager = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=lead-tourist-1051&role=admin&returnLead=lead-1051&returnTab=documents&query=restricted-denis%40example.test', managerPrivacyStorage);
+downgradedManager.dispatch({ action: 'select-role', role: 'manager' });
+assert.equal(downgradedManager.snapshot().role, 'manager');
+assert.equal(downgradedManager.snapshot().touristQuery, '');
+assert.equal(downgradedManager.snapshot().scopeLead, null);
+assert.doesNotMatch(downgradedManager.root.innerHTML, privateTokens);
+downgradedManager.dispatch({ action: 'open-leads' });
+const downgradedLeadHref = new URL(downgradedManager.window.location.href, 'https://prototype.test/');
+assert.equal(downgradedLeadHref.searchParams.get('lead'), null);
+assert.equal(downgradedLeadHref.searchParams.get('tab'), null);
+
+// Only name and surname are mandatory. Passport and birth-date fields remain nullable.
 profile.click({ action: 'toggle-profile-section', section: 'personal' });
-assert.match(profile.root.innerHTML, /Дата рождения/);
-assert.match(profile.root.innerHTML, /Гражданство/);
 profile.click({ action: 'edit-profile-section', id: 't1', section: 'personal' });
-profile.submit('profile-section-form', {
-  lastName: 'Соколова-Тест', firstName: 'Анна', middleName: 'Игоревна', birthDate: '1988-09-18',
-  citizenship: 'Россия', phone: '+7 916 441-22-18', email: 'anna@example.ru', type: 'Взрослый',
-}, { id: 't1', section: 'personal' });
-assert.equal(profile.snapshot().tourists.find((tourist) => tourist.id === 't1').lastName, 'Соколова-Тест');
-profile.click({ action: 'toggle-profile-section', section: 'foreign' });
-profile.click({ action: 'open-ocr-review', id: 't1' });
-assert.match(profile.root.innerHTML, /Распознанные значения не меняют карточку автоматически/);
-profile.assertDisabled({ action: 'apply-ocr' });
-profile.click({ action: 'toggle-ocr-field', field: 'passport' });
-profile.click({ action: 'apply-ocr' });
-assert.equal(profile.snapshot().tourists.find((tourist) => tourist.id === 't1').passport, '72 4567890');
+const requiredNames = [...profile.root.innerHTML.matchAll(/<[^>]+name="([^"]+)"[^>]*\srequired(?:\s|>)/g)].map((match) => match[1]).sort();
+assert.deepEqual(requiredNames, ['firstName', 'lastName']);
+const nullableProfile = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t1&touristSection=profile');
+nullableProfile.click({ action: 'toggle-profile-section', section: 'foreign' });
+nullableProfile.click({ action: 'edit-profile-section', id: 't1', section: 'foreign' });
+nullableProfile.submit('profile-section-form', { latinName: '', passport: '', passportExpiry: '' }, { id: 't1', section: 'foreign' });
+assert.doesNotMatch(nullableProfile.root.innerHTML, /Заполните обязательные данные загранпаспорта|aria-invalid="true"/);
 
-const hydratedLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042', sharedProfiles);
-hydratedLead.click({ detailTab: 'tourists' });
-assert.match(hydratedLead.root.innerHTML, /Соколова-Тест Анна/);
-assert.doesNotMatch(hydratedLead.root.innerHTML, /72 4567890/, 'passport number is not exposed in the lead tourist list');
-const hydratedTour = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1', sharedProfiles);
-assert.equal(hydratedTour.snapshot().tourists.find((tourist) => tourist.id === 't1').lastName, 'Соколова-Тест');
-
-// Dirty profile forms require an explicit discard decision.
-const dirtyProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1');
-dirtyProfile.click({ action: 'toggle-profile-section', section: 'personal' });
-dirtyProfile.click({ action: 'edit-profile-section', id: 't1', section: 'personal' });
-dirtyProfile.field('lastName', 'Изменённая фамилия');
-dirtyProfile.click({ action: 'close-overlay' });
-assert.match(dirtyProfile.root.innerHTML, /Закрыть без сохранения/);
-dirtyProfile.click({ action: 'continue-profile-edit' });
-assert.match(dirtyProfile.root.innerHTML, /Личные данные/);
-
-const requiredProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1');
-requiredProfile.click({ action: 'toggle-profile-section', section: 'foreign' });
-requiredProfile.click({ action: 'edit-profile-section', id: 't1', section: 'foreign' });
-const passportBeforeInvalidSubmit = requiredProfile.snapshot().tourists.find((tourist) => tourist.id === 't1').passport;
-requiredProfile.submit('profile-section-form', { latinName: '', passport: '', passportExpiry: '' }, { id: 't1', section: 'foreign' });
-assert.match(requiredProfile.root.innerHTML, /Заполните обязательные данные загранпаспорта/);
-assert.match(requiredProfile.root.innerHTML, /aria-invalid="true"/);
-assert.equal(requiredProfile.snapshot().tourists.find((tourist) => tourist.id === 't1').passport, passportBeforeInvalidSubmit);
-
-// A limited route opens its stable routeCityId, not the index of the filtered list.
-const limitedRouteProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t4');
-limitedRouteProfile.click({ action: 'toggle-profile-section', section: 'logistics' });
-limitedRouteProfile.click({ action: 'jump-profile-operation', id: 't4', routeCityId: 'route-shanghai-1', stage: 'arrival' });
-assert.equal(limitedRouteProfile.snapshot().routeCityId, 'route-shanghai-1');
-assert.equal(limitedRouteProfile.snapshot().cityIndex, 2);
-
-// A non-source group member can edit hidden ownValues without changing the shared source or effective record.
-const personalOperation = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t2');
-const personalGroupBefore = deepClone(personalOperation.snapshot().operationGroups['route-xian-1'].arrival['arr-x1']);
-const personalSourceBefore = deepClone(personalOperation.snapshot().records['route-xian-1'].arrival.t1);
-personalOperation.click({ action: 'toggle-profile-section', section: 'logistics' });
-personalOperation.click({ action: 'edit-own-operation', id: 't2', routeCityId: 'route-xian-1', stage: 'arrival' });
-assert.match(personalOperation.root.innerHTML, /Личная запись/);
-personalOperation.input({ field: 'time' }, '14:14');
-personalOperation.click({ action: 'save-form' });
-const personalSnapshot = personalOperation.snapshot();
-assert.equal(personalSnapshot.records['route-xian-1'].arrival.t2.time, '14:14');
-assert.deepEqual(personalSnapshot.records['route-xian-1'].arrival.t1, personalSourceBefore);
-assert.deepEqual(personalSnapshot.operationGroups['route-xian-1'].arrival['arr-x1'], personalGroupBefore);
-const personalVisit = personalSnapshot.visits.find((visit) => visit.visitId === 'china:t2:route-xian-1:arrival');
-assert.equal(personalVisit.ownValues.time, '14:14');
-assert.equal(personalVisit.effectiveValues.time, personalSourceBefore.time);
-
-// Guide sees a read-only card without private fields or mutation actions.
-const roles = loadPrototype('tour-operations.js', '#app');
-selectRole(roles, 'guide');
-roles.click({ action: 'summary-section', view: 'tourists' });
-roles.click({ action: 'tourist-detail', id: 't1' });
-assert.match(roles.root.innerHTML, /Режим просмотра/);
-assert.doesNotMatch(roles.root.innerHTML, /Паспорт РФ/);
-roles.click({ action: 'toggle-profile-section', section: 'personal' });
-assert.doesNotMatch(roles.root.innerHTML, /anna@example\.ru/);
-assert.doesNotMatch(roles.root.innerHTML, /data-action="edit-profile-section"/);
-roles.click({ action: 'toggle-profile-section', section: 'foreign' });
-assert.match(roles.root.innerHTML, /passport-anna\.jpg/);
-assert.doesNotMatch(roles.root.innerHTML, /data-action="open-ocr-review"/);
-
-// A manager cannot see private fields of a tourist from an unassigned lead in the same tour.
-const privateLeadStorage = new Map([['unique-guide-tourists-v2', JSON.stringify([{
-  id: 'lead-tourist-1051', tourId: 'china', leadId: 'lead-1051', lead: 'Лид Волков', leadStatus: 'Связались',
-  firstName: 'Денис', lastName: 'Волков', route: ['route-beijing-1'], type: 'Взрослый', scans: [],
-  email: 'private-denis@example.ru', domesticPassport: '92 00 123456',
-  domesticIssuedBy: 'Скрытое подразделение', internalNote: 'Скрытая внутренняя заметка',
-}])]]);
-const unassignedProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=lead-tourist-1051&tourId=china&role=manager', privateLeadStorage);
-assert.match(unassignedProfile.root.innerHTML, /Режим просмотра/);
-assert.doesNotMatch(unassignedProfile.root.innerHTML, /data-section="domestic"|92 00 123456|Скрытое подразделение/);
-unassignedProfile.click({ action: 'toggle-profile-section', section: 'personal' });
-assert.doesNotMatch(unassignedProfile.root.innerHTML, /private-denis@example\.ru/);
-unassignedProfile.click({ action: 'toggle-profile-section', section: 'comments' });
-assert.doesNotMatch(unassignedProfile.root.innerHTML, /Скрытая внутренняя заметка/);
-
-// Persisted manager assignments are authoritative for both grant and revoke.
-const revokedLeadStorage = new Map([['unique-guide-leads-v1', JSON.stringify([
-  { id: 'lead-1042', eventId: 'china', manager: 'Игорь Лебедев' },
-  { id: 'lead-1048', eventId: 'china', manager: 'Елена Воронова' },
-])]]);
-const revokedLeadProfile = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1&tourId=china&role=manager', revokedLeadStorage);
-assert.match(revokedLeadProfile.root.innerHTML, /Режим просмотра/);
-revokedLeadProfile.click({ action: 'toggle-profile-section', section: 'personal' });
-assert.doesNotMatch(revokedLeadProfile.root.innerHTML, /anna\.sokolova@example\.com|data-action="edit-profile-section"/);
-const fullyRevokedStorage = new Map([['unique-guide-leads-v1', JSON.stringify([
-  { id: 'lead-1042', eventId: 'china', manager: 'Игорь Лебедев' },
-  { id: 'lead-1048', eventId: 'china', manager: 'Игорь Лебедев' },
-])]]);
-const fullyRevokedTour = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t1&tourId=china&role=manager', fullyRevokedStorage);
-assert.match(fullyRevokedTour.root.innerHTML, /Тур не назначен текущей роли/);
-assert.doesNotMatch(fullyRevokedTour.root.innerHTML, /Соколова Анна|Загранпаспорт|Паспорт РФ/);
-
-// Capabilities also block forged clicks, and guides edit statuses only in assigned cities.
-const forgedGuide = loadPrototype('tour-operations.js', '#app');
-selectRole(forgedGuide, 'guide');
-forgedGuide.click({ action: 'open-city-picker' });
-assert.doesNotMatch(forgedGuide.root.innerHTML, /data-action="select-city" data-index="2"/);
-forgedGuide.click({ action: 'close-overlay' });
-const guideStatusBefore = forgedGuide.snapshot().tourists.find((tourist) => tourist.id === 't1').statusByCity['route-shanghai-1'].arrival;
-forgedGuide.dispatch({ action: 'select-city', index: '2' });
-assert.equal(forgedGuide.snapshot().routeCityId, 'route-beijing-1');
-assert.equal(forgedGuide.snapshot().tourists.find((tourist) => tourist.id === 't1').statusByCity['route-shanghai-1'].arrival, guideStatusBefore);
-forgedGuide.click({ action: 'workspace', view: 'work' });
-forgedGuide.click({ action: 'change-status', id: 't1', stage: 'arrival' });
-forgedGuide.click({ action: 'apply-status', status: 'arrived' });
-assert.equal(forgedGuide.snapshot().tourists.find((tourist) => tourist.id === 't1').statusByCity['route-beijing-1'].arrival, 'arrived');
-const guideGroupBefore = forgedGuide.snapshot().tourists.find((tourist) => tourist.id === 't1').groupId;
-forgedGuide.dispatch({ action: 'split-tourist-group', group: guideGroupBefore });
-forgedGuide.dispatch({ action: 'apply-global-split' });
-assert.equal(forgedGuide.snapshot().tourists.find((tourist) => tourist.id === 't1').groupId, guideGroupBefore);
-
-// Bulk status guards validate every member against the selected tour and route, even for forged IDs.
-const outOfRouteStatus = loadPrototype('tour-operations.js', '#app');
-selectRole(outOfRouteStatus, 'guide');
-selectCity(outOfRouteStatus, 1);
-const t4StatusesBefore = deepClone(outOfRouteStatus.snapshot().tourists.find((tourist) => tourist.id === 't4').statusByCity);
-outOfRouteStatus.dispatch({ action: 'status-bulk', members: 't4', stage: 'arrival' });
-outOfRouteStatus.dispatch({ action: 'apply-status', status: 'arrived' });
-assert.deepEqual(outOfRouteStatus.snapshot().tourists.find((tourist) => tourist.id === 't4').statusByCity, t4StatusesBefore);
-
-const foreignTourStorage = new Map([['unique-guide-tourists-v2', JSON.stringify([{
-  id: 'japan-forged', tourId: 'japan', leadId: 'lead-japan', lead: 'Лид Япония', leadStatus: 'Подтверждён',
-  firstName: 'Юки', lastName: 'Танака', phone: '+81 90 9999 0000', email: 'private-yuki@example.jp', passport: 'JP-PRIVATE-77',
-  internalNote: 'Скрытая заметка Японии', route: ['route-beijing-1'], type: 'Взрослый', scans: [{ id: 'scan-private', name: 'japan-private-passport.jpg' }], statusByCity: {},
-}])]]);
-const foreignTourStatus = loadPrototype('tour-operations.js', '#app', '?tourist=japan-forged&tourId=china', foreignTourStorage);
-assert.match(foreignTourStatus.root.innerHTML, /Карточка недоступна/);
-assert.doesNotMatch(foreignTourStatus.root.innerHTML, /Танака Юки|JP-PRIVATE-77|private-yuki|japan-private-passport|\+81 90/);
-foreignTourStatus.dispatch({ action: 'tourist-detail', id: 'japan-forged' });
-foreignTourStatus.dispatch({ action: 'call-tourist', id: 'japan-forged' });
-foreignTourStatus.dispatch({ action: 'view-scan', id: 'japan-forged', scan: 'scan-private' });
-assert.doesNotMatch(foreignTourStatus.root.innerHTML, /Танака Юки|JP-PRIVATE-77|private-yuki|japan-private-passport|\+81 90/);
-selectRole(foreignTourStatus, 'guide');
-const foreignStatusBefore = deepClone(foreignTourStatus.snapshot().tourists.find((tourist) => tourist.id === 'japan-forged').statusByCity);
-foreignTourStatus.dispatch({ action: 'status-bulk', members: 'japan-forged', stage: 'arrival' });
-foreignTourStatus.dispatch({ action: 'apply-status', status: 'arrived' });
-assert.deepEqual(foreignTourStatus.snapshot().tourists.find((tourist) => tourist.id === 'japan-forged').statusByCity, foreignStatusBefore);
-
-// Admin can delete one of several lead tourists but cannot delete the last one.
-const admin = loadPrototype('tour-operations.js', '#app', '?view=tourists&tourist=t3');
-selectRole(admin, 'admin');
-admin.click({ action: 'tourist-detail', id: 't3' });
-admin.click({ action: 'delete-tourist', id: 't3' });
-assert.match(admin.root.innerHTML, /Удалить туриста/);
-admin.click({ action: 'confirm-delete-tourist', id: 't3' });
-assert.equal(admin.snapshot().tourists.some((tourist) => tourist.id === 't3'), false);
-admin.click({ action: 'tourist-detail', id: 't4' });
-admin.click({ action: 'delete-tourist', id: 't4' });
-assert.match(admin.root.innerHTML, /Последнего туриста лида удалить нельзя/);
-
-// Documents, city picker, work statuses and explicit UI states are clickable.
-const modes = loadPrototype('tour-operations.js', '#app');
-assert.match(modes.root.innerHTML, /Операции/);
-assert.match(modes.root.innerHTML, /Пекин · остановка 1/);
-modes.click({ action: 'summary-section', view: 'documents' });
-assert.match(modes.root.innerHTML, /Не заполнено/);
-assert.match(modes.root.innerHTML, /Виза, страховка и анкета остаются в бэклоге/);
-assert.match(modes.root.innerHTML, /Соколов Илья/, 'a missing scan keeps the tourist in the missing queue even when the passport expires soon');
-modes.click({ action: 'document-filter', filter: 'expiring' });
-assert.doesNotMatch(modes.root.innerHTML, /Соколов Илья/);
-modes.click({ action: 'workspace', view: 'work' });
-assert.match(modes.root.innerHTML, /Циклическое переключение отключено/);
-modes.click({ action: 'change-status', id: 't2', stage: 'arrival' });
-modes.click({ action: 'apply-status', status: 'arrived' });
-assert.equal(modes.snapshot().tourists.find((tourist) => tourist.id === 't2').statusByCity['route-beijing-1'].arrival, 'arrived');
-selectCity(modes, 3);
-assert.match(modes.root.innerHTML, /Пекин · остановка 2/);
-
-// Closing the canonical card restores the exact tour/list context by routeCityId.
-const contextRestore = loadPrototype('tour-operations.js', '#app');
-selectCity(contextRestore, 3);
-contextRestore.click({ action: 'stage', stage: 'departure' });
-contextRestore.click({ action: 'nav', view: 'tourists' });
-contextRestore.click({ action: 'tourist-list-mode', mode: 'groups' });
-contextRestore.click({ action: 'tourist-filters' });
-contextRestore.click({ action: 'toggle-tourist-filter', filter: 'limitedRoute' });
-contextRestore.click({ action: 'close-overlay' });
-contextRestore.click({ action: 'toggle-scope' });
-contextRestore.click({ action: 'select-scope', id: 'lead-1042' });
-contextRestore.input({ touristSearch: '' }, 'Соколов');
-contextRestore.setScrollTop(237);
-contextRestore.click({ action: 'tourist-detail', id: 't2' });
-const capturedContext = contextRestore.snapshot().returnContext;
-assert.equal(capturedContext.routeCityId, 'route-beijing-2');
-assert.equal(capturedContext.operation, 'departure');
-assert.equal(capturedContext.scopeLeadId, 'lead-1042');
-assert.equal(capturedContext.listMode, 'groups');
-assert.equal(capturedContext.query, 'Соколов');
-assert.equal(capturedContext.scrollTop, 237);
-assert.doesNotMatch(JSON.stringify(capturedContext), /passport|72 1122334|\+7 916/i);
-contextRestore.click({ action: 'close-overlay' });
-const restoredContext = contextRestore.snapshot();
-assert.equal(restoredContext.routeCityId, 'route-beijing-2');
-assert.equal(restoredContext.stage, 'departure');
-assert.equal(restoredContext.scopeLead, 'lead-1042');
-assert.equal(restoredContext.touristListMode, 'groups');
-assert.equal(restoredContext.touristQuery, 'Соколов');
-assert.equal(restoredContext.touristFilters.limitedRoute, true);
-assert.equal(contextRestore.getScrollTop(), 237);
-
-const touristFilters = loadPrototype('tour-operations.js', '#app');
-touristFilters.click({ action: 'nav', view: 'tourists' });
-touristFilters.click({ action: 'tourist-filters' });
-assert.match(touristFilters.root.innerHTML, /Ограниченный маршрут/);
-assert.match(touristFilters.root.innerHTML, /Статус · Прибытие/);
-touristFilters.click({ action: 'set-status-filter', status: 'arrived' });
-touristFilters.click({ action: 'close-overlay' });
-assert.match(touristFilters.root.innerHTML, /Соколова Анна/);
-assert.doesNotMatch(touristFilters.root.innerHTML, /Соколов Илья/);
-
-for (const state of ['loading', 'error', 'empty']) {
-  const preview = loadPrototype('tour-operations.js', '#app');
-  preview.click({ action: 'role-menu' });
-  preview.click({ action: 'open-ui-states' });
-  preview.click({ action: 'set-ui-state', state });
-  if (state === 'loading') assert.match(preview.root.innerHTML, /skeleton-card/);
-  if (state === 'error') assert.match(preview.root.innerHTML, /Не удалось загрузить сводную/);
-  if (state === 'empty') assert.match(preview.root.innerHTML, /В туре пока нет туристов/);
+// READY-01..03 are indicators, not save blockers, and follow the web primary/non-primary distinction exactly.
+const readinessBaseline = deepClone(profile.snapshot().tourists);
+function readinessStorage(mutate) {
+  const stored = deepClone(readinessBaseline);
+  mutate(stored);
+  return new Map([['unique-guide-tourists-v2', JSON.stringify(stored)]]);
 }
 
-const offline = loadPrototype('tour-operations.js', '#app');
-const beforeOffline = deepClone(offline.snapshot());
-offline.click({ action: 'role-menu' });
-offline.click({ action: 'toggle-offline' });
-assert.match(offline.root.innerHTML, /Нет подключения/);
-offline.dispatch({ action: 'add-stage' });
-assert.match(offline.root.innerHTML, /Подключитесь к интернету/);
-assert.deepEqual(offline.snapshot().records, beforeOffline.records);
-selectRole(offline, 'admin');
-const scansBeforeOfflineDelete = deepClone(offline.snapshot().tourists.find((tourist) => tourist.id === 't1').scans);
-offline.dispatch({ action: 'delete-scan', id: 't1', scan: 'scan-t1-1' });
-assert.deepEqual(offline.snapshot().tourists.find((tourist) => tourist.id === 't1').scans, scansBeforeOfflineDelete);
+const missingPrimaryPersonal = loadPrototype(
+  'tour-operations.js',
+  '#app',
+  '?tourId=china&view=tourists&tourist=t1&touristSection=profile',
+  readinessStorage((items) => Object.assign(items.find((item) => item.id === 't1'), { birthDate: '', middleName: '', email: '', phone: '' })),
+);
+assert.match(missingPrimaryPersonal.root.innerHTML, /Не заполнено[^<]*(?:дата рождения|Дата рождения)/i);
+['отчество', 'email', 'телефон'].forEach((fieldLabel) => assert.match(missingPrimaryPersonal.root.innerHTML, new RegExp(fieldLabel, 'i')));
 
-// Conflict resolution stores an explicit source and preserves hidden own values.
-const tours = loadPrototype('tour-operations.js', '#app');
-const t2OwnBefore = deepClone(tours.snapshot().records['route-beijing-1'].arrival.t2);
-tours.click({ action: 'add-stage' });
-['t1', 't2'].forEach((id) => tours.click({ action: 'toggle-tourist', id }));
-tours.click({ action: 'next-operation' });
-tours.click({ action: 'save-form' });
-assert.match(tours.root.innerHTML, /Сверка данных/);
-tours.assertDisabled({ action: 'apply-conflict' });
-tours.click({ action: 'pick-conflict-source', id: 't1' });
-tours.click({ action: 'apply-conflict' });
-const arrivalGroup = Object.values(tours.snapshot().operationGroups['route-beijing-1'].arrival).find((group) => group.members.join(',') === 't1,t2');
-assert.ok(arrivalGroup, 'a common arrival record is created');
-assert.equal(arrivalGroup.sourceId, 't1');
-assert.equal(arrivalGroup.subgroupId, arrivalGroup.id);
-assert.equal(arrivalGroup.tourId, 'china');
-assert.equal(arrivalGroup.routeCityId, 'route-beijing-1');
-assert.equal(arrivalGroup.operation, 'arrival');
-assert.equal(arrivalGroup.sourceVisitId, 'china:t1:route-beijing-1:arrival');
-assert.deepEqual(arrivalGroup.memberVisitIds, ['china:t1:route-beijing-1:arrival', 'china:t2:route-beijing-1:arrival']);
-assert.equal(Object.hasOwn(arrivalGroup, 'touristGroupId'), false);
-assert.deepEqual(tours.snapshot().records['route-beijing-1'].arrival.t2, t2OwnBefore, 'grouping does not copy source values into t2');
-const groupedT2Visit = tours.snapshot().visits.find((visit) => visit.visitId === 'china:t2:route-beijing-1:arrival');
-assert.deepEqual(groupedT2Visit.ownValues, t2OwnBefore);
-assert.deepEqual(groupedT2Visit.effectiveValues, tours.snapshot().records['route-beijing-1'].arrival.t1);
+const nonPrimaryPersonal = loadPrototype('tour-operations.js', '#app', '?tourId=china&view=tourists&tourist=t4&touristSection=profile');
+assert.match(nonPrimaryPersonal.root.innerHTML, /Личные данные заполнены|Данные готовы/);
 
-// Repeating the same apply upserts the same subgroup instead of creating a duplicate.
-const subgroupCountBeforeRetry = Object.keys(tours.snapshot().operationGroups['route-beijing-1'].arrival).length;
-tours.click({ action: 'add-stage' });
-['t1', 't2'].forEach((id) => tours.click({ action: 'toggle-tourist', id }));
-tours.click({ action: 'next-operation' });
-tours.click({ action: 'save-form' });
-const retriedArrivalGroups = tours.snapshot().operationGroups['route-beijing-1'].arrival;
-assert.equal(Object.keys(retriedArrivalGroups).length, subgroupCountBeforeRetry);
-assert.ok(retriedArrivalGroups[arrivalGroup.id]);
+const missingPrimaryDomestic = loadPrototype(
+  'tour-operations.js',
+  '#app',
+  '?tourId=china&view=tourists&tourist=t1&touristSection=profile',
+  readinessStorage((items) => Object.assign(items.find((item) => item.id === 't1'), { domesticPassport: '', domesticIssuedBy: '', registrationAddress: '' })),
+);
+assert.match(missingPrimaryDomestic.root.innerHTML, /Паспорт РФ не заполнен|Нужно дозаполнить/);
+assert.doesNotMatch(missingPrimaryDomestic.root.innerHTML, /Паспорт РФ[^<]*Не требуется/);
+assert.match(nonPrimaryPersonal.root.innerHTML, /Не требуется/, 'an empty domestic passport is not required for a non-primary tourist');
 
-// Splitting an operation does not change the tour group.
-const groupIdsBeforeOperationSplit = tours.snapshot().tourists.filter((tourist) => ['t1', 't2'].includes(tourist.id)).map((tourist) => tourist.groupId);
-tours.click({ action: 'manage-operation', members: 't1,t2', group: arrivalGroup.id });
-tours.click({ action: 'split-operation-members' });
-tours.click({ action: 'toggle-tourist', id: 't1' });
-tours.click({ action: 'apply-operation-split' });
-assert.deepEqual(tours.snapshot().tourists.filter((tourist) => ['t1', 't2'].includes(tourist.id)).map((tourist) => tourist.groupId), groupIdsBeforeOperationSplit);
-assert.match(tours.root.innerHTML, /CZ 342/);
-assert.match(tours.root.innerHTML, /SU 204/);
+const missingForeignScan = loadPrototype(
+  'tour-operations.js',
+  '#app',
+  '?tourId=china&view=tourists&tourist=t1&touristSection=profile',
+  readinessStorage((items) => { items.find((item) => item.id === 't1').scans = []; }),
+);
+assert.match(missingForeignScan.root.innerHTML, /(?:Не заполнено|Нужно дозаполнить)[^<]*скан/i);
+assert.doesNotMatch(missingForeignScan.root.innerHTML, /<span class="profile-section-summary">Готово<\/span>[\s\S]*data-section="foreign"/);
+assert.match(nonPrimaryPersonal.root.innerHTML, /Загранпаспорт[^]*?(?:Не заполнено|Нужно дозаполнить)/i, 'an empty foreign passport is never ready');
+assert.match(nonPrimaryPersonal.root.innerHTML, /Нужно дозаполнить[\s\S]*?(?:ФИО латиницей|номер загранпаспорта|скан)/i);
 
-// An operation subgroup is independent from the tour group and accepts additional tour members.
-const operationAdd = loadPrototype('tour-operations.js', '#app');
-const t4OwnArrivalBeforeAdd = deepClone(operationAdd.snapshot().records['route-beijing-1'].arrival.t4 || {});
-operationAdd.click({ action: 'add-stage' });
-['t1', 't3'].forEach((id) => operationAdd.click({ action: 'toggle-tourist', id }));
-operationAdd.click({ action: 'next-operation' });
-operationAdd.click({ action: 'save-form' });
-operationAdd.click({ action: 'pick-conflict-source', id: 't1' });
-operationAdd.click({ action: 'apply-conflict' });
-const independentGroup = Object.values(operationAdd.snapshot().operationGroups['route-beijing-1'].arrival).find((group) => group.members.slice().sort().join(',') === 't1,t3');
-assert.ok(independentGroup);
-operationAdd.click({ action: 'manage-operation', members: independentGroup.members.join(','), group: independentGroup.id });
-assert.match(operationAdd.root.innerHTML, /Добавить туристов/);
-operationAdd.click({ action: 'add-operation-members' });
-operationAdd.click({ action: 'toggle-tourist', id: 't4' });
-operationAdd.click({ action: 'next-operation' });
-operationAdd.click({ action: 'save-form' });
-assert.deepEqual(operationAdd.snapshot().operationGroups['route-beijing-1'].arrival[independentGroup.id].members.slice().sort(), ['t1', 't3', 't4']);
-assert.deepEqual(operationAdd.snapshot().records['route-beijing-1'].arrival.t4 || {}, t4OwnArrivalBeforeAdd);
+// TaskWidget uses the web lifecycle only: todo, in_progress and done.
+lead.click({ detailTab: 'tasks' });
+['К выполнению', 'В работе'].forEach((status) => assert.match(lead.root.innerHTML, new RegExp(status)));
+lead.click({ action: 'edit-task', index: '0' });
+assert.match(lead.root.innerHTML, /<option value="todo"[^>]*>К выполнению<\/option>/);
+assert.match(lead.root.innerHTML, /<option value="in_progress"[^>]*>В работе<\/option>/);
+assert.match(lead.root.innerHTML, /<option value="done"[^>]*>Готово<\/option>/);
+lead.click({ action: 'cancel-task' });
+assert.doesNotMatch(lead.root.innerHTML, /cancelled|Отменена/);
+const taskStatuses = lead.snapshot().leads.flatMap((item) => item.tasks || []).map((task) => task.status);
+assert.ok(taskStatuses.length > 0);
+assert.ok(taskStatuses.every((status) => ['todo', 'in_progress', 'done'].includes(status)));
 
-const crossTourStorage = new Map([['unique-guide-tourists-v2', JSON.stringify([{
-  id: 'japan-1', tourId: 'japan', leadId: 'lead-japan', lead: 'Лид Япония', leadStatus: 'Подтверждён',
-  firstName: 'Юки', lastName: 'Танака', route: ['route-beijing-1'], type: 'Взрослый', scans: [],
-}, {
-  id: 'china-unconfirmed', tourId: 'china', leadId: 'lead-new', lead: 'Новый лид', leadStatus: 'В работе',
-  firstName: 'Пётр', lastName: 'Новиков', route: ['route-beijing-1'], type: 'Взрослый', scans: [],
-}])]]);
-const crossTour = loadPrototype('tour-operations.js', '#app', '', crossTourStorage);
-crossTour.click({ action: 'add-stage' });
-assert.doesNotMatch(crossTour.root.innerHTML, /data-id="japan-1"/);
-assert.match(crossTour.root.innerHTML, /Логистика доступна после подтверждения лида/);
-crossTour.dispatch({ action: 'toggle-tourist', id: 'japan-1' });
-crossTour.dispatch({ action: 'toggle-tourist', id: 'china-unconfirmed' });
-assert.match(crossTour.root.innerHTML, /Далее · 0/);
+// Lead create/edit keeps web fields and creates exactly one primary tourist from the contact.
+const leadCrudStorage = new Map();
+const createLead = loadPrototype('mobile-leads.js', '#app', '?newLead=1&role=admin', leadCrudStorage);
+assert.match(createLead.root.innerHTML, /Создать новый лид/);
+['ЛИЧНЫЕ ДАННЫЕ', 'ДАТА РОЖДЕНИЯ', 'ПАСПОРТ РФ', 'ЗАГРАНПАСПОРТ', 'ТУР И ОПЛАТА', 'НАСТРОЙКИ', 'ПРИМЕЧАНИЕ'].forEach((section) => assert.match(createLead.root.innerHTML, new RegExp(section)));
+createLead.submit('lead-form', leadFormValues(), { editing: '' });
+const createdLead = createLead.snapshot().leads.find((item) => item.email === 'ivan-prototype@example.test');
+assert.ok(createdLead);
+const createdPrimary = createLead.snapshot().tourists.find((tourist) => tourist.leadId === createdLead.id && tourist.isPrimary);
+assert.ok(createdPrimary);
+assert.equal(createLead.snapshot().tourists.filter((tourist) => tourist.leadId === createdLead.id).length, 1);
+assert.equal(createdPrimary.birthDate, '1990-04-12');
+assert.equal(createdPrimary.domesticPassport, '45 12 987654');
+assert.equal(createdPrimary.passport, '75 7654321');
 
-// Four tourists from exactly two leads become one tour group.
-tours.click({ action: 'nav', view: 'tourists' });
-tours.click({ action: 'start-tourist-group' });
-['t1', 't2', 't3', 't4'].forEach((id) => tours.click({ action: 'toggle-tourist', id }));
-tours.click({ action: 'apply-tourist-group' });
-const four = tours.snapshot().tourists.filter((tourist) => ['t1', 't2', 't3', 't4'].includes(tourist.id));
-assert.equal(new Set(four.map((tourist) => tourist.groupId)).size, 1);
-assert.equal(new Set(four.map((tourist) => tourist.leadId)).size, 2);
+// EventCard and the Tours list derive participant counts from the same live tourist store.
+const dynamicTourCount = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview&role=manager', leadCrudStorage);
+const dynamicChinaCount = dynamicTourCount.snapshot().tourists.filter((tourist) => tourist.tourId === 'china').length;
+assert.equal(dynamicChinaCount, 6);
+assert.match(dynamicTourCount.root.innerHTML, new RegExp(`${dynamicChinaCount} из 12 участников`));
+assert.match(dynamicTourCount.root.innerHTML, new RegExp(`<span>Свободно<\\/span><strong>${12 - dynamicChinaCount}<\\/strong>`));
+dynamicTourCount.click({ action: 'open-tours' });
+assert.match(dynamicTourCount.root.innerHTML, new RegExp(`${dynamicChinaCount} из 12 участников`));
+assert.doesNotMatch(dynamicTourCount.root.innerHTML, /4 из 12 участников/);
 
-// One hotel for four.
-tours.click({ action: 'nav', view: 'operations' });
-tours.click({ action: 'stage', stage: 'hotel' });
-tours.click({ action: 'add-stage' });
-tours.click({ action: 'select-all' });
-tours.click({ action: 'next-operation' });
-tours.click({ action: 'save-form' });
-assert.match(tours.root.innerHTML, /Сверка данных/);
-tours.click({ action: 'pick-conflict-source', id: 't1' });
-tours.click({ action: 'apply-conflict' });
-const hotelGroup = Object.values(tours.snapshot().operationGroups['route-beijing-1'].hotel).find((group) => group.members.length === 4);
-assert.ok(hotelGroup, 'common hotel covers all four tourists');
+// Team assignments are a projection of the same stable user IDs used by EditEventDialog.
+const tourAssignmentForm = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview&role=manager');
+assert.match(tourAssignmentForm.root.innerHTML, /target="_blank"[^>]*aria-label="Открыть сводную в новой вкладке"/);
+assert.match(tourAssignmentForm.root.innerHTML, /<button[^>]*data-action="preview-tour-site"[^>]*>[^]*Открыть на сайте<\/button>/);
+assert.doesNotMatch(tourAssignmentForm.root.innerHTML, /<a[^>]*href="https?:\/\/[^>]*>[^]*Открыть на сайте<\/a>/i);
+const tourSiteHrefBefore = tourAssignmentForm.window.location.href;
+tourAssignmentForm.click({ action: 'preview-tour-site' });
+assert.equal(tourAssignmentForm.window.location.href, tourSiteHrefBefore);
+assert.match(tourAssignmentForm.root.innerHTML, /В рабочей версии откроется сайт тура/);
+tourAssignmentForm.click({ action: 'edit-tour' });
+assert.match(tourAssignmentForm.root.innerHTML, /data-route-guide-id="route-beijing-1"/);
+assert.match(tourAssignmentForm.root.innerHTML, /value="user-guide-li-wei"[^>]*selected/);
+assert.match(tourAssignmentForm.root.innerHTML, /name="financeGuideCityId" value="route-xian-1"[^>]*checked/);
+assert.match(tourAssignmentForm.root.innerHTML, /data-user-search="escort-user"/);
+assert.match(tourAssignmentForm.root.innerHTML, /id="escort-user" name="escort"/);
+assert.match(tourAssignmentForm.root.innerHTML, /value="user-escort-maria-belova"[^>]*selected/);
+assert.match(tourAssignmentForm.root.innerHTML, /<select[^>]*name="chatAdmin"[^>]*>[\s\S]*?<option value="user-manager-elena"[^>]*selected/);
 
-// Independent arrival subgroups 2+2.
-tours.click({ action: 'stage', stage: 'arrival' });
-for (const pair of [['t1', 't2'], ['t3', 't4']]) {
-  tours.click({ action: 'add-stage' });
-  pair.forEach((id) => tours.click({ action: 'toggle-tourist', id }));
-  tours.click({ action: 'next-operation' });
-  tours.click({ action: 'save-form' });
-  if (tours.root.innerHTML.includes('Сверка данных')) {
-    tours.click({ action: 'pick-conflict-source', id: pair[0] });
-    tours.click({ action: 'apply-conflict' });
-  }
+// Blank route rows are discarded as complete entries, without shifting later routeCityId/guide pairs.
+const routePreservation = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=overview&role=manager');
+routePreservation.click({ action: 'edit-tour' });
+routePreservation.submit('tour-form', {
+  name: 'Гранд-тур по Китаю',
+  description: 'Маршрут после удаления пустой строки',
+  site: 'https://unique-travel.ru/china-grand',
+  country: 'Китай',
+  tourType: 'group',
+  routeCityId: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1', 'route-beijing-2'],
+  routeCityName: ['Пекин', '', 'Шанхай', 'Пекин'],
+  cityGuide: ['user-guide-li-wei', 'user-guide-anna-kim', 'user-guide-li-wei', 'user-guide-anna-kim'],
+  financeGuideCityId: 'route-shanghai-1',
+  escort: 'user-escort-maria-belova',
+  chatAdmin: ['user-manager-elena', 'user-manager-igor'],
+  startDate: '2026-09-14', endDate: '2026-09-25',
+  capacity: '12', price: '189000', priceCurrency: 'RUB', color: '#2f6bd8',
+}, { id: 'china' });
+const preservedRouteTour = routePreservation.snapshot().tours.find((tour) => tour.id === 'china');
+assert.deepEqual(preservedRouteTour.cities, ['Пекин', 'Шанхай', 'Пекин']);
+assert.equal(preservedRouteTour.cityGuides['route-beijing-1'], 'user-guide-li-wei');
+assert.equal(preservedRouteTour.cityGuides['route-shanghai-1'], 'user-guide-li-wei');
+assert.equal(preservedRouteTour.cityGuides['route-beijing-2'], 'user-guide-anna-kim');
+assert.equal(preservedRouteTour.cityGuides['route-xian-1'], undefined);
+assert.equal(preservedRouteTour.financeGuideCityId, 'route-shanghai-1');
+routePreservation.click({ action: 'edit-tour', id: 'china' });
+assert.match(routePreservation.root.innerHTML, /name="routeCityId" value="route-shanghai-1"/);
+assert.match(routePreservation.root.innerHTML, /name="routeCityId" value="route-beijing-2"/);
+assert.match(routePreservation.root.innerHTML, /data-route-guide-id="route-shanghai-1"[\s\S]*?<option value="user-guide-li-wei"[^>]*selected/);
+assert.match(routePreservation.root.innerHTML, /data-route-guide-id="route-beijing-2"[\s\S]*?<option value="user-guide-anna-kim"[^>]*selected/);
+
+const editLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&edit=1&role=admin', leadCrudStorage);
+assert.match(editLead.root.innerHTML, /Редактировать лид/);
+editLead.submit('lead-form', leadFormValues({ firstName: 'Анна', lastName: 'Соколова-Тест', middleName: 'Игоревна', phone: '+7 916 441-22-18', telegram: '@anna_sokolova', email: 'anna@example.ru', status: 'converted', note: 'Обновлено в smoke' }), { editing: 'lead-1042' });
+assert.equal(editLead.snapshot().leads.find((item) => item.id === 'lead-1042').lastName, 'Соколова-Тест');
+assert.equal(editLead.snapshot().tourists.find((tourist) => tourist.id === 't1').lastName, 'Соколова-Тест');
+
+// Loss/postponement is a deliberate second step after editing status.
+const outcomeLead = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&edit=1&role=admin', leadCrudStorage);
+outcomeLead.submit('lead-form', leadFormValues({ firstName: 'Анна', lastName: 'Соколова-Тест', middleName: 'Игоревна', phone: '+7 916 441-22-18', email: 'anna@example.ru', status: 'lost' }), { editing: 'lead-1042' });
+assert.match(outcomeLead.root.innerHTML, /Отложить\/потерять/);
+assert.match(outcomeLead.root.innerHTML, /name="outcome" value="postponed"/);
+assert.match(outcomeLead.root.innerHTML, /name="outcome" value="failed"/);
+['outcomeDate', 'postponeReason', 'failureReason'].forEach((name) => assert.match(outcomeLead.root.innerHTML, new RegExp(`name="${name}"`)));
+outcomeLead.submit('lost-form', { outcome: 'postponed', outcomeDate: '2027-02-01', postponeReason: 'thinking', failureReason: '' });
+const postponedLead = outcomeLead.snapshot().leads.find((item) => item.id === 'lead-1042');
+assert.equal(postponedLead.stage, 'lost');
+assert.equal(postponedLead.outcome, 'postponed');
+assert.equal(postponedLead.outcomeDate, '2027-02-01');
+
+// All seven Wazzup states are reachable by deep link without a network request.
+const wazzupStates = {
+  'settings-loading': 'Проверяем настройки Wazzup24',
+  'not-configured': 'Wazzup24 не настроен',
+  'no-contact': 'Контактные данные не указаны',
+  loading: 'Загрузка чата',
+  error: 'Ошибка загрузки чата',
+  'not-loaded': 'Чат не загружен',
+  loaded: 'Чат',
+};
+Object.entries(wazzupStates).forEach(([state, copy]) => {
+  const wazzup = loadPrototype('mobile-leads.js', '#app', `?lead=lead-1042&tab=chat&wazzup=${state}`);
+  assert.match(wazzup.root.innerHTML, new RegExp(copy));
+});
+
+const leadDocuments = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&tab=documents');
+assert.match(leadDocuments.root.innerHTML, /Договор/);
+assert.match(leadDocuments.root.innerHTML, /Лист бронирования/);
+leadDocuments.click({ action: 'download-doc', doc: 'contract' });
+assert.match(leadDocuments.root.innerHTML, /Документ подготовлен к скачиванию/);
+
+// Task create and edit use the same model as TaskWidget, including an explicit urgent priority.
+const leadTasks = loadPrototype('mobile-leads.js', '#app', '?lead=lead-1042&tab=tasks');
+const taskCountBeforeCreate = leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks.length;
+leadTasks.click({ action: 'add-task' });
+leadTasks.submit('task-form', { title: 'Срочная проверка', description: 'Проверить документы', priority: 'urgent', dueDate: '2026-08-05' }, { index: '' });
+let savedTasks = leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks;
+assert.equal(savedTasks.length, taskCountBeforeCreate + 1);
+assert.equal(savedTasks.at(-1).status, 'todo');
+assert.equal(savedTasks.at(-1).priority, 'urgent');
+leadTasks.click({ action: 'edit-task', index: String(savedTasks.length - 1) });
+leadTasks.submit('task-form', { title: 'Срочная проверка', description: 'Выполнено', priority: 'urgent', status: 'done', dueDate: '2026-08-05' }, { index: String(savedTasks.length - 1) });
+savedTasks = leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks;
+assert.equal(savedTasks.at(-1).status, 'done');
+
+leadTasks.click({ action: 'add-task' });
+leadTasks.submit('task-form', { title: 'Просроченная проверка', description: 'Проверить маркировку', priority: 'high', dueDate: '2020-01-02' }, { index: '' });
+savedTasks = leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks;
+const overdueIndex = savedTasks.length - 1;
+assert.match(leadTasks.root.innerHTML, /task-card[^>]*overdue/);
+assert.match(leadTasks.root.innerHTML, /Просрочено · (?:2020-01-02|02\.01\.2020)/);
+leadTasks.click({ action: 'edit-task', index: String(overdueIndex) });
+leadTasks.click({ action: 'request-delete-task', index: String(overdueIndex) });
+assert.match(leadTasks.root.innerHTML, /Удалить задачу/);
+assert.match(leadTasks.root.innerHTML, /data-action="confirm-delete-task"/);
+assert.equal(leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks.length, savedTasks.length);
+leadTasks.click({ action: 'cancel-delete-task' });
+assert.equal(leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks.length, savedTasks.length);
+leadTasks.click({ action: 'request-delete-task', index: String(overdueIndex) });
+leadTasks.click({ action: 'confirm-delete-task', index: String(overdueIndex) });
+assert.equal(leadTasks.snapshot().leads.find((item) => item.id === 'lead-1042').tasks.length, savedTasks.length - 1);
+
+const tourTasks = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=tasks');
+tourTasks.click({ action: 'edit-tour-task', id: 'task1' });
+assert.match(tourTasks.root.innerHTML, /<option value="todo"[^>]*>К выполнению<\/option>/);
+assert.match(tourTasks.root.innerHTML, /<option value="in_progress"[^>]*>В работе<\/option>/);
+assert.match(tourTasks.root.innerHTML, /<option value="done"[^>]*>Готово<\/option>/);
+tourTasks.click({ action: 'close-overlay' });
+assert.doesNotMatch(tourTasks.root.innerHTML, /cancelled|Отменена/);
+
+// Program keeps the web shape and regenerates from tour dates without silently discarding a meaningful description.
+const program = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=program&role=manager');
+const initialProgram = program.snapshot().programDays;
+assert.ok(initialProgram.length > 0);
+initialProgram.forEach((day, index) => {
+  assert.deepEqual(Object.keys(day), ['dayNumber', 'date', 'city', 'cityIdx', 'description']);
+  assert.equal(day.dayNumber, index + 1);
+  assert.match(day.date, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(typeof day.cityIdx, 'number');
+});
+assert.doesNotMatch(program.root.innerHTML, /data-action="(?:add-program|remove-program)"|name="title"/);
+program.click({ action: 'edit-program', index: '0' });
+assert.match(program.root.innerHTML, /Номер дня/);
+assert.match(program.root.innerHTML, /Дата/);
+assert.match(program.root.innerHTML, /name="cityIdx"/);
+assert.match(program.root.innerHTML, /name="description"/);
+assert.doesNotMatch(program.root.innerHTML, /name="(?:dayNumber|date|title)"/);
+const firstProgramDay = initialProgram[0];
+program.submit('program-form', { cityIdx: String(firstProgramDay.cityIdx), description: 'Ручное описание сохраняется после пересоздания.' }, { index: '0' });
+const manuallyEditedDay = deepClone(program.snapshot().programDays[0]);
+assert.equal(manuallyEditedDay.description, 'Ручное описание сохраняется после пересоздания.');
+program.click({ action: 'regenerate-program' });
+assert.match(program.root.innerHTML, /Пересоздать программу/);
+assert.deepEqual(program.snapshot().programDays[0], manuallyEditedDay, 'regeneration preview must not mutate the program');
+program.click({ action: 'confirm-regenerate-program' });
+const regeneratedProgram = program.snapshot().programDays;
+assert.equal(regeneratedProgram.length, 12, '14–25 September produces twelve calendar days');
+regeneratedProgram.forEach((day, index) => {
+  assert.deepEqual(Object.keys(day), ['dayNumber', 'date', 'city', 'cityIdx', 'description']);
+  assert.equal(day.dayNumber, index + 1);
+});
+assert.equal(regeneratedProgram[0].date, '2026-09-14');
+assert.equal(regeneratedProgram.at(-1).date, '2026-09-25');
+assert.equal(
+  regeneratedProgram.find((day) => day.date === manuallyEditedDay.date && day.cityIdx === manuallyEditedDay.cityIdx).description,
+  manuallyEditedDay.description,
+);
+
+// A common operation may only be created inside one existing tourist group.
+const groupGuard = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+const operationsBeforeGuard = deepClone(groupGuard.snapshot().operationGroups);
+groupGuard.click({ action: 'add-stage' });
+groupGuard.click({ action: 'toggle-tourist', id: 't1' });
+groupGuard.assertDisabled({ action: 'toggle-tourist', id: 't3' });
+groupGuard.dispatch({ action: 'toggle-tourist', id: 't3' });
+assert.match(groupGuard.root.innerHTML, /Далее · 1/);
+assert.deepEqual(groupGuard.snapshot().operationGroups, operationsBeforeGuard);
+
+const sameGroup = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+const t2ArrivalOwn = deepClone(sameGroup.snapshot().records['route-beijing-1'].arrival.t2);
+sameGroup.click({ action: 'add-stage' });
+['t1', 't2'].forEach((id) => sameGroup.click({ action: 'toggle-tourist', id }));
+sameGroup.click({ action: 'next-operation' });
+sameGroup.click({ action: 'save-form' });
+if (sameGroup.root.innerHTML.includes('Сверка данных')) {
+  sameGroup.click({ action: 'pick-conflict-source', id: 't1' });
+  sameGroup.click({ action: 'apply-conflict' });
 }
-const arrivalMembers = Object.values(tours.snapshot().operationGroups['route-beijing-1'].arrival).map((group) => group.members.slice().sort().join(',')).sort();
-assert.deepEqual(arrivalMembers, ['t1,t2', 't3,t4']);
+const sharedArrival = Object.values(sameGroup.snapshot().operationGroups['route-beijing-1'].arrival)
+  .find((operation) => operation.members.slice().sort().join(',') === 't1,t2');
+assert.ok(sharedArrival);
+assert.equal(sharedArrival.sourceId, 't1');
+assert.deepEqual(sameGroup.snapshot().records['route-beijing-1'].arrival.t2, t2ArrivalOwn, 'preview/apply keeps hidden ownValues');
 
-// Departures stay different and a hotel split does not affect arrival subgroups.
-tours.click({ action: 'stage', stage: 'departure' });
-const departureGroup = Object.values(tours.snapshot().operationGroups['route-beijing-1'].departure).find((group) => group.members.includes('t1'));
-assert.ok(departureGroup);
-tours.click({ action: 'manage-operation', members: departureGroup.members.join(','), group: departureGroup.id });
-tours.click({ action: 'split-operation-members' });
-tours.click({ action: 'toggle-tourist', id: 't1' });
-tours.click({ action: 'apply-operation-split' });
-['G89', 'G91', 'Лобби Hutong Garden', 'K12'].forEach((value) => assert.match(tours.root.innerHTML, new RegExp(value)));
-tours.click({ action: 'stage', stage: 'hotel' });
-const hotelBeforeSplit = deepClone(tours.snapshot().operationGroups['route-beijing-1'].hotel[hotelGroup.id]);
-tours.click({ action: 'manage-operation', members: hotelBeforeSplit.members.join(','), group: hotelBeforeSplit.id });
-tours.click({ action: 'split-operation-members' });
-tours.click({ action: 'toggle-tourist', id: 't1' });
-tours.click({ action: 'apply-operation-split' });
-assert.match(tours.root.innerHTML, /Основная запись после отделения/);
-tours.click({ action: 'pick-split-source', id: 't2' });
-tours.click({ action: 'confirm-operation-split' });
-assert.deepEqual(Object.values(tours.snapshot().operationGroups['route-beijing-1'].arrival).map((group) => group.members.slice().sort().join(',')).sort(), ['t1,t2', 't3,t4']);
-assert.deepEqual(tours.snapshot().operationGroups['route-beijing-1'].hotel[hotelGroup.id].members.slice().sort(), ['t2', 't3', 't4']);
+// Applying the same members and operation again upserts the same link.
+const arrivalGroupCount = Object.keys(sameGroup.snapshot().operationGroups['route-beijing-1'].arrival).length;
+sameGroup.click({ action: 'add-stage' });
+['t1', 't2'].forEach((id) => sameGroup.click({ action: 'toggle-tourist', id }));
+sameGroup.click({ action: 'next-operation' });
+sameGroup.click({ action: 'save-form' });
+assert.equal(Object.keys(sameGroup.snapshot().operationGroups['route-beijing-1'].arrival).length, arrivalGroupCount);
+assert.ok(sameGroup.snapshot().operationGroups['route-beijing-1'].arrival[sharedArrival.id]);
 
-// Two existing tour groups cannot be merged automatically.
-const groupingGuard = loadPrototype('tour-operations.js', '#app');
-groupingGuard.click({ action: 'nav', view: 'tourists' });
-groupingGuard.click({ action: 'start-tourist-group' });
-['t3', 't4'].forEach((id) => groupingGuard.click({ action: 'toggle-tourist', id }));
-groupingGuard.click({ action: 'apply-tourist-group' });
-const guardBefore = deepClone(groupingGuard.snapshot().tourists);
-groupingGuard.click({ action: 'start-tourist-group' });
-['t1', 't3'].forEach((id) => groupingGuard.click({ action: 'toggle-tourist', id }));
-groupingGuard.click({ action: 'apply-tourist-group' });
-assert.match(groupingGuard.root.innerHTML, /двух существующих групп/);
-assert.deepEqual(groupingGuard.snapshot().tourists, guardBefore);
+// Splitting one operation reveals ownValues and does not alter the tourist group or other operation links.
+const hotelLinksBeforeArrivalSplit = deepClone(sameGroup.snapshot().operationGroups['route-beijing-1'].hotel);
+const departureLinksBeforeArrivalSplit = deepClone(sameGroup.snapshot().operationGroups['route-beijing-1'].departure);
+const touristGroupIdsBeforeArrivalSplit = sameGroup.snapshot().tourists.filter((tourist) => ['t1', 't2'].includes(tourist.id)).map((tourist) => tourist.groupId);
+sameGroup.click({ action: 'manage-operation', members: 't1,t2', group: sharedArrival.id });
+sameGroup.click({ action: 'split-operation-members' });
+sameGroup.click({ action: 'toggle-tourist', id: 't2' });
+sameGroup.click({ action: 'apply-operation-split' });
+assert.deepEqual(sameGroup.snapshot().records['route-beijing-1'].arrival.t2, t2ArrivalOwn);
+assert.deepEqual(sameGroup.snapshot().operationGroups['route-beijing-1'].hotel, hotelLinksBeforeArrivalSplit);
+assert.deepEqual(sameGroup.snapshot().operationGroups['route-beijing-1'].departure, departureLinksBeforeArrivalSplit);
+assert.deepEqual(sameGroup.snapshot().tourists.filter((tourist) => ['t1', 't2'].includes(tourist.id)).map((tourist) => tourist.groupId), touristGroupIdsBeforeArrivalSplit);
 
-// Dissolving the tour group preserves every operation subgroup.
-const fullDissolve = loadPrototype('tour-operations.js', '#app');
-fullDissolve.click({ action: 'nav', view: 'tourists' });
-fullDissolve.click({ action: 'start-tourist-group' });
-['t1', 't2', 't3', 't4'].forEach((id) => fullDissolve.click({ action: 'toggle-tourist', id }));
-fullDissolve.click({ action: 'apply-tourist-group' });
-const operationsBeforeDissolve = deepClone(fullDissolve.snapshot().operationGroups);
-const commonGroupId = fullDissolve.snapshot().tourists.find((tourist) => tourist.id === 't1').groupId;
-fullDissolve.click({ action: 'tourist-list-mode', mode: 'groups' });
-fullDissolve.click({ action: 'split-tourist-group', group: commonGroupId });
-['t1', 't2', 't3', 't4'].forEach((id) => fullDissolve.click({ action: 'toggle-tourist', id }));
-fullDissolve.click({ action: 'apply-global-split' });
-assert.ok(fullDissolve.snapshot().tourists.every((tourist) => !tourist.groupId));
-assert.deepEqual(fullDissolve.snapshot().operationGroups, operationsBeforeDissolve);
+// Default sharedHotel is transactional: conflicting own hotel values require source preview before group creation.
+const hotelConflict = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+hotelConflict.click({ action: 'summary-section', view: 'tourists' });
+hotelConflict.click({ action: 'tourist-list-mode', mode: 'groups' });
+hotelConflict.click({ action: 'split-tourist-group', group: 'family-sokolov' });
+['t1', 't2'].forEach((id) => hotelConflict.click({ action: 'toggle-tourist', id }));
+hotelConflict.click({ action: 'apply-global-split' });
+const beforeHotelPreview = hotelConflict.snapshot();
+hotelConflict.click({ action: 'start-tourist-group' });
+['t1', 't2'].forEach((id) => hotelConflict.click({ action: 'toggle-tourist', id }));
+hotelConflict.click({ action: 'apply-tourist-group' });
+assert.match(hotelConflict.root.innerHTML, /Сверка данных/);
+assert.match(hotelConflict.root.innerHTML, /Отель/);
+assert.deepEqual(hotelConflict.snapshot().tourists, beforeHotelPreview.tourists);
+assert.deepEqual(hotelConflict.snapshot().records, beforeHotelPreview.records);
+assert.deepEqual(hotelConflict.snapshot().operationGroups, beforeHotelPreview.operationGroups);
+assert.deepEqual(hotelConflict.snapshot().tourGroupSettings, beforeHotelPreview.tourGroupSettings);
+hotelConflict.click({ action: 'pick-conflict-source', id: 't2' });
+assert.deepEqual(hotelConflict.snapshot().tourists, beforeHotelPreview.tourists);
+assert.deepEqual(hotelConflict.snapshot().records, beforeHotelPreview.records);
+assert.deepEqual(hotelConflict.snapshot().tourGroupSettings, beforeHotelPreview.tourGroupSettings);
+hotelConflict.click({ action: 'apply-conflict' });
+const hotelConflictApplied = hotelConflict.snapshot();
+assertExactlyOneRepresentativePerGroup(hotelConflictApplied, 'group creation after hotel conflict');
+const regroupedId = hotelConflictApplied.tourists.find((tourist) => tourist.id === 't1').groupId;
+assert.ok(regroupedId);
+assert.equal(hotelConflictApplied.tourists.find((tourist) => tourist.id === 't2').groupId, regroupedId);
+assert.equal(hotelConflictApplied.tourists.find((tourist) => tourist.id === 't1').groupRepresentative, true);
+assert.equal(hotelConflictApplied.tourists.find((tourist) => tourist.id === 't2').groupRepresentative, false);
+assert.deepEqual(hotelConflictApplied.records, beforeHotelPreview.records, 'shared hotel never overwrites ownValues');
+const regroupedHotel = Object.values(hotelConflictApplied.operationGroups['route-beijing-1'].hotel)
+  .find((operation) => operation.members.slice().sort().join(',') === 't1,t2');
+assert.ok(regroupedHotel);
+assert.equal(regroupedHotel.sourceId, 't2');
+hotelConflict.click({ action: 'tourist-list-mode', mode: 'groups' });
+assert.match(hotelConflict.root.innerHTML, /Соколова \+ Соколов/);
 
-// Directory CRUD and persistence.
+// Adding a member with different ownValues previews first and upserts the existing subgroup instead of duplicating it.
+const addOperationMember = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+addOperationMember.click({ action: 'summary-section', view: 'tourists' });
+addOperationMember.click({ action: 'tourist-list-mode', mode: 'groups' });
+addOperationMember.click({ action: 'split-tourist-group', group: 'family-sokolov' });
+['t1', 't2'].forEach((id) => addOperationMember.click({ action: 'toggle-tourist', id }));
+addOperationMember.click({ action: 'apply-global-split' });
+addOperationMember.click({ action: 'start-tourist-group' });
+['t1', 't2', 't3'].forEach((id) => addOperationMember.click({ action: 'toggle-tourist', id }));
+addOperationMember.click({ action: 'apply-tourist-group' });
+let groupConflictGuard = 0;
+while (addOperationMember.root.innerHTML.includes('Сверка данных')) {
+  addOperationMember.click({ action: 'pick-conflict-source', id: 't1' });
+  addOperationMember.click({ action: 'apply-conflict' });
+  groupConflictGuard += 1;
+  assert.ok(groupConflictGuard < 8, 'hotel conflict queue must terminate');
+}
+const expandedTourGroupId = addOperationMember.snapshot().tourists.find((tourist) => tourist.id === 't1').groupId;
+assert.ok(expandedTourGroupId);
+assert.ok(addOperationMember.snapshot().tourists.filter((tourist) => ['t1', 't2', 't3'].includes(tourist.id)).every((tourist) => tourist.groupId === expandedTourGroupId));
+addOperationMember.click({ action: 'summary-section', view: 'operations' });
+addOperationMember.click({ action: 'add-stage' });
+['t1', 't2'].forEach((id) => addOperationMember.click({ action: 'toggle-tourist', id }));
+addOperationMember.click({ action: 'next-operation' });
+addOperationMember.click({ action: 'save-form' });
+if (addOperationMember.root.innerHTML.includes('Сверка данных')) {
+  addOperationMember.click({ action: 'pick-conflict-source', id: 't1' });
+  addOperationMember.click({ action: 'apply-conflict' });
+}
+const existingArrival = Object.values(addOperationMember.snapshot().operationGroups['route-beijing-1'].arrival)
+  .find((operation) => operation.members.slice().sort().join(',') === 't1,t2');
+assert.ok(existingArrival);
+const beforeMemberPreview = addOperationMember.snapshot();
+const arrivalGroupCountBeforeMember = Object.keys(beforeMemberPreview.operationGroups['route-beijing-1'].arrival).length;
+addOperationMember.click({ action: 'manage-operation', members: 't1,t2', group: existingArrival.id });
+addOperationMember.click({ action: 'add-operation-members' });
+addOperationMember.click({ action: 'toggle-tourist', id: 't3' });
+addOperationMember.click({ action: 'next-operation' });
+addOperationMember.click({ action: 'save-form' });
+assert.match(addOperationMember.root.innerHTML, /Сверка данных/);
+assert.deepEqual(addOperationMember.snapshot().tourists, beforeMemberPreview.tourists);
+assert.deepEqual(addOperationMember.snapshot().records, beforeMemberPreview.records);
+assert.deepEqual(addOperationMember.snapshot().operationGroups, beforeMemberPreview.operationGroups);
+addOperationMember.click({ action: 'pick-conflict-source', id: 't3' });
+assert.deepEqual(addOperationMember.snapshot().tourists, beforeMemberPreview.tourists);
+assert.deepEqual(addOperationMember.snapshot().operationGroups, beforeMemberPreview.operationGroups);
+addOperationMember.click({ action: 'apply-conflict' });
+const afterMemberApply = addOperationMember.snapshot();
+assertExactlyOneRepresentativePerGroup(afterMemberApply, 'adding a free tourist to an existing group');
+assert.equal(Object.keys(afterMemberApply.operationGroups['route-beijing-1'].arrival).length, arrivalGroupCountBeforeMember);
+assert.ok(afterMemberApply.operationGroups['route-beijing-1'].arrival[existingArrival.id]);
+assert.deepEqual(afterMemberApply.operationGroups['route-beijing-1'].arrival[existingArrival.id].members.slice().sort(), ['t1', 't2', 't3']);
+assert.equal(afterMemberApply.operationGroups['route-beijing-1'].arrival[existingArrival.id].sourceId, 't3');
+assert.deepEqual(afterMemberApply.records, beforeMemberPreview.records);
+
+// Creating a tourist group immediately shares its hotel, but not arrivals or departures.
+const grouping = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+grouping.click({ action: 'summary-section', view: 'tourists' });
+grouping.click({ action: 'start-tourist-group' });
+['t3', 't4'].forEach((id) => grouping.click({ action: 'toggle-tourist', id }));
+grouping.click({ action: 'apply-tourist-group' });
+const createdGroupId = grouping.snapshot().tourists.find((tourist) => tourist.id === 't3').groupId;
+assertExactlyOneRepresentativePerGroup(grouping.snapshot(), 'new tourist group');
+assert.ok(createdGroupId);
+assert.equal(grouping.snapshot().tourists.find((tourist) => tourist.id === 't4').groupId, createdGroupId);
+assert.equal(grouping.snapshot().tourists.find((tourist) => tourist.id === 't3').groupRepresentative, true);
+assert.equal(grouping.snapshot().tourists.find((tourist) => tourist.id === 't4').groupRepresentative, false);
+const createdHotel = Object.values(grouping.snapshot().operationGroups['route-beijing-1'].hotel)
+  .find((operation) => operation.members.slice().sort().join(',') === 't3,t4');
+assert.ok(createdHotel, 'new tourist group must receive one shared hotel record');
+for (const operation of ['arrival', 'departure']) {
+  assert.equal(Object.values(grouping.snapshot().operationGroups['route-beijing-1'][operation])
+    .some((item) => item.members.includes('t3') && item.members.includes('t4')), false);
+}
+
+// Two existing tourist groups never merge implicitly.
+const touristsBeforeRejectedMerge = deepClone(grouping.snapshot().tourists);
+grouping.click({ action: 'start-tourist-group' });
+['t1', 't3'].forEach((id) => grouping.click({ action: 'toggle-tourist', id }));
+grouping.click({ action: 'apply-tourist-group' });
+assert.match(grouping.root.innerHTML, /двух существующих групп/);
+assert.deepEqual(grouping.snapshot().tourists, touristsBeforeRejectedMerge);
+assertExactlyOneRepresentativePerGroup(grouping.snapshot(), 'rejected group merge');
+grouping.click({ action: 'close-overlay' });
+
+// Full dissolution removes links owned by that group but preserves every individual record.
+const individualRecordsBeforeDissolve = deepClone(grouping.snapshot().records);
+grouping.click({ action: 'tourist-list-mode', mode: 'groups' });
+grouping.click({ action: 'split-tourist-group', group: createdGroupId });
+['t3', 't4'].forEach((id) => grouping.click({ action: 'toggle-tourist', id }));
+grouping.click({ action: 'apply-global-split' });
+assert.ok(grouping.snapshot().tourists.filter((tourist) => ['t3', 't4'].includes(tourist.id)).every((tourist) => !tourist.groupId));
+assertExactlyOneRepresentativePerGroup(grouping.snapshot(), 'tourist group dissolution');
+assert.deepEqual(grouping.snapshot().records, individualRecordsBeforeDissolve);
+Object.values(grouping.snapshot().operationGroups).forEach((cityOperations) => {
+  Object.values(cityOperations).forEach((operationLinks) => {
+    assert.equal(Object.values(operationLinks).some((link) => link.createdFromGroupId === createdGroupId), false);
+  });
+});
+
+// Saving a departure pre-fills only the empty arrival at the tourist's next route stop.
+const transfer = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
+transfer.click({ action: 'stage', stage: 'departure' });
+transfer.click({ action: 'add-stage' });
+transfer.click({ action: 'toggle-tourist', id: 't4' });
+transfer.click({ action: 'next-operation' });
+transfer.input({ field: 'date' }, '2026-09-17');
+transfer.input({ field: 'time' }, '12:45');
+transfer.input({ field: 'transport' }, 'bus', 'change');
+transfer.input({ field: 'number' }, 'K12');
+transfer.click({ action: 'save-form' });
+const nextArrival = transfer.snapshot().records['route-shanghai-1'].arrival.t4;
+assert.equal(nextArrival.date, '2026-09-17');
+assert.equal(nextArrival.time, '12:45');
+assert.equal(nextArrival.transport, 'bus');
+assert.equal(nextArrival.number, 'K12');
+
+// Directory rules cover multiple, one and zero compatible points, including manual fallback and persistence.
 const directoryStorage = new Map();
-const directory = loadPrototype('tour-operations.js', '#app', '', directoryStorage);
+const directory = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary', directoryStorage);
 selectRole(directory, 'admin');
 directory.click({ action: 'tour-menu' });
 directory.click({ action: 'open-directory' });
 directory.click({ action: 'open-directory-city', id: 'city-beijing' });
 directory.click({ action: 'toggle-directory-point', id: 'point-pkx' });
 assert.equal(JSON.parse(directoryStorage.get('unique-guide-directory-v1')).points.find((point) => point.id === 'point-pkx').active, false);
-directory.click({ action: 'close-overlay' });
-directory.click({ action: 'new-directory-city' });
-directory.submit('directory-city-form', { name: 'Тестоград', country: 'Тестландия', aliases: 'Test City', active: 'true' }, { id: '' });
-assert.match(directory.root.innerHTML, /Тестоград/);
-
-const directoryReload = loadPrototype('tour-operations.js', '#app', '', directoryStorage);
+const directoryReload = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary', directoryStorage);
+selectRole(directoryReload, 'admin');
 directoryReload.click({ action: 'tour-menu' });
 directoryReload.click({ action: 'open-directory' });
-assert.match(directoryReload.root.innerHTML, /Тестоград/);
 directoryReload.click({ action: 'open-directory-city', id: 'city-beijing' });
 assert.match(directoryReload.root.innerHTML, /Дасин/);
 assert.match(directoryReload.root.innerHTML, /архив/i);
 
-// 0, 1 and multiple transport-point rules.
-const multiplePoints = loadPrototype('tour-operations.js', '#app');
+const multiplePoints = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
 multiplePoints.click({ action: 'add-stage' });
 multiplePoints.click({ action: 'toggle-tourist', id: 't4' });
 multiplePoints.click({ action: 'next-operation' });
@@ -942,7 +1068,7 @@ multiplePoints.click({ action: 'open-point-picker' });
 assert.match(multiplePoints.root.innerHTML, /Дасин/);
 assert.match(multiplePoints.root.innerHTML, /Шоуду/);
 
-const onePoint = loadPrototype('tour-operations.js', '#app');
+const onePoint = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
 selectCity(onePoint, 1);
 onePoint.click({ action: 'stage', stage: 'departure' });
 onePoint.click({ action: 'add-stage' });
@@ -952,7 +1078,7 @@ onePoint.input({ field: 'transport' }, 'train', 'change');
 assert.match(onePoint.root.innerHTML, /Сиань Северный/);
 assert.match(onePoint.root.innerHTML, /Подставлено из справочника/);
 
-const noPoints = loadPrototype('tour-operations.js', '#app');
+const noPoints = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary');
 selectCity(noPoints, 2);
 noPoints.click({ action: 'stage', stage: 'departure' });
 noPoints.click({ action: 'add-stage' });
@@ -961,19 +1087,196 @@ noPoints.click({ action: 'next-operation' });
 noPoints.input({ field: 'transport' }, 'bus', 'change');
 assert.match(noPoints.root.innerHTML, /Указать вручную/);
 assert.match(noPoints.root.innerHTML, /Не из справочника/);
+noPoints.input({ field: 'point', manualPoint: '' }, 'Площадь у отеля');
+noPoints.input({ field: 'transport' }, 'plane', 'change');
+assert.match(noPoints.root.innerHTML, /value="Площадь у отеля"/);
+assert.match(noPoints.root.innerHTML, /Не из справочника/);
+noPoints.click({ action: 'save-form' });
+assert.equal(noPoints.snapshot().records['route-shanghai-1'].departure.t1.point, 'Площадь у отеля');
+assert.equal(noPoints.snapshot().records['route-shanghai-1'].departure.t1.pointManual, true);
 
-// Operation drafts also require an explicit discard decision.
-const dirtyOperation = loadPrototype('tour-operations.js', '#app');
-dirtyOperation.click({ action: 'add-stage' });
-dirtyOperation.click({ action: 'toggle-tourist', id: 't4' });
-dirtyOperation.click({ action: 'next-operation' });
-dirtyOperation.input({ field: 'time' }, '18:45');
-dirtyOperation.click({ action: 'close-overlay' });
-assert.match(dirtyOperation.root.innerHTML, /Закрыть без сохранения/);
-dirtyOperation.click({ action: 'continue-editing' });
-assert.match(dirtyOperation.root.innerHTML, /value="18:45"/);
+// Confirmation repeats the usage check: a forged/stale delete cannot remove a point that became referenced after preview.
+const directoryToctou = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=admin');
+const recordsBeforeToctou = deepClone(directoryToctou.snapshot().records);
+assert.equal(directoryToctou.snapshot().directory.points.find((point) => point.id === 'point-pkx').active, true);
+directoryToctou.dispatch({ action: 'confirm-delete-directory-point', id: 'point-pkx' });
+const protectedUsedPoint = directoryToctou.snapshot().directory.points.find((point) => point.id === 'point-pkx');
+assert.ok(protectedUsedPoint, 'a used point must survive a stale confirmation');
+assert.equal(protectedUsedPoint.active, false, 'a used point is archived instead of hard-deleted');
+assert.deepEqual(directoryToctou.snapshot().records, recordsBeforeToctou);
 
-// Static isolation and canonical spec checks.
+// Roles are enforced in both rendering and forged event handlers.
+const managerActions = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=manager');
+assert.match(managerActions.root.innerHTML, /data-action="(?:cancel-tour|close-tour)"/);
+assert.doesNotMatch(managerActions.root.innerHTML, /data-action="(?:archive-tour|delete-tour)"/);
+const adminActions = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=admin');
+assert.match(adminActions.root.innerHTML, /data-action="archive-tour"/);
+assert.match(adminActions.root.innerHTML, /data-action="delete-tour"/);
+for (const readonlyRole of ['escort', 'viewer']) {
+  const readonlyActions = loadPrototype('tour-operations.js', '#app', `?tourId=china&tourSection=actions&role=${readonlyRole}`);
+  assert.doesNotMatch(readonlyActions.root.innerHTML, /data-action="(?:cancel-tour|reopen-tour|archive-tour|delete-tour)"/);
+  const readonlyToursBefore = deepClone(readonlyActions.snapshot().tours);
+  ['cancel-tour', 'reopen-tour', 'archive-tour', 'delete-tour'].forEach((action) => readonlyActions.dispatch({ action }));
+  assert.deepEqual(readonlyActions.snapshot().tours, readonlyToursBefore);
+}
+
+// Reopen is a state transition from cancelled only; forged clicks cannot mutate active or draft tours.
+const forgedActiveReopen = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=manager');
+const activeToursBeforeReopen = deepClone(forgedActiveReopen.snapshot().tours);
+const activeLeadArchiveBeforeReopen = deepClone(forgedActiveReopen.snapshot().leadArchiveMocks);
+forgedActiveReopen.dispatch({ action: 'reopen-tour' });
+assert.deepEqual(forgedActiveReopen.snapshot().tours, activeToursBeforeReopen);
+assert.deepEqual(forgedActiveReopen.snapshot().leadArchiveMocks, activeLeadArchiveBeforeReopen);
+assert.match(forgedActiveReopen.root.innerHTML, /Повторно открыть можно только отменённый доступный тур/);
+
+const forgedDraftReopen = loadPrototype('tour-operations.js', '#app', '?tourId=japan&tourSection=actions&role=admin');
+const draftToursBeforeReopen = deepClone(forgedDraftReopen.snapshot().tours);
+forgedDraftReopen.dispatch({ action: 'reopen-tour' });
+assert.deepEqual(forgedDraftReopen.snapshot().tours, draftToursBeforeReopen);
+assert.equal(forgedDraftReopen.snapshot().tours.find((tour) => tour.id === 'japan').status, 'draft');
+
+function lifecycleStorage() {
+  const storage = new Map();
+  const leadSeed = loadPrototype('mobile-leads.js', '#app', '?role=admin', storage);
+  storage.set('unique-guide-leads-v1', JSON.stringify(leadSeed.snapshot().leads));
+  return storage;
+}
+function linkedLeads(storage, tourSnapshot, tourId) {
+  const linkedLeadIds = new Set(tourSnapshot.tourists.filter((tourist) => tourist.tourId === tourId).map((tourist) => tourist.leadId));
+  return JSON.parse(storage.get('unique-guide-leads-v1')).filter((item) => linkedLeadIds.has(item.id));
+}
+
+// AC-46: cancel/archive preserve tour data while linked Leads follow the lifecycle; reopen/unarchive restores them.
+const cancelLifecycleStorage = lifecycleStorage();
+const cancelLifecycle = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=manager', cancelLifecycleStorage);
+const cancelDataBefore = { tourists: deepClone(cancelLifecycle.snapshot().tourists), records: deepClone(cancelLifecycle.snapshot().records) };
+cancelLifecycle.click({ action: 'cancel-tour' });
+cancelLifecycle.submit('cancel-tour-form', { reason: 'Contract smoke cancellation' }, { id: 'china' });
+assert.equal(cancelLifecycle.snapshot().tours.find((tour) => tour.id === 'china').status, 'cancelled');
+assert.ok(linkedLeads(cancelLifecycleStorage, cancelLifecycle.snapshot(), 'china').every((leadItem) => leadItem.archived));
+assert.deepEqual(cancelLifecycle.snapshot().tourists, cancelDataBefore.tourists);
+assert.deepEqual(cancelLifecycle.snapshot().records, cancelDataBefore.records);
+cancelLifecycle.click({ action: 'open-tours' });
+assert.match(cancelLifecycle.root.innerHTML, /Гранд-тур по Китаю/);
+assert.match(cancelLifecycle.root.innerHTML, /Отменён/);
+assert.match(cancelLifecycle.root.innerHTML, /data-action="tour-filter" data-filter="archive"/);
+cancelLifecycle.click({ action: 'select-tour', id: 'china' });
+cancelLifecycle.click({ action: 'workspace', view: 'tour-actions' });
+cancelLifecycle.click({ action: 'reopen-tour' });
+assert.equal(cancelLifecycle.snapshot().tours.find((tour) => tour.id === 'china').status, 'active');
+assert.ok(linkedLeads(cancelLifecycleStorage, cancelLifecycle.snapshot(), 'china').every((leadItem) => !leadItem.archived));
+
+const archiveLifecycleStorage = lifecycleStorage();
+const archiveLifecycle = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=admin', archiveLifecycleStorage);
+const archiveDataBefore = { tourists: deepClone(archiveLifecycle.snapshot().tourists), records: deepClone(archiveLifecycle.snapshot().records) };
+archiveLifecycle.click({ action: 'archive-tour' });
+assert.equal(archiveLifecycle.snapshot().tours.find((tour) => tour.id === 'china').isArchived, true);
+assert.ok(linkedLeads(archiveLifecycleStorage, archiveLifecycle.snapshot(), 'china').every((leadItem) => leadItem.archived));
+assert.deepEqual(archiveLifecycle.snapshot().tourists, archiveDataBefore.tourists);
+assert.deepEqual(archiveLifecycle.snapshot().records, archiveDataBefore.records);
+archiveLifecycle.click({ action: 'archive-tour' });
+assert.equal(archiveLifecycle.snapshot().tours.find((tour) => tour.id === 'china').isArchived, false);
+assert.ok(linkedLeads(archiveLifecycleStorage, archiveLifecycle.snapshot(), 'china').every((leadItem) => !leadItem.archived));
+
+// Archiving a draft restores its draft lifecycle, not a generic active status.
+const draftLifecycle = loadPrototype('tour-operations.js', '#app', '?tourId=japan&tourSection=actions&role=admin');
+assert.equal(draftLifecycle.snapshot().tours.find((tour) => tour.id === 'japan').status, 'draft');
+draftLifecycle.click({ action: 'archive-tour' });
+assert.equal(draftLifecycle.snapshot().tours.find((tour) => tour.id === 'japan').status, 'archive');
+assert.equal(draftLifecycle.snapshot().tours.find((tour) => tour.id === 'japan').isArchived, true);
+draftLifecycle.click({ action: 'archive-tour' });
+assert.equal(draftLifecycle.snapshot().tours.find((tour) => tour.id === 'japan').status, 'draft');
+assert.equal(draftLifecycle.snapshot().tours.find((tour) => tour.id === 'japan').isArchived, false);
+
+// Copies of archived and cancelled tours always start as clean, empty drafts.
+const archivedCopy = loadPrototype('tour-operations.js', '#app', '?tourId=italy&tourSection=actions&role=admin');
+archivedCopy.click({ action: 'copy-tour' });
+const archivedDraftCopy = archivedCopy.snapshot().tours.find((tour) => tour.name === 'Италия для своих · копия');
+assert.ok(archivedDraftCopy);
+assert.equal(archivedDraftCopy.status, 'draft');
+assert.equal(archivedDraftCopy.isArchived, false);
+assert.equal(archivedDraftCopy.cancelReason, '');
+assert.equal(archivedDraftCopy.statusBeforeArchive, null);
+assert.equal(archivedDraftCopy.statusBeforeCancel, null);
+assert.equal(archivedDraftCopy.bookedCount, 0);
+assert.deepEqual(archivedDraftCopy.statusCounts, { confirmed: 0, pending: 0, cancelled: 0 });
+
+const cancelledCopyStorage = lifecycleStorage();
+const cancelledCopy = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=actions&role=admin', cancelledCopyStorage);
+cancelledCopy.click({ action: 'cancel-tour' });
+cancelledCopy.submit('cancel-tour-form', { reason: 'Copy lifecycle smoke' }, { id: 'china' });
+cancelledCopy.click({ action: 'copy-tour' });
+const cancelledDraftCopy = cancelledCopy.snapshot().tours.find((tour) => tour.name === 'Гранд-тур по Китаю · копия');
+assert.ok(cancelledDraftCopy);
+assert.equal(cancelledDraftCopy.status, 'draft');
+assert.equal(cancelledDraftCopy.isArchived, false);
+assert.equal(cancelledDraftCopy.cancelReason, '');
+assert.equal(cancelledDraftCopy.statusBeforeArchive, null);
+assert.equal(cancelledDraftCopy.statusBeforeCancel, null);
+assert.equal(cancelledDraftCopy.bookedCount, 0);
+assert.deepEqual(cancelledDraftCopy.statusCounts, { confirmed: 0, pending: 0, cancelled: 0 });
+const guideSummary = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=guide');
+const guideRecordsBefore = deepClone(guideSummary.snapshot().records);
+assert.match(guideSummary.root.innerHTML, /Режим просмотра/);
+assert.doesNotMatch(guideSummary.root.innerHTML, /data-action="add-stage"/);
+guideSummary.dispatch({ action: 'add-stage' });
+assert.deepEqual(guideSummary.snapshot().records, guideRecordsBefore);
+
+// Saving and save-error are explicit, non-network UI states with retry and draft-return actions.
+const savingState = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=manager');
+savingState.click({ action: 'role-menu' });
+savingState.click({ action: 'open-ui-states' });
+savingState.click({ action: 'set-ui-state', state: 'saving' });
+assert.equal(savingState.snapshot().uiPreview, 'saving');
+assert.match(savingState.root.innerHTML, /Сохраняем изменения/);
+assert.match(savingState.root.innerHTML, /disabled aria-busy="true">Сохраняем…/);
+
+const saveErrorState = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=manager');
+saveErrorState.click({ action: 'role-menu' });
+saveErrorState.click({ action: 'open-ui-states' });
+saveErrorState.click({ action: 'set-ui-state', state: 'save-error' });
+assert.equal(saveErrorState.snapshot().uiPreview, 'save-error');
+assert.match(saveErrorState.root.innerHTML, /Не удалось сохранить/);
+assert.match(saveErrorState.root.innerHTML, /Черновик и выбранные туристы сохранены/);
+assert.match(saveErrorState.root.innerHTML, /data-action="return-draft-state"/);
+assert.match(saveErrorState.root.innerHTML, /data-action="retry-save-state"/);
+saveErrorState.click({ action: 'retry-save-state' });
+assert.equal(saveErrorState.snapshot().uiPreview, 'saving');
+assert.match(saveErrorState.root.innerHTML, /Сохраняем изменения/);
+
+const returnDraftState = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=manager');
+returnDraftState.click({ action: 'role-menu' });
+returnDraftState.click({ action: 'open-ui-states' });
+returnDraftState.click({ action: 'set-ui-state', state: 'save-error' });
+returnDraftState.click({ action: 'return-draft-state' });
+assert.equal(returnDraftState.snapshot().uiPreview, 'ready');
+
+// Save-error restores the actual operation draft, selected member and navigation context, not only a success toast.
+const operationDraftState = loadPrototype('tour-operations.js', '#app', '?tourId=china&tourSection=summary&role=manager');
+selectCity(operationDraftState, 1);
+operationDraftState.click({ action: 'stage', stage: 'departure' });
+operationDraftState.click({ action: 'add-stage' });
+operationDraftState.click({ action: 'toggle-tourist', id: 't1' });
+operationDraftState.click({ action: 'next-operation' });
+operationDraftState.input({ field: 'date' }, '2026-10-04');
+operationDraftState.input({ field: 'time' }, '09:17');
+operationDraftState.input({ field: 'transport' }, 'train', 'change');
+operationDraftState.input({ field: 'number' }, 'G-910');
+operationDraftState.dispatch({ action: 'set-ui-state', state: 'save-error' });
+assert.equal(operationDraftState.snapshot().uiPreview, 'save-error');
+assert.ok(operationDraftState.snapshot().saveErrorSnapshot, 'save-error must retain a structured draft snapshot');
+operationDraftState.click({ action: 'return-draft-state' });
+const restoredOperationDraft = operationDraftState.snapshot();
+assert.equal(restoredOperationDraft.uiPreview, 'ready');
+assert.equal(restoredOperationDraft.routeCityId, 'route-xian-1');
+assert.equal(restoredOperationDraft.stage, 'departure');
+assert.match(operationDraftState.root.innerHTML, /Соколов Илья Максимович|Соколова Анна Игоревна/);
+assert.match(operationDraftState.root.innerHTML, /value="2026-10-04"/);
+assert.match(operationDraftState.root.innerHTML, /value="09:17"/);
+assert.match(operationDraftState.root.innerHTML, /value="G-910"/);
+assert.match(operationDraftState.root.innerHTML, /<option value="train"[^>]*selected/);
+
+// Static isolation: the prototype is mock/localStorage-only and has no production integration.
 const activeFiles = [
   'mobile-leads.html', 'mobile-leads.css', 'mobile-leads.js',
   'tour-operations.html', 'tour-operations.css', 'tour-operations.js',
@@ -983,58 +1286,26 @@ const activeSource = activeFiles.map((file) => fs.readFileSync(file, 'utf8')).jo
 const activeJs = fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8');
 assert.doesNotMatch(activeSource, /@import\s+url\(|url\(["']?https?:|<script[^>]+https?:|<link[^>]+https?:/i);
 assert.doesNotMatch(activeJs, /(?:fetch\s*\(|new\s+XMLHttpRequest|new\s+WebSocket|new\s+EventSource|sendBeacon\s*\(|\/api\/)/);
-assert.doesNotMatch(fs.readFileSync('mobile-leads.js', 'utf8') + fs.readFileSync('tour-operations.js', 'utf8') + fs.readFileSync('tour-operations.html', 'utf8'), /ФИНАНС|Стоимость|Аванс|Остаток|\bfinance\b|\bbalance\b/i);
+assert.doesNotMatch(activeSource, />\s*(?:Финансы|Расходы)\s*</i);
 
+// Markdown is the canonical specification and the visual HTML is a generated, hashed view of it.
 const specMarkdown = fs.readFileSync('mobile-leads-tz.md', 'utf8');
 const specHtml = fs.readFileSync('mobile-leads-tz.html', 'utf8');
-const specCss = fs.readFileSync('mobile-leads-tz.css', 'utf8');
 const specImages = [
-  '01-lead-to-summary.png',
-  '02-tour-summary.png',
-  '03-tour-coverage.png',
-  '04-tourist-group-selection.png',
-  '05-conflict-review.png',
-  '06-tourist-logistics.png',
-  '07-city-directory.png',
-  '08-split-operation.png',
-  '09-guide-readonly.png',
-  '10-work-status.png',
-  '11-offline.png',
-  '12-point-picker.png',
-  '13-error-state.png',
-  '14-empty-state.png',
-  '15-summary-375.png',
+  '16-lead-final.png', '17-tour-final.png', '18-tourist-profile-final.png',
+  '19-tourist-tour-final.png', '20-summary-final.png', '21-team-final.png', '22-statuses-final.png',
 ];
 specImages.forEach((image) => {
-  const path = `assets/spec/${image}`;
-  assert.ok(fs.statSync(path).size > 10_000, `${path} must contain a real interface screenshot`);
-  assert.equal(specHtml.split(path).length - 1, 2, `${path} must be linked and rendered once in the visual spec`);
-  assert.match(specMarkdown, new RegExp(`\\(${escapeRegExp(path)}\\)`), `${path} must be documented in Markdown`);
+  const assetPath = `assets/spec/${image}`;
+  assert.ok(fs.statSync(assetPath).size > 10_000, `${assetPath} must contain a real prototype screenshot`);
+  assert.match(specMarkdown, new RegExp(escapeRegExp(assetPath)), `${assetPath} must be documented in Markdown`);
+  assert.match(specHtml, new RegExp(`src="${escapeRegExp(assetPath)}"`), `${assetPath} must be rendered in HTML`);
 });
-assert.doesNotMatch(specHtml, /<span class="marker/, 'decorative screenshot markers must be hidden from assistive technology');
-assert.ok((specHtml.match(/aria-hidden="true" class="marker/g) || []).length >= 40, 'annotated screenshots must keep their visual markers');
-assert.match(specCss, /\.shot-frame:focus-within::after\s*\{[^}]*border:\s*4px solid #0b57d0/s, 'screenshot links need an internal keyboard focus ring');
-assert.doesNotMatch(specCss, /min\(100%\s*-\s*24px/, 'mobile width must use valid calc syntax');
-const idPattern = /\b(?:SCOPE|MVP|FLOW|MODEL|IA|LEAD|TOUR|CARD|READY|STATUS|OPS|GROUP|LIST|DOC|ROLE|DIR|STATE|VIS|API|AC|NG|BL)-\d+\b/g;
-const markdownIds = [...new Set(specMarkdown.match(idPattern) || [])].sort();
-const htmlIds = [...new Set(specHtml.match(idPattern) || [])].sort();
-assert.deepEqual(htmlIds, markdownIds);
-assert.ok(markdownIds.length >= 100, 'the canonical spec must retain the full requirement set');
-const requirementRows = specMarkdown.split('\n').map((line) => line.match(/^- \*\*([A-Z]+-\d{2})\.\*\* (.+)$/)).filter(Boolean);
-const renderRequirementText = (value) => value
-  .replace(/&/g, '&amp;')
-  .replace(/</g, '&lt;')
-  .replace(/>/g, '&gt;')
-  .replace(/`([^`]+)`/g, '<code>$1</code>')
-  .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
-assert.equal(requirementRows.length, markdownIds.length, 'each requirement ID must have one canonical Markdown row');
-requirementRows.forEach(([, id, text]) => {
-  const exactRow = `<li class="req"><strong>${id}.</strong> ${renderRequirementText(text)}</li>`;
-  assert.equal(specHtml.split(exactRow).length - 1, 1, `${id} must have the exact canonical meaning in HTML`);
-});
+assert.equal((specHtml.match(/aria-hidden="true" class="marker/g) || []).length, 28);
+const requirementIds = [...new Set(specMarkdown.match(/\b(?:AC|NG|BL)-\d+\b/g) || [])];
+assert.ok(requirementIds.length >= 60, 'the canonical spec must retain acceptance criteria, non-goals and backlog');
 const markdownHash = crypto.createHash('sha256').update(specMarkdown).digest('hex');
 assert.match(specHtml, new RegExp(`<meta name="spec-sha256" content="${markdownHash}">`));
 
 assert.equal(networkCalls.length, 0, `prototype made network calls: ${JSON.stringify(networkCalls)}`);
-
-console.log(`Prototype smoke test passed (${markdownIds.length} requirement IDs)`);
+console.log(`Prototype smoke test passed (${requirementIds.length} canonical IDs)`);

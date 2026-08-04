@@ -24,7 +24,7 @@
       latinName: 'ANNA SOKOLOVA', passport: '72 3456789', passportExpiry: '2031-05-21', scans: [{ id: 'scan-t1-1', name: 'passport-anna.jpg', status: 'ready' }],
       lead: 'Лид Соколовы', leadId: 'lead-1042', leadStatus: 'Подтверждён', tourStatus: 'Подтверждён', groupId: 'family-sokolov', groupRepresentative: true,
       route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1'], type: 'Взрослый', isPrimary: true,
-      internalNote: 'Вегетарианское меню. Плательщик по заявке.', guideComment: 'Встречать у выхода B.', preferredChannel: 'WhatsApp'
+      notes: 'Вегетарианское меню. Плательщик по заявке.', guideComment: 'Встречать у выхода B.', preferredChannel: 'WhatsApp'
     },
     {
       id: 't2', leadTouristId: 'lt-1042-2', contactId: 'contact-202', dealId: 'deal-502', tourId: 'china',
@@ -34,7 +34,7 @@
       latinName: 'ILIA SOKOLOV', passport: '72 1122334', passportExpiry: '2026-11-18', scans: [],
       lead: 'Лид Соколовы', leadId: 'lead-1042', leadStatus: 'Подтверждён', tourStatus: 'Подтверждён', groupId: 'family-sokolov', groupRepresentative: false,
       route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1'], type: 'Ребёнок', isPrimary: false,
-      internalNote: '', guideComment: 'Аллергия на арахис.', preferredChannel: 'Telegram'
+      notes: '', guideComment: 'Аллергия на арахис.', preferredChannel: 'Telegram'
     },
     {
       id: 't3', leadTouristId: 'lt-1048-1', contactId: 'contact-203', dealId: 'deal-503', tourId: 'china',
@@ -44,7 +44,7 @@
       latinName: 'MARINA ORLOVA', passport: 'N12345678', passportExpiry: '2030-02-10', scans: [{ id: 'scan-t3-1', name: 'passport-marina.pdf', status: 'ready' }],
       lead: 'Лид Орлова', leadId: 'lead-1048', leadStatus: 'Подтверждён', tourStatus: 'Ожидает', groupId: null, groupRepresentative: false,
       route: ['route-beijing-1', 'route-xian-1', 'route-shanghai-1', 'route-beijing-2'], type: 'Взрослый', isPrimary: true,
-      internalNote: 'Связь после 10:00 по Москве.', guideComment: 'Говорит по-английски.', preferredChannel: 'Telegram'
+      notes: 'Связь после 10:00 по Москве.', guideComment: 'Говорит по-английски.', preferredChannel: 'Telegram'
     },
     {
       id: 't4', leadTouristId: 'lt-1048-2', contactId: null, dealId: 'deal-504', tourId: 'china',
@@ -54,7 +54,7 @@
       latinName: '', passport: '', passportExpiry: '', scans: [],
       lead: 'Лид Орлова', leadId: 'lead-1048', leadStatus: 'Подтверждён', tourStatus: 'Ожидает', groupId: null, groupRepresentative: false,
       route: ['route-beijing-1', 'route-shanghai-1'], type: 'Младенец', isPrimary: false,
-      internalNote: 'Контакт через основного туриста.', guideComment: 'Нужна детская кроватка.', preferredChannel: ''
+      notes: 'Контакт через основного туриста.', guideComment: 'Нужна детская кроватка.', preferredChannel: ''
     }
   ];
 
@@ -62,6 +62,7 @@
   var canonicalTouristStore = [];
 
   function normalizeCanonicalTourist(tourist) {
+    if (tourist.notes == null && tourist.internalNote != null) tourist.notes = tourist.internalNote;
     tourist.tourId = tourist.tourId || (tourist.route && tourist.route.length ? 'china' : null);
     tourist.route = Array.isArray(tourist.route) ? tourist.route : [];
     tourist.scans = Array.isArray(tourist.scans) ? tourist.scans : [];
@@ -104,13 +105,42 @@
   tourists.forEach(normalizeCanonicalTourist);
   hydrateCanonicalTourists();
 
-  var roleLabels = { admin: 'Администратор', manager: 'Менеджер', escort: 'Сопровождающий', guide: 'Гид' };
+  // Production calls this role `viewer`; keep the user-facing CRM label "Гид".
+  // The legacy `?role=guide` deep link is normalized below and never enters state.
+  var roleLabels = { admin: 'Администратор', manager: 'Менеджер', escort: 'Сопровождающий', viewer: 'Гид', forbidden: 'Пользователь' };
   var managerTourIds = ['china'];
   var managerLeadIds = ['lead-1042', 'lead-1048'];
   var escortTourIds = ['china'];
-  var guideTourIds = ['china'];
-  var guideCityIds = ['route-beijing-1', 'route-xian-1'];
+  var viewerTourIds = ['china'];
+  var viewerCityIds = ['route-beijing-1', 'route-xian-1'];
   var LEAD_STORAGE_KEY = 'unique-guide-leads-v1';
+  var userDirectory = [
+    { id: 'user-guide-li-wei', name: 'Ли Вэй', roles: ['viewer'] },
+    { id: 'user-guide-anna-kim', name: 'Анна Ким', roles: ['viewer', 'escort'] },
+    { id: 'user-guide-yuki-tanaka', name: 'Юки Танака', roles: ['viewer'] },
+    { id: 'user-guide-marco-rossi', name: 'Марко Росси', roles: ['viewer'] },
+    { id: 'user-escort-maria-belova', name: 'Мария Белова', roles: ['escort'] },
+    { id: 'user-manager-elena', name: 'Елена Воронова', roles: ['manager', 'chat_admin'] },
+    { id: 'user-manager-igor', name: 'Игорь Лебедев', roles: ['manager', 'chat_admin'] }
+  ];
+  var leadArchiveMocks = {};
+
+  function directoryUser(userId) {
+    return userDirectory.find(function (user) { return user.id === userId; }) || null;
+  }
+
+  function directoryUserName(userId) {
+    var user = directoryUser(userId);
+    return user ? user.name : 'Не назначен';
+  }
+
+  function userOptions(role, selectedId) {
+    return '<option value="">Не назначен</option>' + userDirectory.filter(function (user) {
+      return user.roles.indexOf(role) !== -1;
+    }).map(function (user) {
+      return '<option value="' + h(user.id) + '" ' + (user.id === selectedId ? 'selected' : '') + '>' + h(user.name) + '</option>';
+    }).join('');
+  }
 
   function hydrateManagerAssignments() {
     try {
@@ -171,7 +201,7 @@
       departure: {
         t1: { date: '2026-09-17', time: '08:40', transport: 'train', number: 'G89', point: 'Пекин Западный', pointId: 'point-beijing-west', transfer: 'Минивэн', groupId: 'dep-a' },
         t2: { date: '2026-09-17', time: '09:15', transport: 'train', number: 'G91', point: 'Пекин Южный', pointManual: true, transfer: 'Такси', groupId: 'dep-a' },
-        t3: { date: '2026-09-17', time: '11:00', transport: 'car', number: '', point: 'Лобби Hutong Garden', pointManual: true, transfer: 'Такси', groupId: 'dep-c' },
+        t3: { date: '2026-09-17', time: '11:00', transport: 'bus', number: 'K8', point: 'Люличао', pointId: 'point-beijing-bus', transfer: 'Такси', groupId: 'dep-c' },
         t4: { date: '2026-09-17', time: '12:30', transport: 'bus', number: 'K12', point: 'Люличао', pointId: 'point-beijing-bus', transfer: 'Самостоятельно', groupId: 'dep-d' }
       }
     },
@@ -248,6 +278,138 @@
     });
   });
 
+  // Web EventSummary creates every tourist group with a shared hotel and
+  // individual arrival/departure. Operation groups below are presentation
+  // links only: individual visit records stay untouched.
+  var tourGroupSettings = {
+    'family-sokolov': { sharedHotel: true, sharedArrival: false, sharedDeparture: false }
+  };
+
+  function ensureDefaultSharedHotel(groupId) {
+    var conflicts = [];
+    if (!groupId || !tourGroupSettings[groupId] || !tourGroupSettings[groupId].sharedHotel) return conflicts;
+    cities.forEach(function (city) {
+      var members = tourists.filter(function (tourist) {
+        return tourist.tourId === state.selectedTourId && tourist.groupId === groupId && tourist.route.indexOf(city.id) !== -1;
+      }).map(function (tourist) { return tourist.id; });
+      var groups = operationGroups[city.id].hotel;
+      var defaultId = 'hotel-default-' + groupId + '-' + city.id;
+      if (members.length < 2) {
+        delete groups[defaultId];
+        return;
+      }
+      var matchingGroupId = Object.keys(groups).find(function (candidateId) {
+        var candidate = groups[candidateId];
+        return candidate.createdFromGroupId === groupId || candidate.members.slice().sort().join(',') === members.slice().sort().join(',');
+      });
+      var existing = matchingGroupId ? groups[matchingGroupId] : groups[defaultId];
+      var alreadyConfirmed = existing && existing.members.slice().sort().join(',') === members.slice().sort().join(',');
+      var sourceKeys = {};
+      var sources = [];
+      var candidateMembers = members.slice();
+      if (existing && !alreadyConfirmed) {
+        candidateMembers = members.filter(function (touristId) { return existing.members.indexOf(touristId) === -1; });
+        if (members.indexOf(existing.sourceId) !== -1) candidateMembers.unshift(existing.sourceId);
+      }
+      candidateMembers.forEach(function (touristId) {
+        var ownHotel = records[city.id].hotel[touristId];
+        if (!hasData(ownHotel, 'hotel')) return;
+        var key = recordKey(ownHotel, 'hotel');
+        if (sourceKeys[key]) return;
+        sourceKeys[key] = touristId;
+        sources.push(touristId);
+      });
+      if (!alreadyConfirmed && sources.length > 1) {
+        conflicts.push({
+          routeCityId: city.id,
+          members: members.slice(),
+          sources: sources,
+          groupId: existing ? existing.id : null
+        });
+        return;
+      }
+      if (matchingGroupId && matchingGroupId !== defaultId) delete groups[defaultId];
+      var sourceId = existing && members.indexOf(existing.sourceId) !== -1 ? existing.sourceId : (sources[0] || members[0]);
+      var resolvedId = matchingGroupId || defaultId;
+      groups[resolvedId] = syncOperationGroup({
+        id: resolvedId,
+        subgroupId: resolvedId,
+        sourceId: sourceId,
+        masterId: sourceId,
+        createdFromGroupId: groupId,
+        members: members,
+        idempotencyKey: [state.selectedTourId, city.id, 'hotel', members.slice().sort().join(',')].join('|')
+      }, city.id, 'hotel');
+    });
+    return conflicts;
+  }
+
+  function previewDefaultSharedHotelConflicts(pendingGroup) {
+    var conflicts = [];
+    if (!pendingGroup || !pendingGroup.settings.sharedHotel) return conflicts;
+    cities.forEach(function (city) {
+      var members = pendingGroup.allMemberIds.filter(function (touristId) {
+        var tourist = touristById(touristId);
+        return tourist && tourist.route.indexOf(city.id) !== -1;
+      });
+      if (members.length < 2) return;
+      var groups = operationGroups[city.id].hotel;
+      var matchingGroupId = Object.keys(groups).find(function (candidateId) {
+        var candidate = groups[candidateId];
+        return candidate.createdFromGroupId === pendingGroup.groupId || candidate.members.slice().sort().join(',') === members.slice().sort().join(',');
+      });
+      var existing = matchingGroupId ? groups[matchingGroupId] : null;
+      var alreadyConfirmed = existing && existing.members.slice().sort().join(',') === members.slice().sort().join(',');
+      var candidateMembers = members.slice();
+      if (existing && !alreadyConfirmed) {
+        candidateMembers = members.filter(function (touristId) { return existing.members.indexOf(touristId) === -1; });
+        if (members.indexOf(existing.sourceId) !== -1) candidateMembers.unshift(existing.sourceId);
+      }
+      var sourceKeys = {};
+      var sources = [];
+      candidateMembers.forEach(function (touristId) {
+        var ownHotel = records[city.id].hotel[touristId];
+        if (!hasData(ownHotel, 'hotel')) return;
+        var key = recordKey(ownHotel, 'hotel');
+        if (sourceKeys[key]) return;
+        sourceKeys[key] = touristId;
+        sources.push(touristId);
+      });
+      if (!alreadyConfirmed && sources.length > 1) conflicts.push({
+        routeCityId: city.id,
+        members: members,
+        sources: sources,
+        groupId: existing ? existing.id : null
+      });
+    });
+    return conflicts;
+  }
+
+  function openDefaultHotelConflict(pendingGroup, conflicts) {
+    var conflict = conflicts[0];
+    if (!conflict) return false;
+    var cityIndex = cities.findIndex(function (city) { return city.id === conflict.routeCityId; });
+    if (cityIndex >= 0) state.cityIndex = cityIndex;
+    var firstSource = conflict.sources[0];
+    state.draft = cleanRecord(records[conflict.routeCityId].hotel[firstSource] || blankRecord('hotel'), 'hotel');
+    state.overlay = {
+      kind: 'conflict',
+      stage: 'hotel',
+      members: conflict.members.slice(),
+      sources: conflict.sources.slice(),
+      sourceId: null,
+      previousDraft: Object.assign({}, state.draft),
+      dirtyFields: new Set(),
+      groupId: conflict.groupId || null,
+      routeCityId: conflict.routeCityId,
+      tourId: state.selectedTourId,
+      pendingTouristGroup: pendingGroup,
+      remainingDefaultHotelConflicts: conflicts.slice(1)
+    };
+    render();
+    return true;
+  }
+
   var stageMeta = {
     arrival: {
       tab: 'Прибытие',
@@ -296,16 +458,44 @@
   };
 
   var tours = [
-    { id: 'china', name: 'Гранд-тур по Китаю', dates: '14–25 сен 2026', status: 'active', color: '#2f6bd8', tourists: 4, capacity: 12, route: 'Пекин → Сиань → Шанхай → Пекин', guides: 'Ли Вэй, Анна Ким', site: 'unique-travel.ru/china-grand' },
-    { id: 'japan', name: 'Япония: сезон момидзи', dates: '8–18 ноя 2026', status: 'draft', color: '#7a5af0', tourists: 7, capacity: 10, route: 'Токио → Киото → Осака', guides: 'Юки Танака', site: 'unique-travel.ru/japan' },
-    { id: 'italy', name: 'Италия для своих', dates: '4–12 июн 2026', status: 'archive', color: '#c98a1e', tourists: 9, capacity: 9, route: 'Рим → Флоренция → Венеция', guides: 'Марко Росси', site: 'unique-travel.ru/italy' }
+    {
+      id: 'china', name: 'Гранд-тур по Китаю', country: 'Китай', cities: ['Пекин', 'Сиань', 'Шанхай', 'Пекин'],
+      startDate: '2026-09-14', endDate: '2026-09-25', dates: '14–25 сен 2026', status: 'active', isArchived: false,
+      tourType: 'group', tourTypeLabel: 'Групповой', color: '#2f6bd8', tourists: 4, bookedCount: 4, capacity: 12,
+      price: '189000', priceCurrency: 'RUB', availableSpots: 8, logisticsCompleteness: 63,
+      statusCounts: { confirmed: 2, pending: 2, cancelled: 0 },
+      route: 'Пекин → Сиань → Шанхай → Пекин', guides: 'Ли Вэй, Анна Ким', escort: 'Мария Белова',
+      cityGuides: { 'route-beijing-1': 'user-guide-li-wei', 'route-xian-1': 'user-guide-anna-kim', 'route-shanghai-1': 'user-guide-li-wei', 'route-beijing-2': 'user-guide-anna-kim' },
+      financeGuideCityId: 'route-xian-1', escortUserId: 'user-escort-maria-belova', chatAdminIds: ['user-manager-elena', 'user-manager-igor'],
+      chatAdmins: ['Елена Воронова', 'Игорь Лебедев'], site: 'https://unique-travel.ru/china-grand',
+      description: 'Авторский маршрут с четырьмя городскими остановками и повторным Пекином.'
+    },
+    {
+      id: 'japan', name: 'Япония: сезон момидзи', country: 'Япония', cities: ['Токио', 'Киото', 'Осака'],
+      startDate: '2026-11-08', endDate: '2026-11-18', dates: '8–18 ноя 2026', status: 'draft', isArchived: false,
+      tourType: 'group', tourTypeLabel: 'Групповой', color: '#7a5af0', tourists: 7, bookedCount: 7, capacity: 10,
+      price: '245000', priceCurrency: 'RUB', availableSpots: 3, logisticsCompleteness: 18,
+      statusCounts: { confirmed: 4, pending: 3, cancelled: 0 }, route: 'Токио → Киото → Осака',
+      guides: 'Юки Танака', cityGuides: {}, financeGuideCityId: null, escortUserId: '', escort: 'Не назначен', chatAdminIds: ['user-manager-elena'], chatAdmins: ['Елена Воронова'], site: 'https://unique-travel.ru/japan',
+      description: 'Осенний маршрут по Японии в сезон красных клёнов.'
+    },
+    {
+      id: 'italy', name: 'Италия для своих', country: 'Италия', cities: ['Рим', 'Флоренция', 'Венеция'],
+      startDate: '2026-06-04', endDate: '2026-06-12', dates: '4–12 июн 2026', status: 'archive', isArchived: true,
+      tourType: 'individual', tourTypeLabel: 'Индивидуальный', color: '#c98a1e', tourists: 9, bookedCount: 9, capacity: 9,
+      price: '275000', priceCurrency: 'RUB', availableSpots: 0, logisticsCompleteness: 100,
+      statusCounts: { confirmed: 9, pending: 0, cancelled: 0 }, route: 'Рим → Флоренция → Венеция',
+      guides: 'Марко Росси', cityGuides: {}, financeGuideCityId: null, escortUserId: 'user-guide-anna-kim', escort: 'Анна Ким', chatAdminIds: ['user-manager-igor'], chatAdmins: ['Игорь Лебедев'], site: 'https://unique-travel.ru/italy',
+      description: 'Завершённый камерный тур по трём городам Италии.'
+    }
   ];
 
-  var programDays = [
-    { date: '14 сен', city: 'Пекин', title: 'Прилёт и знакомство', text: 'Встреча в аэропорту, размещение, вечерняя прогулка по хутунам.' },
-    { date: '15 сен', city: 'Пекин', title: 'Императорский Пекин', text: 'Запретный город, парк Цзиншань и чайная церемония.' },
-    { date: '16 сен', city: 'Пекин', title: 'Великая Китайская стена', text: 'Участок Мутяньюй, обед и свободный вечер.' }
-  ];
+  var programSeedDescriptions = {
+    '2026-09-14': 'Встреча в аэропорту, размещение, вечерняя прогулка по хутунам.',
+    '2026-09-15': 'Запретный город, парк Цзиншань и чайная церемония.',
+    '2026-09-16': 'Участок Мутяньюй, обед и свободный вечер.'
+  };
+  var programDays = buildProgramDays(tours[0], [], programSeedDescriptions);
 
   var DIRECTORY_STORAGE_KEY = 'unique-guide-directory-v1';
   var defaultDirectory = {
@@ -360,37 +550,50 @@
   }
 
   var tourTasks = [
-    { id: 'task1', title: 'Подтвердить минивэн в Пекине', date: '12 сен', done: false },
-    { id: 'task2', title: 'Отправить гиду список паспортов', date: '13 сен', done: false },
-    { id: 'task3', title: 'Проверить билеты G89', date: 'Готово', done: true }
+    { id: 'task1', title: 'Подтвердить минивэн в Пекине', description: 'Связаться с принимающей стороной и подтвердить вместимость.', priority: 'urgent', status: 'todo', dueDate: '2026-09-12' },
+    { id: 'task2', title: 'Отправить гиду список паспортов', description: 'Только после финальной проверки документов.', priority: 'high', status: 'in_progress', dueDate: '2026-09-13' },
+    { id: 'task3', title: 'Проверить билеты G89', description: '', priority: 'medium', status: 'done', dueDate: '2026-09-10' }
   ];
 
   var initialParams = requestedParams;
   var initialTouristId = initialParams.get('tourist');
   var initialRouteCityId = initialParams.get('routeCityId');
   var initialCityIndex = cities.findIndex(function (city) { return city.id === initialRouteCityId; });
-  var initialView = ['operations', 'tourists', 'documents', 'work', 'program'].indexOf(initialParams.get('view')) !== -1 ? initialParams.get('view') : 'operations';
+  var tourSectionMap = { overview: 'tour-info', summary: 'operations', statuses: 'work', program: 'program', team: 'tour-team', tasks: 'tour-tasks', actions: 'tour-actions' };
+  var requestedTourSection = initialParams.get('tourSection');
+  var summarySectionMap = { operations: 'operations', tourists: 'tourists', documents: 'documents', statuses: 'work' };
+  var requestedSummarySection = summarySectionMap[initialParams.get('summarySection')];
+  var requestedLegacyView = initialParams.get('view') === 'statuses' ? 'work' : initialParams.get('view');
+  var initialView = requestedSummarySection && (!requestedTourSection || requestedTourSection === 'summary') ? requestedSummarySection :
+    (tourSectionMap[requestedTourSection] || (['operations', 'tourists', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions'].indexOf(requestedLegacyView) !== -1 ? requestedLegacyView : 'tour-info'));
   var initialStage = ['arrival', 'hotel', 'departure'].indexOf(initialParams.get('operation')) !== -1 ? initialParams.get('operation') : 'arrival';
-  var initialRole = roleLabels[initialParams.get('role')] ? initialParams.get('role') : 'manager';
+  var rawRequestedRole = initialParams.get('role');
+  var requestedRole = rawRequestedRole === 'guide' ? 'viewer' : rawRequestedRole;
+  // Keep the authoring demo default, but fail closed for every explicit unknown role.
+  var initialRole = !rawRequestedRole ? 'manager' : (['admin', 'manager', 'escort', 'viewer'].indexOf(requestedRole) !== -1 ? requestedRole : 'forbidden');
   var initialOffline = initialParams.get('offline') === '1';
   var initialTourist = tourists.find(function (tourist) { return tourist.id === initialTouristId; });
   var initialSelectedTourId = initialParams.get('tourId') || (initialTourist && initialTourist.tourId) || 'china';
+  var requestedReturnLead = initialParams.get('returnLead');
+  var initialReturnLead = requestedReturnLead && (initialRole === 'admin' || (initialRole === 'manager' && managerLeadIds.indexOf(requestedReturnLead) !== -1)) ? requestedReturnLead : null;
+  var requestedReturnTab = initialParams.get('returnTab');
+  var initialReturnTab = ['details', 'chat', 'documents', 'tasks'].indexOf(requestedReturnTab) !== -1 ? requestedReturnTab : 'details';
   var state = {
     view: initialView,
     summaryMode: 'groups',
     touristListMode: initialParams.get('listMode') === 'groups' ? 'groups' : 'list',
-    touristQuery: initialParams.get('query') || '',
+    touristQuery: (initialRole === 'admin' || initialRole === 'manager') ? (initialParams.get('query') || '') : '',
     touristFilters: { needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' },
     documentFilter: ['attention', 'expiring', 'ready'].indexOf(initialParams.get('documentFilter')) !== -1 ? initialParams.get('documentFilter') : 'attention',
     cityIndex: initialCityIndex >= 0 ? initialCityIndex : 0,
     stage: initialStage,
-    overlay: initialTouristId ? { kind: 'tourist-detail', touristId: initialTouristId, expanded: new Set() } : null,
+    overlay: initialTouristId ? { kind: 'tourist-detail', touristId: initialTouristId, expanded: new Set(['personal', 'citizenship', 'domestic', 'foreign', 'settings', 'tour-context', 'logistics'].indexOf(initialParams.get('expand')) !== -1 ? [initialParams.get('expand')] : []), detailTab: initialParams.get('touristSection') === 'tour' ? 'tour' : 'profile' } : (initialParams.get('editTour') === '1' ? { kind: 'tour-form', tourId: initialSelectedTourId } : null),
     draft: null,
     toast: null,
     toastKind: 'success',
-    scopeLead: initialParams.get('lead') || null,
-    returnLead: initialParams.get('returnLead') || null,
-    returnTab: initialParams.get('returnTab') || 'tourists',
+    scopeLead: (initialRole === 'viewer' || initialRole === 'escort' || (initialRole === 'manager' && managerLeadIds.indexOf(initialParams.get('lead')) === -1)) ? null : (initialParams.get('lead') || null),
+    returnLead: initialReturnLead,
+    returnTab: initialReturnTab,
     returnContext: null,
     pendingScrollTop: null,
     tourFilter: 'active',
@@ -400,8 +603,12 @@
     pointPickerReturn: null,
     role: initialRole,
     offline: initialOffline,
-    uiPreview: 'ready'
+    uiPreview: 'ready',
+    saveErrorSnapshot: null
   };
+
+  normalizeAllTourGroupRepresentatives();
+  Object.keys(tourGroupSettings).forEach(ensureDefaultSharedHotel);
 
   function captureTourContext() {
     var scroller = root.querySelector && root.querySelector('.scroll');
@@ -436,10 +643,78 @@
     state.pendingScrollTop = Number(context.scrollTop || 0);
   }
 
+  function overlaySnapshot(overlay) {
+    if (!overlay) return null;
+    var snapshot = {};
+    Object.keys(overlay).forEach(function (key) {
+      var value = overlay[key];
+      if (value instanceof Set) snapshot[key] = { __set: Array.from(value) };
+      else snapshot[key] = value == null ? value : clone(value);
+    });
+    return snapshot;
+  }
+
+  function restoreOverlaySnapshot(snapshot) {
+    if (!snapshot) return null;
+    var overlay = {};
+    Object.keys(snapshot).forEach(function (key) {
+      var value = snapshot[key];
+      overlay[key] = value && Array.isArray(value.__set) ? new Set(value.__set) : (value == null ? value : clone(value));
+    });
+    return overlay;
+  }
+
+  function captureSaveErrorSnapshot(sourceOverlay) {
+    var savedOverlay = sourceOverlay && sourceOverlay.kind !== 'ui-states' ? sourceOverlay : null;
+    var savedDraft = state.draft ? clone(state.draft) : null;
+    if (!savedOverlay || ['form', 'operation-select', 'conflict'].indexOf(savedOverlay.kind) === -1) {
+      var candidates = scopedTourists(false).filter(leadConfirmed).slice(0, 2);
+      var candidateIds = candidates.map(function (tourist) { return tourist.id; });
+      var sourceId = candidateIds[0] || null;
+      var operationGroup = sourceId ? operationGroupFor(state.stage, sourceId) : null;
+      savedDraft = sourceId ? cleanRecord(effectiveRecord(state.stage, sourceId), state.stage) : blankRecord(state.stage);
+      savedOverlay = {
+        kind: 'form',
+        stage: state.stage,
+        members: candidateIds,
+        editing: Boolean(operationGroup),
+        groupId: operationGroup ? operationGroup.id : null,
+        sourceId: operationGroup ? operationGroup.sourceId : sourceId,
+        editMode: operationGroup ? 'shared' : 'create',
+        routeCityId: currentCity().id,
+        tourId: state.selectedTourId,
+        dirtyFields: new Set(Object.keys(savedDraft).filter(function (key) { return Boolean(savedDraft[key]); }))
+      };
+    }
+    state.saveErrorSnapshot = {
+      overlay: overlaySnapshot(savedOverlay),
+      draft: clone(savedDraft || {}),
+      view: state.view,
+      cityIndex: state.cityIndex,
+      stage: state.stage,
+      scopeLead: state.scopeLead
+    };
+  }
+
+  function restoreSaveErrorSnapshot() {
+    var snapshot = state.saveErrorSnapshot;
+    if (!snapshot) return false;
+    state.view = snapshot.view;
+    state.cityIndex = snapshot.cityIndex;
+    state.stage = snapshot.stage;
+    state.scopeLead = snapshot.scopeLead;
+    state.draft = clone(snapshot.draft || {});
+    state.overlay = restoreOverlaySnapshot(snapshot.overlay);
+    state.uiPreview = 'ready';
+    return Boolean(state.overlay);
+  }
+
   function mobileLeadsHref(leadId, tab) {
     var params = new URLSearchParams();
-    if (leadId) params.set('lead', leadId);
-    if (tab) params.set('tab', tab);
+    var safeLeadId = canOpenSourceLead(leadId) ? leadId : null;
+    var safeTab = ['details', 'chat', 'documents', 'tasks'].indexOf(tab) !== -1 ? tab : null;
+    if (safeLeadId) params.set('lead', safeLeadId);
+    if (safeLeadId && safeTab) params.set('tab', safeTab);
     if (state.selectedTourId) params.set('tourId', state.selectedTourId);
     params.set('role', state.role);
     params.set('offline', state.offline ? '1' : '0');
@@ -496,12 +771,62 @@
 
   function canViewRouteCity(routeCityId) {
     if (!canViewSelectedTour()) return false;
-    if (state.role !== 'guide') return true;
-    return guideTourIds.indexOf(state.selectedTourId) !== -1 && guideCityIds.indexOf(routeCityId) !== -1;
+    if (state.role !== 'viewer') return true;
+    return viewerTourIds.indexOf(state.selectedTourId) !== -1 && viewerCityIds.indexOf(routeCityId) !== -1;
   }
 
   function visibleRouteCities() {
     return cities.filter(function (city) { return canViewRouteCity(city.id); });
+  }
+
+  function routeCitiesForRole(tour) {
+    if (!tour) return [];
+    if (!tourHasOperationalModel(tour.id)) return (tour.cities || []).map(function (name, index) {
+      return { id: 'route-' + tour.id + '-' + index, catalogCityId: 'catalog-' + tour.id + '-' + index, name: name, routeIndex: index };
+    });
+    if (state.role !== 'viewer' || tour.id !== state.selectedTourId) return cities;
+    return visibleRouteCities();
+  }
+
+  function tourRoutePresentation(tour) {
+    if (!tour || state.role !== 'viewer' || !tourHasOperationalModel(tour.id)) {
+      return { cityNames: (tour && tour.cities) || [], dates: tour && tour.dates };
+    }
+    var assignedCities = cities.filter(function (city) {
+      return viewerTourIds.indexOf(tour.id) !== -1 && viewerCityIds.indexOf(city.id) !== -1;
+    });
+    return {
+      cityNames: assignedCities.map(cityLabel),
+      dates: assignedCities.map(function (city) { return city.dates; }).join(' · ')
+    };
+  }
+
+  function linkedLeadIdsForTour(tourId) {
+    return Array.from(new Set(tourists.filter(function (tourist) {
+      return tourist.tourId === tourId && tourist.leadId;
+    }).map(function (tourist) { return tourist.leadId; })));
+  }
+
+  function syncLinkedLeadArchive(tourId, archived) {
+    var linkedIds = linkedLeadIdsForTour(tourId);
+    linkedIds.forEach(function (leadId) { leadArchiveMocks[leadId] = Boolean(archived); });
+    try {
+      if (!window.localStorage) return;
+      var raw = window.localStorage.getItem(LEAD_STORAGE_KEY);
+      var savedLeads = raw == null ? [] : JSON.parse(raw);
+      if (!Array.isArray(savedLeads)) savedLeads = [];
+      var byId = {};
+      savedLeads.forEach(function (lead) { if (lead && lead.id) byId[lead.id] = lead; });
+      linkedIds.forEach(function (leadId) {
+        var lead = byId[leadId] || { id: leadId, eventId: tourId, manager: 'Елена Воронова', assignedUserId: 'manager-elena' };
+        lead.eventId = lead.eventId || tourId;
+        lead.archived = Boolean(archived);
+        byId[leadId] = lead;
+      });
+      window.localStorage.setItem(LEAD_STORAGE_KEY, JSON.stringify(Object.keys(byId).map(function (id) { return byId[id]; })));
+    } catch (error) {
+      console.warn('Linked lead archive state remains in memory', error);
+    }
   }
 
   function normalizeCityForRole() {
@@ -533,11 +858,20 @@
     };
   }
 
+  function selectedTourName() {
+    return selectedTour().name;
+  }
+
+  function formatMoney(value, currency) {
+    var symbols = { RUB: '₽', USD: '$', EUR: '€', CNY: '¥' };
+    return new Intl.NumberFormat('ru-RU', { maximumFractionDigits: 0 }).format(Number(value || 0)) + ' ' + (symbols[currency] || currency || '₽');
+  }
+
   function canViewTourId(tourId) {
     if (state.role === 'admin') return true;
     if (state.role === 'manager') return managerTourIds.indexOf(tourId) !== -1;
     if (state.role === 'escort') return escortTourIds.indexOf(tourId) !== -1;
-    return state.role === 'guide' && guideTourIds.indexOf(tourId) !== -1;
+    return state.role === 'viewer' && viewerTourIds.indexOf(tourId) !== -1;
   }
 
   function canViewSelectedTour() {
@@ -554,6 +888,30 @@
 
   function currentTourists() {
     return tourists.filter(function (tourist) { return tourist.tourId === state.selectedTourId; });
+  }
+
+  function normalizeTourGroupRepresentative(groupId, preferredId) {
+    if (!groupId) return null;
+    var members = tourists.filter(function (tourist) { return tourist.groupId === groupId; });
+    if (!members.length) return null;
+    var representative = preferredId && members.find(function (tourist) { return tourist.id === preferredId; });
+    representative = representative || members.find(function (tourist) { return tourist.groupRepresentative; }) || members[0];
+    members.forEach(function (tourist) { tourist.groupRepresentative = tourist.id === representative.id; });
+    return representative.id;
+  }
+
+  function normalizeAllTourGroupRepresentatives() {
+    Array.from(new Set(tourists.map(function (tourist) { return tourist.groupId; }).filter(Boolean))).forEach(function (groupId) {
+      normalizeTourGroupRepresentative(groupId);
+    });
+  }
+
+  function bookedCountForTour(tour) {
+    if (!tour) return 0;
+    if (tourHasOperationalModel(tour.id)) {
+      return tourists.filter(function (tourist) { return tourist.tourId === tour.id; }).length;
+    }
+    return Number(tour.bookedCount != null ? tour.bookedCount : tour.tourists) || 0;
   }
 
   function scopedTourists(includeUnavailable) {
@@ -691,12 +1049,12 @@
     var type = pointTypeForTransport(state.draft.transport);
     var selectedPoint = directoryPointById(state.draft.pointId);
     var compatible = selectedPoint && selectedPoint.cityId === currentCity().catalogCityId && selectedPoint.type === type;
+    var archivedSelection = selectedPoint && !selectedPoint.active;
 
-    if (selectedPoint && !compatible) {
+    // Historical/manual values are never silently destroyed when transport changes.
+    // An active incompatible directory point can be safely cleared and selected again.
+    if (selectedPoint && !compatible && !archivedSelection) {
       state.draft.pointId = '';
-      state.draft.point = '';
-      state.draft.pointManual = false;
-    } else if (previousTransport && previousTransport !== state.draft.transport && state.draft.pointManual) {
       state.draft.point = '';
       state.draft.pointManual = false;
     }
@@ -707,7 +1065,7 @@
       state.draft.point = pointDisplay(options[0]);
       state.draft.pointManual = false;
       state.draft.pointAutofilled = true;
-    } else if (!type) {
+    } else if (!type && !archivedSelection) {
       state.draft.pointId = '';
       state.draft.pointAutofilled = false;
     }
@@ -750,7 +1108,7 @@
   }
 
   function transportLabel(value) {
-    return { plane: 'Самолёт', train: 'Поезд', bus: 'Автобус', car: 'Автомобиль' }[value] || 'Транспорт';
+    return { plane: 'Самолёт', train: 'Поезд', bus: 'Автобус' }[value] || 'Транспорт';
   }
 
   function shortDate(value) {
@@ -774,8 +1132,8 @@
     var role = state.role;
     var managerTour = managerTourIds.indexOf(state.selectedTourId) !== -1;
     var escortTour = escortTourIds.indexOf(state.selectedTourId) !== -1;
-    var guideTour = guideTourIds.indexOf(state.selectedTourId) !== -1;
-    var guideCity = guideCityIds.indexOf(currentCity().id) !== -1;
+    var viewerTour = viewerTourIds.indexOf(state.selectedTourId) !== -1;
+    var viewerCity = viewerCityIds.indexOf(currentCity().id) !== -1;
     var operationalModel = tourHasOperationalModel(state.selectedTourId);
     return {
       canEditProfile: role === 'admin' || (role === 'manager' && managerTour),
@@ -783,7 +1141,7 @@
       canGroup: operationalModel && (role === 'admin' || (role === 'manager' && managerTour)),
       canManageDocuments: role === 'admin' || (role === 'manager' && managerTour),
       canDelete: role === 'admin',
-      canEditStatuses: operationalModel && (role === 'admin' || (role === 'manager' && managerTour) || (role === 'escort' && escortTour) || (role === 'guide' && guideTour && guideCity)),
+      canEditStatuses: operationalModel && (role === 'admin' || (role === 'manager' && managerTour) || (role === 'escort' && escortTour) || (role === 'viewer' && viewerTour && viewerCity)),
       canManageTour: canManageTourId(state.selectedTourId),
       canManageProgram: operationalModel && (role === 'admin' || (role === 'manager' && managerTour)),
       canManageTasks: operationalModel && (role === 'admin' || (role === 'manager' && managerTour)),
@@ -804,6 +1162,36 @@
   function canSeePrivateFor(tourist) {
     if (!canViewTouristForSelectedTour(tourist)) return false;
     return state.role === 'admin' || (state.role === 'manager' && managerTourIds.indexOf(tourist.tourId) !== -1 && managerLeadIds.indexOf(tourist.leadId) !== -1);
+  }
+
+  function canSeeSourceLeadFor(tourist) {
+    if (!canViewTouristForSelectedTour(tourist)) return false;
+    return state.role === 'admin' || (state.role === 'manager' && managerLeadIds.indexOf(tourist.leadId) !== -1);
+  }
+
+  function hasRestrictedTouristPrivacy(tourist) {
+    return hasLimitedTouristPrivacy() || (state.role === 'manager' && !canSeeSourceLeadFor(tourist));
+  }
+
+  function canViewDocumentsFor(tourist) {
+    if (!canViewTouristForSelectedTour(tourist)) return false;
+    return state.role === 'admin' || state.role === 'viewer' || state.role === 'escort' ||
+      (state.role === 'manager' && managerLeadIds.indexOf(tourist.leadId) !== -1);
+  }
+
+  function canViewContactFor(tourist) {
+    if (!canViewTouristForSelectedTour(tourist)) return false;
+    return state.role === 'admin' || state.role === 'viewer' || state.role === 'escort' ||
+      (state.role === 'manager' && managerLeadIds.indexOf(tourist.leadId) !== -1);
+  }
+
+  function canOpenSourceLead(leadId) {
+    if (!leadId || !tourists.some(function (tourist) { return tourist.leadId === leadId; })) return false;
+    return state.role === 'admin' || (state.role === 'manager' && managerLeadIds.indexOf(leadId) !== -1);
+  }
+
+  function hasLimitedTouristPrivacy() {
+    return state.role === 'viewer' || state.role === 'escort';
   }
 
   function canManageDocumentsFor(tourist) {
@@ -829,7 +1217,7 @@
     if (state.role === 'admin') return true;
     if (state.role === 'manager') return managerTourIds.indexOf(tourist.tourId) !== -1;
     if (state.role === 'escort') return escortTourIds.indexOf(tourist.tourId) !== -1;
-    return state.role === 'guide' && guideTourIds.indexOf(tourist.tourId) !== -1 && guideCityIds.indexOf(routeCityId) !== -1;
+    return state.role === 'viewer' && viewerTourIds.indexOf(tourist.tourId) !== -1 && viewerCityIds.indexOf(routeCityId) !== -1;
   }
 
   function canEditStatusesFor(memberIds, routeCityId) {
@@ -865,13 +1253,11 @@
       ['firstName', 'имя'],
       ['birthDate', 'дата рождения']
     ];
-    if (tourist.isPrimary) {
-      required = required.concat([
-        ['middleName', 'отчество'],
-        ['email', 'email'],
-        ['phone', 'телефон']
-      ]);
-    }
+    if (tourist.isPrimary) required = required.concat([
+      ['middleName', 'отчество'],
+      ['email', 'email'],
+      ['phone', 'телефон']
+    ]);
     var missing = required.filter(function (field) { return !String(tourist[field[0]] || '').trim(); }).map(function (field) { return field[1]; });
     return {
       ready: missing.length === 0,
@@ -882,8 +1268,8 @@
 
   function domesticPassportReadiness(tourist) {
     if (tourist.citizenship !== 'Россия') return { ready: true, category: 'not-required', label: 'Не требуется', issue: '' };
-    var hasAny = Boolean(tourist.domesticPassport || tourist.domesticIssuedBy);
-    if (!tourist.isPrimary && !hasAny) return { ready: true, category: 'not-required', label: 'Не требуется', issue: '' };
+    var hasAny = Boolean(tourist.domesticPassport || tourist.domesticIssuedBy || tourist.registrationAddress);
+    if (!hasAny && !tourist.isPrimary) return { ready: true, category: 'not-required', label: 'Не требуется', issue: '' };
     var missing = [];
     if (!tourist.domesticPassport) missing.push('серия и номер паспорта РФ');
     if (!tourist.domesticIssuedBy) missing.push('орган выдачи паспорта РФ');
@@ -897,6 +1283,15 @@
   }
 
   function foreignPassportReadiness(tourist) {
+    var hasAny = Boolean(tourist.latinName || tourist.passport || tourist.passportExpiry || (tourist.scans && tourist.scans.length));
+    if (!hasAny) return {
+      ready: false,
+      category: 'missing',
+      missing: ['ФИО латиницей', 'номер загранпаспорта', 'срок действия', 'скан'],
+      expiring: false,
+      issue: 'Не заполнено: ФИО латиницей, номер загранпаспорта, срок действия, скан',
+      label: 'Нужно дозаполнить'
+    };
     var missing = [];
     if (!tourist.latinName) missing.push('ФИО латиницей');
     if (!tourist.passport) missing.push('номер загранпаспорта');
@@ -982,14 +1377,17 @@
 
   function workspaceTabs() {
     var tabs = [
-      { id: 'operations', label: 'Сводная' },
-      { id: 'work', label: 'Работа' },
-      { id: 'program', label: 'Программа' }
+      { id: 'tour-info', section: 'overview', label: 'Обзор' },
+      { id: 'operations', section: 'summary', label: 'Сводная' },
+      { id: 'program', section: 'program', label: 'Программа' },
+      { id: 'tour-team', section: 'team', label: 'Команда' },
+      { id: 'tour-tasks', section: 'tasks', label: 'Задачи' },
+      { id: 'tour-actions', section: 'actions', label: 'Действия' }
     ];
     return '<div class="workspace-tabs">' + tabs.map(function (tab) {
-      var summaryView = ['operations', 'tourists', 'documents'].indexOf(state.view) !== -1;
+      var summaryView = ['operations', 'tourists', 'documents', 'work'].indexOf(state.view) !== -1;
       var active = tab.id === 'operations' ? summaryView : state.view === tab.id;
-      return '<button type="button" class="' + (active ? 'active' : '') + '" data-action="workspace" data-view="' + tab.id + '">' + tab.label + '</button>';
+      return '<button type="button" class="' + (active ? 'active' : '') + '" data-action="workspace" data-view="' + tab.id + '" data-tour-section="' + tab.section + '">' + tab.label + '</button>';
     }).join('') + '</div>';
   }
 
@@ -997,7 +1395,8 @@
     var tabs = [
       { id: 'operations', label: 'Операции' },
       { id: 'tourists', label: 'Туристы' },
-      { id: 'documents', label: 'Документы' }
+      { id: 'documents', label: 'Документы' },
+      { id: 'work', label: 'Статусы' }
     ];
     return '<div class="summary-tabs" role="tablist" aria-label="Разделы сводной">' + tabs.map(function (tab) {
       return '<button type="button" role="tab" aria-selected="' + (state.view === tab.id) + '" class="' + (state.view === tab.id ? 'active' : '') + '" data-action="summary-section" data-view="' + tab.id + '">' + tab.label + '</button>';
@@ -1020,8 +1419,9 @@
   }
 
   function memberRow(tourist, note) {
+    var visibleNote = hasRestrictedTouristPrivacy(tourist) ? tourist.type : (note || tourist.lead);
     return '<div class="member member-link" role="button" tabindex="0" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><div class="member-copy"><strong>' + h(tourist.name) +
-      '</strong><span>' + h(note || tourist.lead) + '</span></div><span class="lead-pill">Тур · ' + h(globalGroupLabel(tourist)) + '</span></div>';
+      '</strong><span>' + h(visibleNote) + '</span></div><span class="lead-pill">Тур · ' + h(globalGroupLabel(tourist)) + '</span></div>';
   }
 
   function groupStageRecords(stage) {
@@ -1088,6 +1488,12 @@
     if (state.uiPreview === 'empty') {
       return '<main class="scroll"><div class="empty-state">' + icon('users') + '<strong>В туре пока нет туристов</strong><span>Добавьте участников или измените выбранный тур.</span><button type="button" class="secondary-button empty-state-action" data-action="reset-ui-state">Вернуть mock-данные</button></div></main>';
     }
+    if (state.uiPreview === 'saving') {
+      return '<main class="scroll"><div class="empty-state save-state">' + icon('more') + '<strong>Сохраняем изменения</strong><span>Черновик и выбранные туристы остаются на экране до ответа.</span><button type="button" class="primary-button blue empty-state-action" disabled aria-busy="true">Сохраняем…</button></div></main>';
+    }
+    if (state.uiPreview === 'save-error') {
+      return '<main class="scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Не удалось сохранить</strong><span>Черновик и выбранные туристы сохранены. Можно повторить или вернуться к редактированию.</span><div class="empty-state-controls"><button type="button" class="secondary-button" data-action="return-draft-state">Вернуться к черновику</button><button type="button" class="primary-button blue" data-action="retry-save-state">Повторить</button></div></div></main>';
+    }
     return '';
   }
 
@@ -1111,15 +1517,17 @@
         grouped.free.length + ' из ' + available.length + ' туристов</span></div>' + freeAction + '</div>' +
         '<div class="free-list">' + grouped.free.map(function (tourist) { return memberRow(tourist, 'Нет записи для города'); }).join('') + '</div></section>';
     }
-    var shell = statusBar() + topBar('Гранд-тур по Китаю', '14–25 сентября · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() + stageSwitch();
+    var shell = statusBar() + topBar(selectedTourName(), selectedTour().dates + ' · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() + stageSwitch();
     var preview = statePreview();
     if (preview) return shell + preview;
-    var selectedScope = state.scopeLead ? (currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead; }) || {}).lead : null;
+    var selectedScopeTourist = state.scopeLead ? currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead && canSeeSourceLeadFor(tourist); }) : null;
+    var selectedScope = selectedScopeTourist ? selectedScopeTourist.lead : null;
     var scopeName = selectedScope ? selectedScope.replace(/^Лид\s+/, 'Лид: ') : 'Весь тур';
+    var scopeControl = hasLimitedTouristPrivacy() ? '' : '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button>';
     var canAdd = capabilities().canEditLogistics && !state.offline && available.some(leadConfirmed);
     var addAction = canAdd ? '<button type="button" class="add-button compact-add" data-action="add-stage" aria-label="' + h(stageMeta[state.stage].add) + '">' + icon('plus') + '</button>' : '';
     return shell + '<main class="scroll">' + summaryModeSwitch() + '<div class="operation-toolbar"><div class="section-copy"><strong>' + stageMeta[state.stage].heading + '</strong><span>' +
-      h(cityLabel(currentCity())) + ' · заполнено ' + filled + ' из ' + available.length + '</span></div><button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button>' + addAction + '</div>' + cards + free + '</main>';
+      h(cityLabel(currentCity())) + ' · заполнено ' + filled + ' из ' + available.length + '</span></div>' + scopeControl + addAction + '</div>' + cards + free + '</main>';
   }
 
   function summaryModeSwitch() {
@@ -1127,10 +1535,11 @@
   }
 
   function summaryTools() {
-    var selectedScope = state.scopeLead ? (currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead; }) || {}).lead : null;
+    var selectedScopeTourist = state.scopeLead ? currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead && canSeeSourceLeadFor(tourist); }) : null;
+    var selectedScope = selectedScopeTourist ? selectedScopeTourist.lead : null;
     var scopeName = selectedScope ? selectedScope.replace(/^Лид\s+/, 'Лид: ') : 'Весь тур';
     return '<div class="summary-tools"><span class="summary-context">' + h(stageMeta[state.stage].tab) + ' · ' + h(cityLabel(currentCity())) + '</span>' +
-      '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button></div>';
+      (hasLimitedTouristPrivacy() ? '' : '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + h(scopeName) + '</button>') + '</div>';
   }
 
   function coverageCell(tourist, city, cityIndex, stage) {
@@ -1152,10 +1561,11 @@
         return '<div class="coverage-city"><span><strong>' + h(cityLabel(city)) + '</strong><small>' + h(city.dates) + '</small></span><div class="coverage-cells">' +
           coverageCell(tourist, city, cityIndex, 'arrival') + coverageCell(tourist, city, cityIndex, 'hotel') + coverageCell(tourist, city, cityIndex, 'departure') + '</div></div>';
       }).join('');
-      return '<article class="coverage-card"><button type="button" class="coverage-person" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(tourist.lead + ' · ' + globalGroupLabel(tourist)) + '</small></span><b>›</b></button><div class="coverage-head"><span>Город</span><div><i>Рейс</i><i>Отель</i><i>Отъезд</i></div></div>' + cityRows + '</article>';
+      var coverageSubtitle = hasRestrictedTouristPrivacy(tourist) ? tourist.type + ' · ' + globalGroupLabel(tourist) : tourist.lead + ' · ' + globalGroupLabel(tourist);
+      return '<article class="coverage-card"><button type="button" class="coverage-person" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(coverageSubtitle) + '</small></span><b>›</b></button><div class="coverage-head"><span>Город</span><div><i>Рейс</i><i>Отель</i><i>Отъезд</i></div></div>' + cityRows + '</article>';
     }).join('');
     var exportAction = capabilities().canExport && !state.offline ? '<button type="button" class="text-button" data-action="export-summary">Excel</button>' : '';
-    return statusBar() + topBar('Гранд-тур по Китаю', '14–25 сентября · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() +
+    return statusBar() + topBar(selectedTourName(), selectedTour().dates + ' · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() +
       '<main class="scroll">' + summaryModeSwitch() + summaryTools() + '<div class="tour-stats"><div><span>Мест</span><strong>' + currentTourists().length + ' / 12</strong></div><div><span>Подтверждено</span><strong>' + currentTourists().filter(leadConfirmed).length + '</strong></div><div><span>Групп</span><strong>' + Object.keys(touristGroups().groups).length + '</strong></div></div><div class="section-row"><div class="section-copy"><strong>Покрытие по туристам</strong><span>Прибытие, отель и отъезд для каждой доступной остановки</span></div>' + exportAction + '</div>' + rows + '</main>';
   }
 
@@ -1177,9 +1587,16 @@
     var query = state.touristQuery.trim().toLowerCase();
     return currentTourists().filter(function (tourist) {
       if (state.scopeLead && tourist.leadId !== state.scopeLead) return false;
-      if (query && [tourist.name, tourist.phone, tourist.lead, globalGroupLabel(tourist)].join(' ').toLowerCase().indexOf(query) === -1) return false;
+      var restricted = hasRestrictedTouristPrivacy(tourist);
+      var searchable = restricted ? [tourist.name, tourist.type, globalGroupLabel(tourist)] : [tourist.name, tourist.phone, tourist.lead, globalGroupLabel(tourist)];
+      if (hasLimitedTouristPrivacy()) searchable.push(tourist.phone);
+      if (query && searchable.join(' ').toLowerCase().indexOf(query) === -1) return false;
+      if (restricted && !hasLimitedTouristPrivacy() && (state.touristFilters.needsData || state.touristFilters.documentIssue)) return false;
       if (state.touristFilters.needsData && personalReadiness(tourist).ready) return false;
-      if (state.touristFilters.documentIssue && documentReadiness(tourist).ready) return false;
+      if (state.touristFilters.documentIssue) {
+        var documentState = documentReadiness(tourist);
+        if (hasLimitedTouristPrivacy() ? documentState.foreign.ready : documentState.ready) return false;
+      }
       if (state.touristFilters.limitedRoute && tourist.route.length >= cities.length) return false;
       if (state.touristFilters.type !== 'all' && tourist.type !== state.touristFilters.type) return false;
       if (state.touristFilters.group === 'grouped' && !tourist.groupId) return false;
@@ -1192,9 +1609,16 @@
   function touristListCard(tourist) {
     var personal = personalReadiness(tourist);
     var documents = documentReadiness(tourist);
+    var limitedPrivacy = hasLimitedTouristPrivacy();
+    var restricted = hasRestrictedTouristPrivacy(tourist);
+    var operationalOnly = state.role === 'manager' && restricted;
+    var visibleDocuments = limitedPrivacy ? { ready: documents.foreign.ready, expiring: documents.foreign.expiring, label: documents.foreign.label } : documents;
     var filled = filledOperationsForCity(tourist, currentCity());
-    var primary = tourist.isPrimary ? '<span class="group-pill">Основной в заявке</span>' : '';
-    return '<article class="tourist-card"><button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(tourist.type + ' · ' + tourist.lead) + '</small><em>Группа тура · ' + h(globalGroupLabel(tourist)) + '</em></span><b>›</b></button><div class="tourist-card-badges">' + primary + '<span class="readiness-pill ' + readinessClass(personal.ready) + '">' + h(personal.ready ? 'Данные готовы' : 'Дозаполнить данные') + '</span><span class="readiness-pill ' + readinessClass(documents.ready, documents.expiring) + '">' + h(documents.label) + '</span></div><div class="tourist-next"><span><strong>' + h(cityLabel(currentCity())) + '</strong><small>Логистика · ' + filled + ' из 3</small></span><span class="status-chip">' + h(statusLabel(tourist, currentCity().id, state.stage)) + '</span></div><div class="card-actions"><button type="button" class="secondary-button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + 'Позвонить</button><button type="button" class="secondary-button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + 'Написать</button></div></article>';
+    var primary = !restricted && tourist.isPrimary ? '<span class="group-pill">Основной в заявке</span>' : '';
+    var subtitle = restricted ? tourist.type + ' · ' + globalGroupLabel(tourist) : tourist.type + ' · ' + tourist.lead;
+    var readinessBadges = operationalOnly ? '<span class="group-pill">Участие · ' + h(tourist.tourStatus) + '</span>' : '<span class="readiness-pill ' + readinessClass(personal.ready) + '">' + h(personal.ready ? 'Данные готовы' : 'Дозаполнить данные') + '</span><span class="readiness-pill ' + readinessClass(visibleDocuments.ready, visibleDocuments.expiring) + '">' + h(visibleDocuments.label) + '</span>';
+    var contactActions = canViewContactFor(tourist) ? '<div class="card-actions"><button type="button" class="secondary-button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + 'Позвонить</button><button type="button" class="secondary-button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + 'Написать</button></div>' : '';
+    return '<article class="tourist-card"><button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + tourist.id + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(subtitle) + '</small><em>Группа тура · ' + h(globalGroupLabel(tourist)) + '</em></span><b>›</b></button><div class="tourist-card-badges">' + primary + readinessBadges + '</div><div class="tourist-next"><span><strong>' + h(cityLabel(currentCity())) + '</strong><small>Логистика · ' + filled + ' из 3</small></span><span class="status-chip">' + h(statusLabel(tourist, currentCity().id, state.stage)) + '</span></div>' + contactActions + '</article>';
   }
 
   function touristFilterChips() {
@@ -1210,6 +1634,7 @@
 
   function touristsView() {
     var visible = filteredTourists();
+    var limitedPrivacy = hasLimitedTouristPrivacy();
     var cards = '';
     if (state.touristListMode === 'groups') {
       var groupOrder = [];
@@ -1227,32 +1652,49 @@
       cards = visible.map(touristListCard).join('');
     }
     if (!cards) cards = '<div class="empty-state">' + icon('search') + '<strong>Ничего не найдено</strong><span>Измените запрос или сбросьте фильтры.</span><button type="button" class="secondary-button empty-state-action" data-action="reset-tourist-filters">Сбросить фильтры</button></div>';
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Туристы · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() +
-      '<main class="scroll"><div class="tourist-search-row"><label class="search-box">' + icon('search') + '<input data-tourist-search value="' + h(state.touristQuery) + '" placeholder="ФИО, телефон, лид или группа"></label><button type="button" class="filter-button" data-action="tourist-filters" aria-label="Фильтры">' + icon('filter') + '</button></div>' + touristFilterChips() + '<div class="summary-tools"><div class="mini-switch"><button class="' + (state.touristListMode === 'list' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="list">Список</button><button class="' + (state.touristListMode === 'groups' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="groups">По группам</button></div><button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + (state.scopeLead ? 'Этот лид' : 'Весь тур') + '</button></div><div class="section-row"><div class="section-copy"><strong>Участники тура</strong><span>' + touristCount(visible.length) + ' найдено</span></div>' + (capabilities().canGroup && !state.offline ? '<button type="button" class="add-button" data-action="start-tourist-group">' + icon('users') + 'Группа</button>' : '') + '</div>' + cards + '</main>';
+    var scopeControl = limitedPrivacy ? '' : '<button type="button" class="scope-chip ' + (state.scopeLead ? 'active' : '') + '" data-action="toggle-scope">' + (state.scopeLead ? 'Этот лид' : 'Весь тур') + '</button>';
+    var searchPlaceholder = limitedPrivacy ? 'ФИО, телефон, тип или группа' : 'ФИО, телефон, лид или группа';
+    return statusBar() + topBar(selectedTourName(), 'Туристы · ' + touristCount(currentTourists().length)) + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() +
+      '<main class="scroll"><div class="tourist-search-row"><label class="search-box">' + icon('search') + '<input data-tourist-search value="' + h(state.touristQuery) + '" placeholder="' + h(searchPlaceholder) + '"></label><button type="button" class="filter-button" data-action="tourist-filters" aria-label="Фильтры">' + icon('filter') + '</button></div>' + touristFilterChips() + '<div class="summary-tools"><div class="mini-switch"><button class="' + (state.touristListMode === 'list' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="list">Список</button><button class="' + (state.touristListMode === 'groups' ? 'active' : '') + '" data-action="tourist-list-mode" data-mode="groups">По группам</button></div>' + scopeControl + '</div><div class="section-row"><div class="section-copy"><strong>Участники тура</strong><span>' + touristCount(visible.length) + ' найдено</span></div>' + (capabilities().canGroup && !state.offline ? '<button type="button" class="add-button" data-action="start-tourist-group">' + icon('users') + 'Группа</button>' : '') + '</div>' + cards + '</main>';
   }
 
   function documentsView() {
-    var scoped = currentTourists().filter(function (tourist) { return !state.scopeLead || tourist.leadId === state.scopeLead; });
+    var scoped = currentTourists().filter(function (tourist) {
+      return canViewDocumentsFor(tourist) && (!state.scopeLead || tourist.leadId === state.scopeLead);
+    });
+    var limitedPrivacy = hasLimitedTouristPrivacy();
+    function visibleReadiness(tourist) {
+      var documents = documentReadiness(tourist);
+      if (!limitedPrivacy) return documents;
+      var foreign = documents.foreign;
+      return {
+        ready: foreign.ready,
+        category: foreign.category === 'empty' ? 'ready' : foreign.category,
+        expiring: foreign.expiring,
+        label: foreign.label,
+        issue: foreign.issue
+      };
+    }
     var counts = { attention: 0, expiring: 0, ready: 0 };
     scoped.forEach(function (tourist) {
-      var readiness = documentReadiness(tourist);
+      var readiness = visibleReadiness(tourist);
       if (readiness.category === 'ready') counts.ready += 1;
       else if (readiness.category === 'expiring') counts.expiring += 1;
       else counts.attention += 1;
     });
     var visible = scoped.filter(function (tourist) {
-      var readiness = documentReadiness(tourist);
+      var readiness = visibleReadiness(tourist);
       if (state.documentFilter === 'ready') return readiness.category === 'ready';
       if (state.documentFilter === 'expiring') return readiness.category === 'expiring';
       return readiness.category === 'missing';
     });
     var cards = visible.map(function (tourist) {
-      var readiness = documentReadiness(tourist);
-      return '<article class="document-card"><div class="document-card-head"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(tourist.lead) + '</small></span><span class="readiness-pill ' + readinessClass(readiness.ready, readiness.expiring) + '">' + h(readiness.label) + '</span></div><div class="document-issue">' + icon(readiness.ready ? 'success' : 'alert') + '<span>' + h(readiness.issue) + '</span></div><button type="button" class="secondary-button full-button" data-action="open-tourist-documents" data-id="' + tourist.id + '">Открыть документы</button></article>';
+      var readiness = visibleReadiness(tourist);
+      return '<article class="document-card"><div class="document-card-head"><span class="avatar">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(limitedPrivacy ? tourist.type : tourist.lead) + '</small></span><span class="readiness-pill ' + readinessClass(readiness.ready, readiness.expiring) + '">' + h(readiness.label) + '</span></div><div class="document-issue">' + icon(readiness.ready ? 'success' : 'alert') + '<span>' + h(readiness.issue) + '</span></div><button type="button" class="secondary-button full-button" data-action="open-tourist-documents" data-id="' + tourist.id + '">Открыть документы</button></article>';
     }).join('');
     if (!cards) cards = '<div class="empty-state">' + icon('document') + '<strong>' + (state.documentFilter === 'ready' ? 'Нет готовых комплектов' : 'Все документы готовы') + '</strong><span>В выбранной очереди нет туристов.</span></div>';
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Документы туристов') + roleBanner() + workspaceTabs() + summaryTabs() +
-      '<main class="scroll"><div class="document-stats"><button class="' + (state.documentFilter === 'attention' ? 'active' : '') + '" data-action="document-filter" data-filter="attention"><span>Не заполнено</span><strong>' + counts.attention + '</strong></button><button class="' + (state.documentFilter === 'expiring' ? 'active' : '') + '" data-action="document-filter" data-filter="expiring"><span>Истекает</span><strong>' + counts.expiring + '</strong></button><button class="' + (state.documentFilter === 'ready' ? 'active' : '') + '" data-action="document-filter" data-filter="ready"><span>Готово</span><strong>' + counts.ready + '</strong></button></div><div class="form-note">В очереди только реальные данные: паспорт РФ, загранпаспорт и сканы. Виза, страховка и анкета остаются в бэклоге.</div>' + cards + '</main>';
+    return statusBar() + topBar(selectedTourName(), 'Документы туристов') + roleBanner() + workspaceTabs() + summaryTabs() +
+      '<main class="scroll"><div class="document-stats"><button class="' + (state.documentFilter === 'attention' ? 'active' : '') + '" data-action="document-filter" data-filter="attention"><span>Не заполнено</span><strong>' + counts.attention + '</strong></button><button class="' + (state.documentFilter === 'expiring' ? 'active' : '') + '" data-action="document-filter" data-filter="expiring"><span>Истекает</span><strong>' + counts.expiring + '</strong></button><button class="' + (state.documentFilter === 'ready' ? 'active' : '') + '" data-action="document-filter" data-filter="ready"><span>Готово</span><strong>' + counts.ready + '</strong></button></div><div class="form-note">' + (limitedPrivacy ? 'Для этой роли доступны только загранпаспорт и его сканы.' : 'В очереди только реальные данные: паспорт РФ, загранпаспорт и сканы. Виза, страховка и анкета остаются в бэклоге.') + '</div>' + cards + '</main>';
   }
 
   function workView() {
@@ -1263,44 +1705,135 @@
       }).join('');
       return '<section class="work-card"><div class="work-card-head"><span>' + icon(stage === 'hotel' ? 'hotel' : 'plane') + '</span><div><strong>' + h(stageMeta[stage].tab) + '</strong><small>Операционный статус · данные не изменяются</small></div></div>' + rows + '</section>';
     }).join('');
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Работа на маршруте') + roleBanner() + workspaceTabs() + cityPickerButton() + '<main class="scroll"><div class="form-note">Выберите конкретный статус. Циклическое переключение отключено.</div>' + cards + '</main>';
+    return statusBar() + topBar(selectedTourName(), 'Статусы на маршруте') + roleBanner() + workspaceTabs() + summaryTabs() + cityPickerButton() + '<main class="scroll"><div class="form-note">Выберите конкретный статус. Циклическое переключение отключено.</div>' + cards + '</main>';
+  }
+
+  function isoDateValue(date) {
+    return date.getUTCFullYear() + '-' + String(date.getUTCMonth() + 1).padStart(2, '0') + '-' + String(date.getUTCDate()).padStart(2, '0');
+  }
+
+  function dateFromIso(value) {
+    var parts = String(value || '').split('-').map(Number);
+    return parts.length === 3 && parts.every(Number.isFinite) ? new Date(Date.UTC(parts[0], parts[1] - 1, parts[2])) : null;
+  }
+
+  function formatProgramDate(value) {
+    var date = dateFromIso(value);
+    if (!date) return value || 'Дата не указана';
+    return new Intl.DateTimeFormat('ru-RU', { day: 'numeric', month: 'short', timeZone: 'UTC' }).format(date).replace('.', '');
+  }
+
+  function programCityIndexForDate(dateValue) {
+    var matchedIndex = 0;
+    cities.forEach(function (city, index) {
+      if ((!city.arrival || dateValue >= city.arrival) && (!city.departure || dateValue <= city.departure)) matchedIndex = index;
+    });
+    return matchedIndex;
+  }
+
+  function buildProgramDays(tour, existingDays, seedDescriptions) {
+    var start = dateFromIso(tour && tour.startDate);
+    var end = dateFromIso(tour && tour.endDate);
+    if (!start || !end || start > end) return [];
+    var previous = {};
+    (existingDays || []).forEach(function (day) {
+      previous[day.date + '|' + day.cityIdx] = day.description || day.text || '';
+    });
+    var days = [];
+    for (var cursor = new Date(start.getTime()), dayNumber = 1; cursor <= end; cursor.setUTCDate(cursor.getUTCDate() + 1), dayNumber += 1) {
+      var date = isoDateValue(cursor);
+      var cityIdx = programCityIndexForDate(date);
+      var routeCity = cities[cityIdx] || { name: '' };
+      var description = previous[date + '|' + cityIdx] || (seedDescriptions && seedDescriptions[date]) ||
+        (dayNumber === 1 ? 'Встреча, трансфер и размещение.' : 'Программа в городе ' + routeCity.name + '.');
+      days.push({ dayNumber: dayNumber, date: date, city: routeCity.name, cityIdx: cityIdx, description: description });
+    }
+    return days;
   }
 
   function programView() {
     var canManage = capabilities().canManageProgram && !state.offline;
-    var days = programDays.map(function (day, index) {
-      return '<article class="day-card"><div class="day-date"><strong>' + h(day.date) + '</strong><span>' + h(day.city) + '</span></div><div class="day-copy"><strong>' + h(day.title) + '</strong><p>' + h(day.text) + '</p></div>' + (canManage ? '<button type="button" class="inline-action" data-action="edit-program" data-index="' + index + '">Изменить</button>' : '') + '</article>';
+    var visibleProgramDays = state.role === 'viewer' ? programDays.filter(function (day) {
+      return cities[day.cityIdx] && canViewRouteCity(cities[day.cityIdx].id);
+    }) : programDays;
+    if (!visibleProgramDays.length) {
+      return statusBar() + topBar(selectedTourName(), 'Программа тура') + workspaceTabs() + '<main class="scroll"><div class="empty-state">' + icon('tours') + '<strong>Программа ещё не сформирована</strong><span>Дни создаются автоматически из дат тура. Вручную добавлять и удалять отдельные дни нельзя.</span>' + (canManage ? '<button type="button" class="primary-button empty-state-action" data-action="generate-program">Сформировать программу</button>' : '') + '</div></main>';
+    }
+    var days = visibleProgramDays.map(function (day) {
+      var index = programDays.indexOf(day);
+      return '<article class="day-card"><div class="day-date"><strong>' + h(day.dayNumber) + '</strong><span>день</span></div><div class="day-copy"><strong>' + h(formatProgramDate(day.date)) + '</strong><span>' + icon('pin') + h(day.city || 'Город не указан') + ' · cityIdx ' + h(day.cityIdx) + '</span><p>' + h(day.description || 'Описание не заполнено') + '</p></div>' + (canManage ? '<button type="button" class="inline-action" data-action="edit-program" data-index="' + index + '">Изменить</button>' : '') + '</article>';
     }).join('');
-    var programActions = canManage ? '<div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>По дням и городам маршрута</span></div><button type="button" class="add-button" data-action="add-program">' + icon('plus') + 'День</button></div><div class="tool-grid"><button data-action="generate-program"><strong>Сформировать</strong><span>Из шаблона маршрута</span></button><button data-action="regenerate-program"><strong>Обновить</strong><span>Сохранить ручные правки</span></button><button class="danger-tool" data-action="clear-program"><strong>Очистить</strong><span>Все дни программы</span></button></div>' :
+    var programActions = canManage ? '<div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>Даты заданы туром; редактируются город и описание</span></div></div><div class="tool-grid two-tools"><button data-action="regenerate-program"><strong>Пересоздать</strong><span>Сформировать заново по датам</span></button><button class="danger-tool" data-action="clear-program"><strong>Очистить</strong><span>Удалить всю программу</span></button></div>' :
       '<div class="section-row"><div class="section-copy"><strong>Программа тура</strong><span>По дням и городам маршрута</span></div></div><div class="form-note">Режим просмотра. Изменять программу могут менеджер и администратор тура.</div>';
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Программа · ' + programDays.length + ' дня заполнено') + workspaceTabs() +
+    return statusBar() + topBar(selectedTourName(), 'Программа · ' + visibleProgramDays.length + ' дней') + workspaceTabs() +
       '<main class="scroll">' + programActions + days + '</main>';
   }
 
   function tourInfoView() {
     var tour = selectedTour();
-    var statusLabel = { active: 'АКТИВНЫЙ ТУР', draft: 'ЧЕРНОВИК', archive: 'АРХИВ' }[tour.status] || 'ТУР';
-    var description = tour.id === 'china' ? 'Авторский маршрут с четырьмя городскими остановками и повторным Пекином.' : 'Карточка тура открыта из общего мобильного списка. Сводная с демонстрационными данными заполнена для тура по Китаю.';
-    var management = capabilities().canManageTour && !state.offline ? '<div class="management-grid"><button data-action="edit-tour"><strong>Изменить</strong><span>Маршрут, даты и команда</span></button><button data-action="copy-tour"><strong>Копировать</strong><span>Создать новый тур</span></button><button data-action="archive-tour"><strong>Архивировать</strong><span>Скрыть из активных</span></button><button class="danger-tool" data-action="cancel-tour"><strong>Отменить тур</strong><span>Нужна причина</span></button></div>' : '<div class="form-note">Режим просмотра. Управление параметрами тура доступно менеджеру и администратору.</div>';
-    return statusBar() + topBar(tour.name, capabilities().canManageTour ? 'Параметры и управление туром' : 'Параметры тура · просмотр') + workspaceTabs() +
-      '<main class="scroll"><div class="tour-cover" style="--tour-color:' + h(tour.color) + '"><span>' + h(statusLabel) + '</span><strong>' + h(tour.name) + '</strong><small>' + h(tour.dates) + '</small></div><section class="info-card details-card"><div><span>Маршрут</span><strong>' + h(tour.route) + '</strong></div><div><span>Гиды и сопровождающие</span><strong>' + h(tour.guides || 'Не назначены') + '</strong></div><div><span>Участники</span><strong>' + tour.tourists + ' из ' + tour.capacity + ' мест</strong></div><div><span>Администраторы чата</span><strong>Елена Воронова, Игорь Лебедев</strong></div><div><span>Страница тура</span><strong>' + h(tour.site || 'Не указана') + '</strong></div><div><span>Описание</span><strong>' + h(description) + '</strong></div></section>' + management + '</main>';
+    var routePresentation = tourRoutePresentation(tour);
+    var overviewRouteCities = routeCitiesForRole(tour);
+    var visibleGuideNames = overviewRouteCities.map(function (city) { return directoryUserName((tour.cityGuides || {})[city.id]); }).filter(function (name) { return name !== 'Не назначен'; });
+    var hideFinancials = state.role === 'viewer' || state.role === 'escort';
+    var liveTourists = tourHasOperationalModel(tour.id) ? currentTourists() : null;
+    var bookedCount = liveTourists ? liveTourists.length : bookedCountForTour(tour);
+    var statusCounts = liveTourists ? liveTourists.reduce(function (counts, tourist) {
+      if (tourist.tourStatus === 'Подтверждён') counts.confirmed += 1;
+      else if (tourist.tourStatus === 'Отменён') counts.cancelled += 1;
+      else counts.pending += 1;
+      return counts;
+    }, { confirmed: 0, pending: 0, cancelled: 0 }) : tour.statusCounts;
+    var availableSpots = Math.max(Number(tour.capacity || 0) - bookedCount, 0);
+    var statusBadges = (statusCounts.confirmed ? '<span class="state-pill">Подтв. ' + statusCounts.confirmed + '</span>' : '') + (statusCounts.pending ? '<span class="warning-pill">Ожид. ' + statusCounts.pending + '</span>' : '') + (statusCounts.cancelled ? '<span class="danger-pill">Отм. ' + statusCounts.cancelled + '</span>' : '');
+    var headerBadges = '<span class="battery-pill">' + tour.logisticsCompleteness + '%</span><span class="group-pill">' + h(tour.tourTypeLabel) + '</span>' + (tour.isArchived ? '<span class="lead-pill">Архив</span>' : '') + (tour.status === 'cancelled' ? '<span class="danger-pill">Отменён</span>' : '');
+    var manageActions = capabilities().canManageTour && !state.offline ? '<button type="button" class="icon-button" data-action="copy-tour" aria-label="Копировать тур">' + icon('tours') + '</button><button type="button" class="icon-button" data-action="edit-tour" aria-label="Изменить тур">' + icon('edit') + '</button>' + (state.role === 'admin' ? '<button type="button" class="icon-button danger-icon" data-action="delete-tour" aria-label="Удалить тур">' + icon('trash') + '</button>' : '') : '';
+    var viewerGuideLine = state.role === 'viewer' ? '<div class="event-line">' + icon('users') + '<span><em>Назначенные гиды:</em> ' + h(visibleGuideNames.join(', ') || 'Не назначены') + '</span></div>' : '';
+    var summaryHref = './tour-operations.html?' + new URLSearchParams({ tourId: tour.id, tourSection: 'summary', role: state.role, offline: state.offline ? '1' : '0' }).toString();
+    return statusBar() + topBar(tour.name, 'Карточка тура') + workspaceTabs() + '<main class="scroll"><article class="event-card" style="--tour-color:' + h(tour.color) + '"><div class="event-card-title"><span class="event-color"></span><strong>' + h(tour.name) + '</strong><div>' + headerBadges + '</div></div><div class="event-line">' + icon('pin') + '<span><em>' + h(tour.country) + ':</em> ' + h(routePresentation.cityNames.join(', ')) + '</span></div><div class="event-line split-line">' + icon('tours') + '<span>' + h(routePresentation.dates) + '</span>' + (hideFinancials ? '' : '<strong>' + h(formatMoney(tour.price, tour.priceCurrency)) + '</strong>') + '</div>' + viewerGuideLine + '<div class="event-line event-participants">' + icon('users') + '<span>' + bookedCount + ' из ' + tour.capacity + ' участников</span>' + statusBadges + (availableSpots === 0 ? '<span class="state-pill">Мест нет</span>' : '') + '</div><p class="event-description">' + h(tour.description) + '</p>' + (tour.site && !hideFinancials ? '<button type="button" class="event-site" data-action="preview-tour-site">' + icon('success') + 'Открыть на сайте</button>' : '') + '<div class="event-actions"><button type="button" class="secondary-button event-summary-button" data-action="workspace" data-view="operations">Сводная таблица <b>→</b></button><a class="icon-button" href="' + h(summaryHref) + '" target="_blank" rel="noopener" aria-label="Открыть сводную в новой вкладке">' + icon('success') + '</a>' + manageActions + '</div></article><div class="overview-stats"><div><span>Логистика</span><strong>' + tour.logisticsCompleteness + '%</strong></div><div><span>Свободно</span><strong>' + availableSpots + '</strong></div><div><span>Маршрут</span><strong>' + overviewRouteCities.length + '</strong></div></div></main>';
+  }
+
+  function tourTeamView() {
+    var tour = selectedTour();
+    var teamCities = routeCitiesForRole(tour);
+    var guideRows = teamCities.map(function (city) {
+      var routeIndex = city.routeIndex == null ? cities.indexOf(city) : city.routeIndex;
+      var guideId = (tour.cityGuides || {})[city.id];
+      return '<div class="team-row"><span class="route-stop-index">' + (routeIndex + 1) + '</span><span><strong>' + h(cityLabel(city)) + '</strong><small>Гид города</small></span><b>' + h(directoryUserName(guideId)) + '</b>' + (tour.financeGuideCityId === city.id ? '<em>Сбор оплаты</em>' : '') + '</div>';
+    }).join('');
+    var edit = capabilities().canManageTour && !state.offline ? '<button type="button" class="add-button" data-action="edit-tour">' + icon('edit') + 'Изменить</button>' : '';
+    var teamDetails = state.role === 'viewer' ? '<div class="form-note">Показаны только гиды назначенных вам позиций маршрута.</div>' : '<section class="info-card details-card"><div><span>Сопровождающий</span><strong>' + h(directoryUserName(tour.escortUserId)) + '</strong></div><div><span>Администраторы чата</span><strong>' + h((tour.chatAdminIds || []).map(directoryUserName).join(', ') || 'Не назначены') + '</strong></div></section>';
+    return statusBar() + topBar(tour.name, 'Команда и доступы') + workspaceTabs() + '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Гиды по городам</strong><span>Назначение привязано к позиции маршрута</span></div>' + edit + '</div><section class="info-card team-list">' + guideRows + '</section>' + teamDetails + '</main>';
   }
 
   function tourTasksView() {
     var canManage = capabilities().canManageTasks && !state.offline;
-    var rows = tourTasks.map(function (task, index) {
-      var tag = canManage ? 'button' : 'div';
-      var action = canManage ? ' data-action="toggle-tour-task" data-index="' + index + '"' : '';
-      return '<' + tag + ' class="tour-task ' + (task.done ? 'done' : '') + '"' + action + '><span class="task-check">' + (task.done ? icon('check') : '') + '</span><span><strong>' + h(task.title) + '</strong><small>' + h(task.date) + '</small></span></' + tag + '>';
+    var statuses = { todo: 'К выполнению', in_progress: 'В работе', done: 'Готово' };
+    var priorities = { low: 'Низкий', medium: 'Средний', high: 'Высокий', urgent: 'Срочный' };
+    var order = { todo: 0, in_progress: 1, done: 2 };
+    var rows = tourTasks.slice().sort(function (a, b) { return order[a.status] - order[b.status]; }).map(function (task) {
+      var overdue = task.status !== 'done' && task.dueDate && task.dueDate < '2026-09-14';
+      var content = '<span class="task-check ' + h(task.status) + '">' + (task.status === 'done' ? icon('check') : (task.status === 'in_progress' ? '◷' : '○')) + '</span><span><strong class="' + (task.status === 'done' ? 'done-title' : '') + '">' + h(task.title) + '</strong><small>' + h(task.description || 'Без описания') + '</small><em>' + h(statuses[task.status]) + ' · срок: ' + h(task.dueDate || 'не указан') + '</em></span><span class="task-meta"><b class="priority-' + h(task.priority) + '">' + h(priorities[task.priority]) + '</b>' + (overdue ? '<b class="overdue">Просрочено</b>' : '') + '</span>';
+      return canManage ? '<button type="button" class="tour-task" data-action="edit-tour-task" data-id="' + h(task.id) + '">' + content + '</button>' : '<div class="tour-task">' + content + '</div>';
     }).join('');
-    return statusBar() + topBar('Гранд-тур по Китаю', 'Задачи текущего тура') + workspaceTabs() +
-      '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Задачи тура</strong><span>Не заменяют общий раздел CRM-задач</span></div>' + (canManage ? '<button type="button" class="add-button" data-action="add-tour-task">' + icon('plus') + 'Задача</button>' : '') + '</div><div class="form-note">' + (canManage ? 'Здесь показаны только задачи выбранного тура. Полноценный общий раздел задач зафиксирован в бэклоге.' : 'Режим просмотра. Изменять задачи могут менеджер и администратор тура.') + '</div><section class="info-card task-list">' + rows + '</section></main>';
+    var counts = ['todo', 'in_progress', 'done'].map(function (status) { var count = tourTasks.filter(function (task) { return task.status === status; }).length; return count ? '<span>' + count + ' · ' + statuses[status] + '</span>' : ''; }).join('');
+    return statusBar() + topBar(selectedTourName(), 'Задачи текущего тура') + workspaceTabs() + '<main class="scroll"><div class="section-row"><div class="section-copy"><strong>Задачи</strong><div class="task-counters">' + counts + '</div></div>' + (canManage ? '<button type="button" class="add-button" data-action="add-tour-task">' + icon('plus') + 'Добавить</button>' : '') + '</div>' + (rows || '<div class="empty-state"><strong>Задач нет</strong><span>Добавьте первую задачу по туру.</span></div>') + '</main>';
+  }
+
+  function tourActionsView() {
+    var tour = selectedTour();
+    var canManage = capabilities().canManageTour && !state.offline;
+    var rows = '<button data-action="open-directory"><span>' + icon('pin') + '</span><div><strong>Города и точки</strong><small>Справочник аэропортов и вокзалов</small></div><b>›</b></button>';
+    if (canManage) {
+      rows = '<button data-action="edit-tour"><span>' + icon('edit') + '</span><div><strong>Изменить тур</strong><small>Поля в порядке веб-формы</small></div><b>›</b></button><button data-action="copy-tour"><span>' + icon('tours') + '</span><div><strong>Копировать</strong><small>Создать черновик с теми же настройками</small></div><b>›</b></button><button class="danger-row" data-action="' + (tour.status === 'cancelled' ? 'reopen-tour' : 'cancel-tour') + '"><span>' + icon('close') + '</span><div><strong>' + (tour.status === 'cancelled' ? 'Открыть тур снова' : 'Закрыть тур с отказом') + '</strong><small>Доступно менеджеру и администратору</small></div><b>›</b></button>' + (state.role === 'admin' ? '<button class="danger-row" data-action="archive-tour"><span>' + icon('archive') + '</span><div><strong>' + (tour.isArchived ? 'Вернуть из архива' : 'Архивировать') + '</strong><small>Только администратор</small></div><b>›</b></button><button class="danger-row" data-action="delete-tour"><span>' + icon('trash') + '</span><div><strong>Удалить тур</strong><small>Только администратор</small></div><b>›</b></button>' : '') + rows;
+    }
+    return statusBar() + topBar(tour.name, 'Действия с туром') + workspaceTabs() + '<main class="scroll">' + (canManage ? '' : '<div class="form-note">Режим просмотра. Изменять тур могут менеджер и администратор.</div>') + '<div class="action-menu">' + rows + '</div></main>';
   }
 
   function unsupportedTourView() {
     var tour = selectedTour();
     var members = currentTourists().map(function (tourist) {
-      return '<button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + h(tourist.id) + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h((tourist.type || 'Турист') + (tourist.lead ? ' · ' + tourist.lead : '')) + '</small><em>Открыть карточку туриста</em></span><b>›</b></button>';
+      var memberSubtitle = (tourist.type || 'Турист') + (!hasRestrictedTouristPrivacy(tourist) && tourist.lead ? ' · ' + tourist.lead : '');
+      return '<button type="button" class="tourist-card-main" data-action="tourist-detail" data-id="' + h(tourist.id) + '"><span class="avatar dark">' + h(tourist.initials) + '</span><span><strong>' + h(tourist.name) + '</strong><small>' + h(memberSubtitle) + '</small><em>Открыть карточку туриста</em></span><b>›</b></button>';
     }).join('');
     var memberSection = members ? '<section class="info-card"><div class="section-row"><div class="section-copy"><strong>Туристы</strong><span>' + touristCount(currentTourists().length) + ' в сохранённых данных</span></div></div>' + members + '</section>' : '<div class="form-note">В локальных данных пока нет туристов этого тура.</div>';
     return statusBar() + topBar(tour.name, 'Сводная · режим просмотра') +
@@ -1315,13 +1848,13 @@
 
   function bottomNav() {
     var items = [
-      { id: 'operations', label: 'Туры', icon: 'tours' },
-      { id: 'tourists', label: 'Туристы', icon: 'users' },
-      { id: 'leads', label: 'Лиды', icon: 'leads' }
+      { id: 'tour-info', label: 'Туры', icon: 'tours' },
+      { id: 'tourists', label: 'Туристы', icon: 'users' }
     ];
+    if (state.role === 'admin' || state.role === 'manager') items.push({ id: 'leads', label: 'Лиды', icon: 'leads' });
     return '<nav class="bottom-nav" aria-label="Основная навигация">' + items.map(function (item) {
-      var taskViews = ['operations', 'documents', 'work', 'program', 'tour-info', 'tour-tasks'];
-      var active = (item.id === 'operations' && taskViews.indexOf(state.view) !== -1) || item.id === state.view;
+      var tourViews = ['operations', 'documents', 'work', 'program', 'tour-info', 'tour-team', 'tour-tasks', 'tour-actions'];
+      var active = (item.id === 'tour-info' && tourViews.indexOf(state.view) !== -1) || item.id === state.view;
       var action = item.id === 'leads' ? 'open-leads' : 'nav';
       return '<button type="button" class="nav-item ' + (active ? 'active' : '') + '" data-action="' + action + '" data-view="' + item.id + '">' +
         icon(item.icon) + '<span>' + item.label + '</span></button>';
@@ -1343,19 +1876,23 @@
     var selected = overlay.selected;
     var existingGroup = overlay.groupId ? stageGroups(overlay.stage)[overlay.groupId] : null;
     var initialMembers = existingGroup ? existingGroup.members : [];
+    var selectedTourists = Array.from(selected).map(touristById).filter(Boolean);
+    var selectedGroupId = existingGroup ? existingGroup.createdFromGroupId : ((selectedTourists[0] || {}).groupId || null);
+    var selectedFreeId = !selectedGroupId && selectedTourists.length ? selectedTourists[0].id : null;
     var rows = scopedTourists(true).map(function (tourist) {
       var record = effectiveRecord(overlay.stage, tourist.id);
       var outsideRoute = tourist.route.indexOf(currentCity().id) === -1;
       var unconfirmed = !leadConfirmed(tourist);
       var alreadyIncluded = initialMembers.indexOf(tourist.id) !== -1;
-      var unavailable = outsideRoute || unconfirmed || alreadyIncluded;
-      var note = alreadyIncluded ? 'Уже входит в эту общую запись' : (outsideRoute ? 'Город не входит в маршрут туриста' : (unconfirmed ? 'Логистика доступна после подтверждения лида' : recordSummary(record, overlay.stage) + ' · ' + globalGroupLabel(tourist)));
+      var wrongGroup = Boolean(selectedGroupId && tourist.groupId !== selectedGroupId) || Boolean(selectedFreeId && tourist.id !== selectedFreeId);
+      var unavailable = outsideRoute || unconfirmed || alreadyIncluded || wrongGroup;
+      var note = alreadyIncluded ? 'Уже входит в эту общую запись' : (outsideRoute ? 'Город не входит в маршрут туриста' : (unconfirmed ? 'Логистика доступна после подтверждения лида' : (wrongGroup ? 'Общая операция доступна только внутри одной группы тура' : recordSummary(record, overlay.stage) + ' · ' + globalGroupLabel(tourist))));
       return selectionRow(tourist, selected.has(tourist.id), note, unavailable);
     }).join('');
     var canContinue = existingGroup ? selected.size > initialMembers.length : selected.size > 0;
     return '<section class="screen">' + screenHeader('Выберите туристов', cityLabel(currentCity()) + ' · ' + stageMeta[overlay.stage].tab) +
       '<div class="screen-scroll"><div class="selection-head"><strong>Туристы тура</strong><button type="button" class="text-button" data-action="select-all">Выбрать всех</button></div>' +
-      '<div class="form-note">Общая запись операции независима от группы тура. Можно выбрать любых участников этого тура и остановки; их личные значения сохранятся.</div>' + (overlay.error ? '<div class="error-note">' + h(overlay.error) + '</div>' : '') + rows + '</div>' +
+      '<div class="form-note">Индивидуальную запись можно создать для любого туриста. Общая запись объединяет только участников с одним непустым groupId; личные значения сохраняются.</div>' + (overlay.error ? '<div class="error-note">' + h(overlay.error) + '</div>' : '') + rows + '</div>' +
       '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button>' +
       '<button type="button" class="primary-button blue" data-action="next-operation" ' + (canContinue ? '' : 'disabled') + '>' + (existingGroup ? 'Добавить' : 'Далее') + ' · ' + selected.size + '</button></footer></section>';
   }
@@ -1374,7 +1911,7 @@
   function touristGroupSelectionScreen(overlay) {
     var selected = overlay.selected;
     var rows = currentTourists().map(function (tourist) {
-      return selectionRow(tourist, selected.has(tourist.id), globalGroupLabel(tourist) + ' · ' + tourist.lead);
+      return selectionRow(tourist, selected.has(tourist.id), globalGroupLabel(tourist) + (hasRestrictedTouristPrivacy(tourist) ? ' · ' + tourist.type : ' · ' + tourist.lead));
     }).join('');
     return '<section class="screen">' + screenHeader('Объединить туристов', 'Одна группа на весь тур') +
       '<div class="screen-scroll"><div class="selection-head"><strong>Выберите минимум двоих</strong><span>' + selected.size + ' выбрано</span></div>' +
@@ -1388,7 +1925,7 @@
     var candidates = globalSplit ? currentTourists().filter(function (tourist) { return tourist.groupId === overlay.groupId; }) :
       overlay.members.map(touristById);
     var rows = candidates.map(function (tourist) {
-      var note = globalSplit ? tourist.lead : recordSummary(effectiveRecord(overlay.stage, tourist.id), overlay.stage);
+      var note = globalSplit ? (hasRestrictedTouristPrivacy(tourist) ? tourist.type : tourist.lead) : recordSummary(effectiveRecord(overlay.stage, tourist.id), overlay.stage);
       return selectionRow(tourist, overlay.selected.has(tourist.id), note);
     }).join('');
     var action = globalSplit ? 'apply-global-split' : 'apply-operation-split';
@@ -1533,7 +2070,7 @@
     if (field.type === 'select') {
       return '<label class="field"><span>' + h(field.label) + '</span><select data-field="' + field.key + '">' +
         '<option value="">Не выбран</option>' +
-        ['plane', 'train', 'bus', 'car'].map(function (valueOption) {
+        ['plane', 'train', 'bus'].map(function (valueOption) {
           return '<option value="' + valueOption + '" ' + (value === valueOption ? 'selected' : '') + '>' + transportLabel(valueOption) + '</option>';
         }).join('') + '</select></label>';
     }
@@ -1542,11 +2079,12 @@
       var options = activePointsFor(currentCity(), state.draft.transport);
       var selectedPoint = directoryPointById(state.draft.pointId);
       var helper = '';
-      if (!type) {
-        return '<label class="field"><span>' + h(field.label) + '</span><input data-field="point" type="text" value="' + h(value) + '" placeholder="Укажите место вручную"><small class="field-help">Для автомобиля используется ручной ввод.</small></label>';
+      if (selectedPoint && !selectedPoint.active) {
+        return '<div class="field"><span>' + h(field.label) + '</span><button type="button" class="point-selector selected archived-selection" data-action="open-point-picker"><span>' + icon('archive') + '</span><span><strong>' + h(pointDisplay(selectedPoint)) + '</strong><small>Архивная точка сохранена в записи</small></span><b>›</b></button><small class="field-help warning-help">Историческое значение не перезаписывается автоматически. Выберите активную точку, только если нужно заменить её.</small></div>';
       }
+      if (!type) return '<label class="field"><span>' + h(field.label) + '</span><input data-field="point" type="text" value="' + h(value) + '" placeholder="Сначала выберите транспорт"><small class="field-help">Доступны самолёт, поезд и автобус.</small></label>';
       if (options.length === 0 || state.draft.pointManual) {
-        helper = '<small class="field-help warning-help">Не из справочника · нет подходящей точки типа «' + h(pointTypeLabel(type, false)) + '». Значение не будет добавлено автоматически.</small>';
+        helper = '<small class="field-help warning-help">Не из справочника' + (options.length ? ' · активные точки не подставляются вместо ручного значения.' : ' · нет подходящей точки типа «' + h(pointTypeLabel(type, false)) + '».') + '</small>';
         return '<label class="field"><span>' + h(field.label) + '</span><input data-field="point" data-manual-point="true" type="text" value="' + h(value) + '" placeholder="Указать вручную">' + helper + '</label>';
       }
       if (state.draft.pointAutofilled && selectedPoint) helper = '<small class="field-help success-help">Подставлено из справочника · можно изменить</small>';
@@ -1622,23 +2160,44 @@
       '<div class="selection-head"><strong>Основная запись</strong><span>обязательно</span></div>' + sourceCards +
       '<div class="selection-head"><strong>Что отличается</strong><span>' + differing.length + ' поля</span></div>' + comparisons + '</div>' +
       '<footer class="screen-actions"><button type="button" class="secondary-button" data-action="back-to-form">Назад</button>' +
-      '<button type="button" class="primary-button blue" data-action="apply-conflict" ' + (overlay.sourceId ? '' : 'disabled') + '>Создать общую запись</button></footer></section>';
+      '<button type="button" class="primary-button blue" data-action="apply-conflict" ' + (overlay.sourceId ? '' : 'disabled') + '>' + (overlay.groupId ? 'Применить к общей записи' : 'Создать общую запись') + '</button></footer></section>';
   }
 
   function toursScreen(overlay) {
     var labels = { active: 'Активные', draft: 'Черновики', archive: 'Архив' };
     var query = state.tourQuery.trim().toLowerCase();
-    var filtered = tours.filter(function (tour) { return canViewTourId(tour.id) && tour.status === state.tourFilter && (!query || [tour.name, tour.route, tour.guides].join(' ').toLowerCase().indexOf(query) !== -1); });
+    var filtered = tours.filter(function (tour) {
+      var matchesStatus = state.tourFilter === 'archive' ? (tour.isArchived || tour.status === 'archive' || tour.status === 'cancelled') :
+        (!tour.isArchived && tour.status === state.tourFilter);
+      return canViewTourId(tour.id) && matchesStatus && (!query || [tour.name, tour.route, tour.guides].join(' ').toLowerCase().indexOf(query) !== -1);
+    });
     var cards = filtered.map(function (tour) {
-      return '<article class="tour-list-card" style="--tour-color:' + h(tour.color) + '"><button type="button" data-action="select-tour" data-id="' + tour.id + '"><span class="tour-list-state">' + h(labels[tour.status]) + '</span><strong>' + h(tour.name) + '</strong><small>' + h(tour.dates + ' · ' + tour.route) + '</small><div><span>' + tour.tourists + ' / ' + tour.capacity + ' мест</span><span>' + h(tour.guides || 'Гид не назначен') + '</span></div></button><button type="button" class="card-more" data-action="tour-card-menu" data-id="' + tour.id + '">' + icon('more') + '</button></article>';
+      var routePresentation = tourRoutePresentation(tour);
+      var hideFinancials = state.role === 'viewer' || state.role === 'escort';
+      var liveTourists = tourHasOperationalModel(tour.id) ? tourists.filter(function (tourist) { return tourist.tourId === tour.id; }) : null;
+      var bookedCount = bookedCountForTour(tour);
+      var statusCounts = liveTourists ? liveTourists.reduce(function (counts, tourist) {
+        if (tourist.tourStatus === 'Подтверждён') counts.confirmed += 1;
+        else if (tourist.tourStatus === 'Отменён') counts.cancelled += 1;
+        else counts.pending += 1;
+        return counts;
+      }, { confirmed: 0, pending: 0, cancelled: 0 }) : (tour.statusCounts || { confirmed: 0, pending: 0, cancelled: 0 });
+      var availableSpots = Math.max(Number(tour.capacity || 0) - bookedCount, 0);
+      var statusBadges = (statusCounts.confirmed ? '<span class="state-pill">Подтв. ' + statusCounts.confirmed + '</span>' : '') + (statusCounts.pending ? '<span class="warning-pill">Ожид. ' + statusCounts.pending + '</span>' : '') + (statusCounts.cancelled ? '<span class="danger-pill">Отм. ' + statusCounts.cancelled + '</span>' : '');
+      var headerBadges = '<span class="battery-pill">' + tour.logisticsCompleteness + '%</span><span class="group-pill">' + h(tour.tourTypeLabel) + '</span>' + (tour.isArchived ? '<span class="lead-pill">Архив</span>' : '') + (tour.status === 'cancelled' ? '<span class="danger-pill">Отменён</span>' : '');
+      var manageActions = canManageTourId(tour.id) && !state.offline ? '<button type="button" class="icon-button" data-action="copy-tour" data-id="' + h(tour.id) + '" aria-label="Копировать тур">' + icon('tours') + '</button><button type="button" class="icon-button" data-action="edit-tour" data-id="' + h(tour.id) + '" aria-label="Изменить тур">' + icon('edit') + '</button>' + (state.role === 'admin' ? '<button type="button" class="icon-button danger-icon" data-action="delete-tour" data-id="' + h(tour.id) + '" aria-label="Удалить тур">' + icon('trash') + '</button>' : '') : '';
+      var summaryHref = './tour-operations.html?' + new URLSearchParams({ tourId: tour.id, tourSection: 'summary', role: state.role, offline: state.offline ? '1' : '0' }).toString();
+      return '<article class="event-card tour-list-card" style="--tour-color:' + h(tour.color) + '"><div class="event-card-title"><span class="event-color"></span><strong>' + h(tour.name) + '</strong><div>' + headerBadges + '</div></div><div class="event-line">' + icon('pin') + '<span><em>' + h(tour.country) + ':</em> ' + h(routePresentation.cityNames.join(', ')) + '</span></div><div class="event-line split-line">' + icon('tours') + '<span>' + h(routePresentation.dates) + '</span>' + (hideFinancials ? '' : '<strong>' + h(formatMoney(tour.price, tour.priceCurrency)) + '</strong>') + '</div><div class="event-line event-participants">' + icon('users') + '<span>' + bookedCount + ' из ' + tour.capacity + ' участников</span>' + statusBadges + (availableSpots === 0 ? '<span class="state-pill">Мест нет</span>' : '') + '</div><p class="event-description">' + h(tour.description) + '</p>' + (tour.site && !hideFinancials ? '<button type="button" class="event-site" data-action="preview-tour-site">' + icon('success') + 'Открыть на сайте</button>' : '') + '<div class="event-actions"><button type="button" class="secondary-button event-summary-button" data-action="select-tour" data-id="' + h(tour.id) + '">Сводная таблица <b>→</b></button><a class="icon-button" href="' + h(summaryHref) + '" target="_blank" rel="noopener" aria-label="Открыть сводную в новой вкладке">' + icon('success') + '</a>' + manageActions + '</div></article>';
     }).join('');
     var emptyToursHint = capabilities().canManageTour && !state.offline ? 'Измените фильтр или создайте новый тур.' : 'Измените фильтр. Создание тура недоступно в текущем режиме.';
     var createAction = capabilities().canManageTour && !state.offline ? '<footer class="screen-actions single"><button type="button" class="primary-button" data-action="new-tour">' + icon('plus') + 'Создать тур</button></footer>' : '';
     var readOnlyNote = state.offline ? '<div class="form-note">Нет подключения. Список туров доступен без создания и изменений.</div>' :
       (capabilities().canManageTour ? '' : '<div class="form-note">Режим просмотра. Создание и управление турами недоступно для роли «' + h(roleLabels[state.role]) + '».</div>');
+    var totalBooked = filtered.reduce(function (sum, tour) { return sum + bookedCountForTour(tour); }, 0);
+    var totalAvailable = filtered.reduce(function (sum, tour) { return sum + Math.max(Number(tour.capacity || 0) - bookedCountForTour(tour), 0); }, 0);
     return '<section class="screen">' + screenHeader('Туры', capabilities().canManageTour ? 'Список, создание и архив' : 'Список туров · просмотр') + '<div class="screen-scroll">' + readOnlyNote + '<div class="filter-tabs">' + Object.keys(labels).map(function (status) {
       return '<button type="button" class="' + (state.tourFilter === status ? 'active' : '') + '" data-action="tour-filter" data-filter="' + status + '">' + labels[status] + '</button>';
-    }).join('') + '</div><label class="search-box">' + icon('search') + '<input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.tourists; }, 0) + '</strong></div><div><span>Свободно</span><strong>' + filtered.reduce(function (sum, tour) { return sum + tour.capacity - tour.tourists; }, 0) + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>' + h(emptyToursHint) + '</span></div>') + '</div>' + createAction + '</section>';
+    }).join('') + '</div><label class="search-box">' + icon('search') + '<input data-tour-search value="' + h(state.tourQuery) + '" placeholder="Название, город или гид"></label><div class="tour-stats compact-stats"><div><span>Туров</span><strong>' + filtered.length + '</strong></div><div><span>Туристов</span><strong>' + totalBooked + '</strong></div><div><span>Свободно</span><strong>' + totalAvailable + '</strong></div></div>' + (cards || '<div class="empty-state"><strong>Туров нет</strong><span>' + h(emptyToursHint) + '</span></div>') + '</div>' + createAction + '</section>';
   }
 
   function tourMenuScreen(overlay) {
@@ -1648,11 +2207,12 @@
     var title = tour ? tour.name : 'Выбранный тур';
     var viewActions = '<button data-action="view-tour-info"><span>' + icon('tours') + '</span><div><strong>О туре</strong><small>Маршрут, команда и параметры</small></div><b>›</b></button>' +
       (tourHasOperationalModel(tourId) ? '<button data-action="view-tour-tasks"><span>' + icon('check') + '</span><div><strong>Задачи тура</strong><small>Операционные задачи выбранного тура</small></div><b>›</b></button>' : '');
-    var manageActions = canManageTourId(tourId) && tour && !state.offline ? '<button data-action="edit-tour"><span>' + icon('settings') + '</span><div><strong>Изменить тур</strong><small>Маршрут, даты и команда</small></div><b>›</b></button><button data-action="copy-tour"><span>' + icon('tours') + '</span><div><strong>Копировать</strong><small>Создать тур с теми же настройками</small></div><b>›</b></button><button class="danger-row" data-action="archive-tour"><span>' + icon('archive') + '</span><div><strong>Архивировать</strong><small>Скрыть из активных туров</small></div><b>›</b></button><button class="danger-row" data-action="cancel-tour"><span>' + icon('close') + '</span><div><strong>Отменить тур</strong><small>Сохранить данные и указать причину</small></div><b>›</b></button>' : '';
+    var manageActions = canManageTourId(tourId) && tour && !state.offline ? '<button data-action="edit-tour"><span>' + icon('settings') + '</span><div><strong>Изменить тур</strong><small>Маршрут, даты и команда</small></div><b>›</b></button><button data-action="copy-tour"><span>' + icon('tours') + '</span><div><strong>Копировать</strong><small>Создать тур с теми же настройками</small></div><b>›</b></button>' + (state.role === 'admin' ? '<button class="danger-row" data-action="archive-tour"><span>' + icon('archive') + '</span><div><strong>' + (tour.isArchived ? 'Вернуть из архива' : 'Архивировать') + '</strong><small>Только администратор</small></div><b>›</b></button>' : '') + '<button class="danger-row" data-action="' + (tour.status === 'cancelled' ? 'reopen-tour' : 'cancel-tour') + '"><span>' + icon('close') + '</span><div><strong>' + (tour.status === 'cancelled' ? 'Открыть тур снова' : 'Отменить тур') + '</strong><small>Сохранить данные и синхронизировать лиды</small></div><b>›</b></button>' : '';
     var directoryAction = '<button data-action="open-directory"><span>' + icon('pin') + '</span><div><strong>Города и точки</strong><small>' +
       (capabilities().canManageDirectory && !state.offline ? 'Аэропорты, ж/д и автовокзалы' : 'Просмотр справочника') + '</small></div><b>›</b></button>';
+    var uiStatesAction = tourHasOperationalModel(tourId) ? '<button type="button" data-action="open-ui-states"><span>' + icon('alert') + '</span><div><strong>Состояния экрана</strong><small>Загрузка, сохранение, ошибка и пустой список</small></div><b>›</b></button>' : '';
     var readOnlyNote = manageActions ? '' : '<div class="form-note">' + (state.offline ? 'Нет подключения. Управляющие действия временно недоступны.' : 'Режим просмотра. Управляющие действия для этого тура недоступны.') + '</div>';
-    return '<section class="screen">' + screenHeader('Действия с туром', title) + '<div class="screen-scroll">' + readOnlyNote + '<div class="action-menu">' + viewActions + manageActions + directoryAction + '</div></div></section>';
+    return '<section class="screen">' + screenHeader('Действия с туром', title) + '<div class="screen-scroll">' + readOnlyNote + '<div class="action-menu">' + viewActions + manageActions + directoryAction + uiStatesAction + '</div></div></section>';
   }
 
   function unavailableTouristScreen() {
@@ -1669,6 +2229,10 @@
     var expanded = overlay.expanded || new Set();
     var capability = capabilities();
     var canSeePrivate = canSeePrivateFor(tourist);
+    var limitedPrivacy = state.role === 'viewer' || state.role === 'escort';
+    var operationalOnly = state.role === 'manager' && !canSeePrivate;
+    var restrictedContext = limitedPrivacy || operationalOnly;
+    var detailTab = overlay.detailTab || 'profile';
 
     function profileValue(label, value, privateField) {
       if (privateField && !canSeePrivate) return '';
@@ -1680,7 +2244,10 @@
       return '<article class="profile-section ' + (open ? 'open' : '') + '"><button type="button" class="profile-section-head" data-action="toggle-profile-section" data-section="' + id + '"><span><strong>' + h(title) + '</strong><small>' + h(status) + '</small></span><b>⌄</b></button>' + (open ? '<div class="profile-section-body">' + content + (editable && canEditProfileFor(tourist) && !state.offline ? '<button type="button" class="secondary-button full-button" data-action="edit-profile-section" data-id="' + tourist.id + '" data-section="' + id + '">' + icon('edit') + 'Изменить раздел</button>' : '') + '</div>' : '') + '</article>';
     }
 
-    var personalContent = profileValue('Фамилия', tourist.lastName) + profileValue('Имя', tourist.firstName) + profileValue('Отчество', tourist.middleName) + profileValue('Дата рождения', tourist.birthDate) + profileValue('Гражданство', tourist.citizenship) + profileValue('Телефон', tourist.phone) + profileValue('Email', tourist.email, true) + profileValue('Тип туриста', tourist.type);
+    var personalContent = limitedPrivacy ?
+      profileValue('Имя для отображения', tourist.name) + profileValue('Дата рождения', tourist.birthDate) + profileValue('Телефон', tourist.phone) :
+      profileValue('Фамилия', tourist.lastName) + profileValue('Имя', tourist.firstName) + profileValue('Отчество', tourist.middleName) + profileValue('Дата рождения', tourist.birthDate) + profileValue('Email', tourist.email, true) + profileValue('Телефон', tourist.phone);
+    var citizenshipContent = profileValue('Гражданство', tourist.citizenship);
     var domesticContent = tourist.citizenship !== 'Россия' ? '<div class="form-note">Для гражданина другой страны блок паспорта РФ не применяется. Ранее сохранённые значения прототип не удаляет.</div>' : profileValue('Серия и номер', tourist.domesticPassport) + profileValue('Кем выдан', tourist.domesticIssuedBy) + profileValue('Адрес регистрации', tourist.registrationAddress);
     var scans = (tourist.scans || []).map(function (scan) {
       return '<div class="scan-row"><span>' + icon('document') + '</span><span><strong>' + h(scan.name) + '</strong><small>Скан загранпаспорта · mock</small></span><button type="button" data-action="view-scan" data-id="' + tourist.id + '" data-scan="' + scan.id + '" aria-label="Посмотреть скан">' + icon('eye') + '</button></div>';
@@ -1700,28 +2267,46 @@
       }).join('');
       return '<section class="route-city-card"><div><strong>' + h(cityLabel(city)) + '</strong><span>' + h(city.dates) + ' · остановка ' + (routePosition + 1) + '</span></div>' + rows + '</section>';
     }).join('');
-    var linksContent = profileValue('Исходный лид', tourist.lead + ' · ' + tourist.leadStatus) + profileValue('Статус участия', tourist.tourStatus) + profileValue('Группа тура', globalGroupLabel(tourist)) + profileValue('Представитель группы', tourist.groupRepresentative ? 'Да' : 'Нет') + profileValue('Основной турист заявки', tourist.isPrimary ? 'Да' : 'Нет') + '<button type="button" class="secondary-button full-button" data-action="open-source-lead" data-id="' + tourist.leadId + '">Открыть исходный лид</button>';
-    var commentsContent = profileValue('Комментарий для гида', tourist.guideComment) + profileValue('Внутренняя заметка', tourist.internalNote, true);
-    var attentionCount = Number(!personal.ready) + Number(domestic.category === 'missing') + Number(foreign.category !== 'ready');
+    var settingsContent = limitedPrivacy ? profileValue('Тип туриста', tourist.type) :
+      profileValue('Тип туриста', tourist.type) + profileValue('Основной турист в лиде', tourist.isPrimary ? 'Да' : 'Нет') + profileValue('Примечание', tourist.notes, true);
+    var allowedRouteCities = (limitedPrivacy ? visibleRouteCities() : cities).filter(function (city) { return tourist.route.indexOf(city.id) !== -1; });
+    var routeContextLabel = allowedRouteCities.map(cityLabel).join(' → ') || 'Нет доступных остановок';
+    var tourContextContent = profileValue('Комментарий для гида', tourist.guideComment) +
+      (restrictedContext ? '' : profileValue('Исходный лид', tourist.lead) + profileValue('Статус лида', tourist.leadStatus)) +
+      profileValue('Выбранный тур', selectedTourName()) +
+      profileValue('Статус участия', tourist.tourStatus) +
+      profileValue('Группа туристов', globalGroupLabel(tourist)) +
+      (restrictedContext ? '' : profileValue('Представитель группы', tourist.groupRepresentative ? 'Да' : 'Нет') + profileValue('Основной турист заявки', tourist.isPrimary ? 'Да' : 'Нет')) +
+      profileValue('Ограниченный маршрут', routeContextLabel) +
+      (canSeeSourceLeadFor(tourist) ? '<button type="button" class="secondary-button full-button" data-action="open-source-lead" data-id="' + tourist.leadId + '">Открыть исходный лид</button>' : '');
+    var attentionCount = Number(!personal.ready) + Number(!limitedPrivacy && domestic.category === 'missing') + Number(foreign.category !== 'ready');
     var editButton = canEditProfileFor(tourist) && !state.offline ? '<button type="button" class="icon-button" data-action="edit-profile-section" data-id="' + tourist.id + '" data-section="personal" aria-label="Изменить личные данные">' + icon('edit') + '</button>' : '';
     var deleteButton = capability.canDelete && !state.offline ? '<button type="button" class="danger-button full-button" data-action="delete-tourist" data-id="' + tourist.id + '">Удалить туриста</button>' : '';
 
-    var statusSummary = tourHasOperationalModel(state.selectedTourId) ? '<div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Отель</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены в MVP.</div>';
+    var statusSummary = tourHasOperationalModel(state.selectedTourId) ? '<div class="selection-head"><strong>Фактические статусы</strong><span>' + h(cityLabel(currentCity())) + '</span></div><div class="status-grid"><div><span>Прибытие</span><strong>' + h(statusLabel(tourist, currentCity().id, 'arrival')) + '</strong></div><div><span>Заселение</span><strong>' + h(statusLabel(tourist, currentCity().id, 'hotel')) + '</strong></div><div><span>Отъезд</span><strong>' + h(statusLabel(tourist, currentCity().id, 'departure')) + '</strong></div></div>' : '<div class="form-note">Операционные статусы этого тура ещё не загружены в MVP.</div>';
+    var detailTabs = '<div class="profile-tabs"><button type="button" class="' + (detailTab === 'profile' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="profile">Профиль</button><button type="button" class="' + (detailTab === 'tour' ? 'active' : '') + '" data-action="tourist-detail-tab" data-tab="tour">В туре</button></div>';
+    var profileSections = section('personal', 'Личные данные', personal.label, personalContent, true) +
+      (limitedPrivacy ? '' : section('citizenship', 'Гражданство', tourist.citizenship || 'Не заполнено', citizenshipContent, true)) +
+      (canSeePrivate ? section('domestic', 'Паспорт РФ', domestic.label, domesticContent, true) : '') +
+      section('foreign', 'Загранпаспорт', foreign.label, foreignContent, true) +
+      section('settings', 'Тип и настройки', tourist.type || 'Не заполнено', settingsContent, true);
+    var tourSections = section('tour-context', 'Данные в туре', selectedTourName(), tourContextContent, true) + statusSummary + section('logistics', 'Маршрут и логистика', allowedRouteCities.length + ' остановки · личные и общие записи', logisticsContent, false);
 
-    return '<section class="screen"><header class="screen-header"><button type="button" class="back-button" data-action="close-overlay" aria-label="Назад">' + icon('back') + '</button><div class="screen-title"><strong>' + h(tourist.name) + '</strong><span>' + h(tourist.lead) + '</span></div>' + editButton + '</header><div class="screen-scroll profile-scroll">' + (canEditProfileFor(tourist) ? '' : roleBanner(tourist)) + '<div class="person-hero profile-hero"><span class="avatar dark">' + h(tourist.initials) + '</span><div><strong>' + h(tourist.name) + '</strong><span>' + h(tourist.type + ' · Группа тура: ' + globalGroupLabel(tourist)) + '</span></div></div><div class="profile-badges"><span class="state-pill">Лид · ' + h(tourist.leadStatus) + '</span><span class="group-pill">Участие · ' + h(tourist.tourStatus) + '</span>' + (tourist.isPrimary ? '<span class="count-pill">Основной в заявке</span>' : '') + '</div>' + (attentionCount ? '<div class="attention-card">' + icon('alert') + '<span><strong>Нужно проверить ' + attentionCount + ' ' + (attentionCount === 1 ? 'раздел' : 'раздела') + '</strong><small>' + h([!personal.ready ? personal.label : '', domestic.category === 'missing' ? domestic.label : '', foreign.category !== 'ready' ? foreign.issue : ''].filter(Boolean).join(' · ')) + '</small></span></div>' : '<div class="success-note">Профиль и документы готовы к поездке.</div>') + '<div class="quick-actions"><button type="button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + '<span>Позвонить</span></button><button type="button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + '<span>Написать</span></button><button type="button" data-action="copy-tourist-contact" data-id="' + tourist.id + '">' + icon('document') + '<span>Копировать</span></button></div>' + statusSummary +
-      section('personal', 'Личные данные', personal.label, personalContent, true) +
-      (canSeePrivate ? section('domestic', 'Паспорт РФ', domestic.label, domesticContent, domestic.category !== 'not-required') : '') +
-      section('foreign', 'Загранпаспорт и сканы', foreign.label, foreignContent, true) +
-      section('logistics', 'Маршрут и логистика', tourist.route.length + ' остановки · own / effective', logisticsContent, false) +
-      section('links', 'Связи и группы', globalGroupLabel(tourist), linksContent, true) +
-      section('comments', 'Комментарии', tourist.guideComment ? 'Комментарий для гида заполнен' : 'Не заполнено', commentsContent, true) + deleteButton + '</div></section>';
+    var identitySubtitle = restrictedContext ? 'Турист тура' : tourist.lead;
+    var heroSubtitle = tourist.type + ' · Группа тура: ' + globalGroupLabel(tourist);
+    var profileBadges = restrictedContext ? '' : '<div class="profile-badges"><span class="state-pill">Лид · ' + h(tourist.leadStatus) + '</span><span class="group-pill">Участие · ' + h(tourist.tourStatus) + '</span>' + (tourist.isPrimary ? '<span class="count-pill">Основной в лиде</span>' : '') + (tourist.groupRepresentative ? '<span class="count-pill">Основной в группе</span>' : '') + '</div>';
+    var attentionDetails = [!limitedPrivacy && domestic.category === 'missing' ? domestic.label : '', foreign.category === 'missing' ? foreign.issue : ''].filter(Boolean).join(' · ');
+    var profileBody = operationalOnly ? '<div class="empty-state error-state">' + icon('alert') + '<strong>Профиль недоступен</strong><span>Исходный лид не назначен текущему менеджеру. Вкладка «В туре» сохраняет доступ к операционным данным без раскрытия контактов и документов.</span></div>' :
+      ((attentionCount ? '<div class="attention-card">' + icon('alert') + '<span><strong>Есть незаполненные необязательные данные</strong><small>' + h(attentionDetails) + '</small></span></div>' : '<div class="success-note">Обязательные поля профиля заполнены.</div>') + '<div class="quick-actions"><button type="button" data-action="call-tourist" data-id="' + tourist.id + '">' + icon('phone') + '<span>Позвонить</span></button><button type="button" data-action="message-tourist" data-id="' + tourist.id + '">' + icon('chat') + '<span>Написать</span></button><button type="button" data-action="copy-tourist-contact" data-id="' + tourist.id + '">' + icon('document') + '<span>Копировать</span></button></div>' + profileSections);
+
+    return '<section class="screen"><header class="screen-header"><button type="button" class="back-button" data-action="close-overlay" aria-label="Назад">' + icon('back') + '</button><div class="screen-title"><strong>' + h(tourist.name) + '</strong><span>' + h(identitySubtitle) + '</span></div>' + editButton + '</header>' + detailTabs + '<div class="screen-scroll profile-scroll">' + (canEditProfileFor(tourist) ? '' : roleBanner(tourist)) + '<div class="person-hero profile-hero"><span class="avatar dark">' + h(tourist.initials) + '</span><div><strong>' + h(tourist.name) + '</strong><span>' + h(heroSubtitle) + '</span></div></div>' + profileBadges + (detailTab === 'profile' ? profileBody : tourSections) + deleteButton + '</div></section>';
   }
 
   function profileEditScreen(overlay) {
     var tourist = touristById(overlay.touristId);
     if (!canEditProfileFor(tourist)) return unavailableTouristScreen();
     var section = overlay.section;
-    var title = { personal: 'Личные данные', domestic: 'Паспорт РФ', foreign: 'Загранпаспорт', links: 'Связи и группы', comments: 'Комментарии' }[section] || 'Данные туриста';
+    var title = { personal: 'Личные данные', citizenship: 'Гражданство', domestic: 'Паспорт РФ', foreign: 'Загранпаспорт', settings: 'Тип и настройки', 'tour-context': 'Данные в туре' }[section] || 'Данные туриста';
     var fieldErrors = overlay.fieldErrors || {};
     function fieldError(name) {
       return fieldErrors[name] ? '<small class="field-error" id="error-' + h(name) + '" role="alert">' + h(fieldErrors[name]) + '</small>' : '';
@@ -1740,15 +2325,17 @@
     }
     var controls = '';
     if (section === 'personal') {
-      controls = profileInput('Фамилия', 'lastName', tourist.lastName, 'text', true) + profileInput('Имя', 'firstName', tourist.firstName, 'text', true) + profileInput('Отчество', 'middleName', tourist.middleName, 'text', tourist.isPrimary) + profileInput('Дата рождения', 'birthDate', tourist.birthDate, 'date', true) + profileSelect('Гражданство', 'citizenship', ['Россия', 'Казахстан'], tourist.citizenship, true) + profileInput('Телефон', 'phone', tourist.phone, 'tel', tourist.isPrimary) + (canSeePrivateFor(tourist) ? profileInput('Email', 'email', tourist.email, 'email', tourist.isPrimary) : '') + profileSelect('Тип туриста', 'type', ['Взрослый','Ребёнок','Младенец'], tourist.type, false);
+      controls = profileInput('Фамилия', 'lastName', tourist.lastName, 'text', true) + profileInput('Имя', 'firstName', tourist.firstName, 'text', true) + profileInput('Отчество', 'middleName', tourist.middleName) + profileInput('Дата рождения', 'birthDate', tourist.birthDate, 'date') + (canSeePrivateFor(tourist) ? profileInput('Email', 'email', tourist.email, 'email') : '') + profileInput('Телефон', 'phone', tourist.phone, 'tel');
+    } else if (section === 'citizenship') {
+      controls = profileSelect('Гражданство', 'citizenship', [['', 'Не указано'], 'Россия', 'Казахстан'], tourist.citizenship, false);
     } else if (section === 'domestic') {
-      controls = tourist.citizenship !== 'Россия' ? '<div class="form-note">Для гражданина другой страны паспорт РФ не требуется. Сохранённые значения не удаляются.</div>' : profileInput('Серия и номер', 'domesticPassport', tourist.domesticPassport, 'text', tourist.isPrimary) + profileInput('Кем выдан', 'domesticIssuedBy', tourist.domesticIssuedBy, 'text', tourist.isPrimary) + profileInput('Адрес регистрации', 'registrationAddress', tourist.registrationAddress, 'text', false);
+      controls = tourist.citizenship !== 'Россия' ? '<div class="form-note">Для гражданина другой страны паспорт РФ не требуется. Сохранённые значения не удаляются.</div>' : profileInput('Серия и номер', 'domesticPassport', tourist.domesticPassport) + profileInput('Кем выдан', 'domesticIssuedBy', tourist.domesticIssuedBy) + profileInput('Адрес регистрации', 'registrationAddress', tourist.registrationAddress);
     } else if (section === 'foreign') {
-      controls = profileInput('ФИО латиницей', 'latinName', tourist.latinName, 'text', true) + profileInput('Номер загранпаспорта', 'passport', tourist.passport, 'text', true) + profileInput('Годен до', 'passportExpiry', tourist.passportExpiry, 'date', true) + '<div class="form-note">Сканы и OCR доступны в карточке раздела. Распознанные значения применяются только после сверки.</div>';
-    } else if (section === 'links') {
-      controls = '<label class="field"><span>Основной турист заявки</span><select name="isPrimary"><option value="true" ' + (tourist.isPrimary ? 'selected' : '') + '>Да</option><option value="false" ' + (!tourist.isPrimary ? 'selected' : '') + '>Нет</option></select><small class="field-help">Единственного основного туриста нельзя снять без выбора замены.</small></label><label class="field"><span>Представитель группы тура</span><select name="groupRepresentative"><option value="true" ' + (tourist.groupRepresentative ? 'selected' : '') + '>Да</option><option value="false" ' + (!tourist.groupRepresentative ? 'selected' : '') + '>Нет</option></select></label>';
-    } else if (section === 'comments') {
-      controls = '<label class="field"><span>Комментарий для гида</span><textarea name="guideComment" rows="4">' + h(tourist.guideComment) + '</textarea></label>' + (canSeePrivateFor(tourist) ? '<label class="field"><span>Внутренняя заметка</span><textarea name="internalNote" rows="4">' + h(tourist.internalNote) + '</textarea></label>' : '');
+      controls = profileInput('ФИО латиницей', 'latinName', tourist.latinName) + profileInput('Номер загранпаспорта', 'passport', tourist.passport) + profileInput('Годен до', 'passportExpiry', tourist.passportExpiry, 'date') + '<div class="form-note">Сканы и OCR доступны в карточке раздела. Распознанные значения применяются только после сверки.</div>';
+    } else if (section === 'settings') {
+      controls = profileSelect('Тип туриста', 'type', [['', 'Не указан'], 'Взрослый','Ребёнок','Младенец'], tourist.type, false) + '<label class="field"><span>Основной турист в лиде</span><select name="isPrimary"><option value="true" ' + (tourist.isPrimary ? 'selected' : '') + '>Да</option><option value="false" ' + (!tourist.isPrimary ? 'selected' : '') + '>Нет</option></select><small class="field-help">Это leadTourist.isPrimary, не основной участник группы тура.</small></label>' + (canSeePrivateFor(tourist) ? '<label class="field"><span>Примечание</span><textarea name="notes" rows="4">' + h(tourist.notes) + '</textarea></label>' : '');
+    } else if (section === 'tour-context') {
+      controls = '<label class="field"><span>Комментарий для гида</span><textarea name="guideComment" rows="4">' + h(tourist.guideComment) + '</textarea></label><label class="field"><span>Основной в группе тура</span><select name="groupRepresentative"><option value="true" ' + (tourist.groupRepresentative ? 'selected' : '') + '>Да</option><option value="false" ' + (!tourist.groupRepresentative ? 'selected' : '') + '>Нет</option></select><small class="field-help">Это deal.isPrimaryInGroup; флаг основного туриста в лиде не меняется.</small></label>';
     }
     return '<section class="screen"><form id="profile-section-form" class="screen-form" data-id="' + tourist.id + '" data-section="' + section + '" novalidate>' + screenHeader(title, tourist.name) + '<div class="screen-scroll"><div class="form-note">Изменения сохраняются в канонической mock-карточке туриста и видны во всех разделах прототипа.</div>' + (overlay.error ? '<div class="error-note" role="alert">' + h(overlay.error) + '</div>' : '') + controls + '</div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></section>';
   }
@@ -1767,7 +2354,7 @@
 
   function documentPreviewScreen(overlay) {
     var tourist = touristById(overlay.touristId);
-    if (!canViewTouristForSelectedTour(tourist)) return unavailableTouristScreen();
+    if (!canViewDocumentsFor(tourist)) return unavailableTouristScreen();
     var scan = (tourist.scans || []).find(function (item) { return item.id === overlay.scanId; });
     return '<section class="screen">' + screenHeader(scan ? scan.name : 'Скан паспорта', tourist.name) + '<div class="screen-scroll"><div class="document-preview">' + icon('document') + '<strong>Предпросмотр mock-файла</strong><span>В прототипе файл не отправляется на сервер.</span></div>' + (canManageDocumentsFor(tourist) && !state.offline ? '<button type="button" class="danger-button full-button" data-action="delete-scan" data-id="' + tourist.id + '" data-scan="' + h(overlay.scanId) + '">Удалить скан</button>' : '') + '</div></section>';
   }
@@ -1784,7 +2371,7 @@
 
   function bulkTouristsScreen(overlay) {
     var rows = currentTourists().map(function (tourist) {
-      return selectionRow(tourist, overlay.selected.has(tourist.id), tourist.lead + ' · ' + globalGroupLabel(tourist));
+      return selectionRow(tourist, overlay.selected.has(tourist.id), (hasRestrictedTouristPrivacy(tourist) ? tourist.type : tourist.lead) + ' · ' + globalGroupLabel(tourist));
     }).join('');
     var bulkActions = [];
     if (capabilities().canExport && !state.offline) bulkActions.push('<button type="button" class="secondary-button" data-action="export-summary">Экспорт</button>');
@@ -1795,8 +2382,9 @@
   }
 
   function scopeSelectScreen() {
+    if (hasLimitedTouristPrivacy()) return '<section class="screen">' + screenHeader('Фильтр недоступен', 'Исходные лиды скрыты') + '<div class="screen-scroll"><div class="empty-state error-state">' + icon('alert') + '<strong>Нет доступа к лидам</strong><span>Вернитесь к полному составу тура.</span></div></div></section>';
     var seen = {};
-    var tourMembers = currentTourists();
+    var tourMembers = currentTourists().filter(canSeeSourceLeadFor);
     var options = tourMembers.filter(function (tourist) {
       if (seen[tourist.leadId]) return false;
       seen[tourist.leadId] = true;
@@ -1822,10 +2410,10 @@
   }
 
   function roleMenuScreen() {
-    var rows = Object.keys(roleLabels).map(function (role) {
+    var rows = ['admin', 'manager', 'escort', 'viewer'].map(function (role) {
       return '<button type="button" class="source-card ' + (state.role === role ? 'active' : '') + '" data-action="select-role" data-role="' + role + '"><span class="radio"></span><span class="member-copy"><strong>' + h(roleLabels[role]) + '</strong><span>' + h(role === 'admin' ? 'Все действия и удаление' : role === 'manager' ? 'Профиль, логистика и группы' : role === 'escort' ? 'Read-only профиль, статусы всего тура' : 'Read-only профиль, статусы назначенных городов') + '</span></span></button>';
     }).join('');
-    var uiStatesAction = tourHasOperationalModel(state.selectedTourId) ? '<button type="button" data-action="open-ui-states">' + icon('alert') + '<span><strong>Состояния экрана</strong><small>Loading, error и empty</small></span></button>' : '';
+    var uiStatesAction = tourHasOperationalModel(state.selectedTourId) ? '<button type="button" data-action="open-ui-states">' + icon('alert') + '<span><strong>Состояния экрана</strong><small>Loading, saving, error и empty</small></span></button>' : '';
     return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay" aria-label="Закрыть"></button><section class="sheet"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>Роль просмотра</strong><span>Mock capability-сценарий</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll">' + rows + '<div class="system-tools"><button type="button" data-action="toggle-offline">' + icon('wifiOff') + '<span><strong>' + (state.offline ? 'Вернуть подключение' : 'Показать offline') + '</strong><small>Проверить запрет записи</small></span></button>' + uiStatesAction + '</div></div></section></div>';
   }
 
@@ -1847,7 +2435,7 @@
   }
 
   function uiStatesScreen() {
-    return '<section class="screen">' + screenHeader('Состояния интерфейса', 'Проверка без production API') + '<div class="screen-scroll"><div class="action-menu"><button data-action="set-ui-state" data-state="loading"><span>' + icon('more') + '</span><div><strong>Загрузка</strong><small>Секционные skeleton-карточки</small></div><b>›</b></button><button data-action="set-ui-state" data-state="error"><span>' + icon('alert') + '</span><div><strong>Ошибка</strong><small>Сообщение и действие «Повторить»</small></div><b>›</b></button><button data-action="set-ui-state" data-state="empty"><span>' + icon('users') + '</span><div><strong>Пустой тур</strong><small>Объяснение и следующий шаг</small></div><b>›</b></button><button data-action="set-ui-state" data-state="ready"><span>' + icon('success') + '</span><div><strong>Рабочее состояние</strong><small>Вернуть mock-данные</small></div><b>›</b></button></div></div></section>';
+    return '<section class="screen">' + screenHeader('Состояния интерфейса', 'Проверка без production API') + '<div class="screen-scroll"><div class="action-menu"><button data-action="set-ui-state" data-state="loading"><span>' + icon('more') + '</span><div><strong>Загрузка</strong><small>Секционные skeleton-карточки</small></div><b>›</b></button><button data-action="set-ui-state" data-state="error"><span>' + icon('alert') + '</span><div><strong>Ошибка загрузки</strong><small>Сообщение и действие «Повторить»</small></div><b>›</b></button><button data-action="set-ui-state" data-state="saving"><span>' + icon('more') + '</span><div><strong>Сохранение</strong><small>Наглядная блокировка повторной отправки</small></div><b>›</b></button><button data-action="set-ui-state" data-state="save-error"><span>' + icon('alert') + '</span><div><strong>Ошибка сохранения</strong><small>Черновик и выбор не теряются</small></div><b>›</b></button><button data-action="set-ui-state" data-state="empty"><span>' + icon('users') + '</span><div><strong>Пустой тур</strong><small>Объяснение и следующий шаг</small></div><b>›</b></button><button data-action="set-ui-state" data-state="ready"><span>' + icon('success') + '</span><div><strong>Рабочее состояние</strong><small>Вернуть mock-данные</small></div><b>›</b></button></div></div></section>';
   }
 
   function clearProgramScreen() {
@@ -1864,14 +2452,51 @@
   }
 
   function programFormScreen(overlay) {
-    var day = overlay.index == null ? { date: '26 сен', city: 'Пекин (2)', title: '', text: '' } : programDays[overlay.index];
-    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><form id="program-form" class="sheet" data-index="' + (overlay.index == null ? '' : overlay.index) + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>' + (overlay.index == null ? 'Новый день' : 'Изменить день') + '</strong><span>Программа тура</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><div class="field-grid">' + simpleField('Дата', 'date', day.date) + simpleField('Город', 'city', day.city) + '</div>' + simpleField('Название', 'title', day.title, 'text', 'Событие дня') + '<label class="field"><span>Описание</span><textarea name="text" rows="5">' + h(day.text) + '</textarea></label></div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></div>';
+    var day = programDays[overlay.index];
+    if (!day) return '';
+    var cityOptions = cities.map(function (city, index) {
+      return '<option value="' + index + '" ' + (Number(day.cityIdx) === index ? 'selected' : '') + '>' + h(cityLabel(city)) + '</option>';
+    }).join('');
+    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><form id="program-form" class="sheet" data-index="' + overlay.index + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>День ' + h(day.dayNumber) + '</strong><span>День и дата заданы границами тура</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll"><div class="readonly-field"><span>Номер дня</span><strong>' + h(day.dayNumber) + '</strong></div><div class="readonly-field"><span>Дата</span><strong>' + h(formatProgramDate(day.date)) + '</strong></div><label class="field"><span>Город маршрута</span><select name="cityIdx">' + cityOptions + '</select><small class="field-help">Сохраняется cityIdx конкретной позиции, а не только название.</small></label><label class="field"><span>Описание</span><textarea name="description" rows="7" placeholder="Программа дня">' + h(day.description) + '</textarea></label><div class="template-actions"><button type="button" class="secondary-button" data-action="apply-program-template">Подставить шаблон</button><button type="button" class="secondary-button" data-action="save-program-template">Сохранить как шаблон</button></div><div class="form-note">Шаблон меняет только описание. День и дата не создаются и не удаляются вручную.</div></div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></div>';
+  }
+
+  function regenerateProgramScreen() {
+    return '<section class="screen">' + screenHeader('Пересоздать программу?', 'Каркас будет сверен с датами и маршрутом') + '<div class="screen-scroll"><div class="conflict-summary"><strong>Обновить дни по туру</strong><span>Сохранённые описания останутся у тех же дат и cityIdx. Новые дни получат понятный шаблон.</span></div></div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="button" class="primary-button blue" data-action="confirm-regenerate-program">Пересоздать</button></footer></section>';
   }
 
   function tourFormScreen(overlay) {
     var tour = overlay.tourId ? tours.find(function (item) { return item.id === overlay.tourId; }) : null;
-    var item = tour || { name: '', dates: '', route: '', guides: '', capacity: 12, color: '#2f6bd8', site: '' };
-    return '<section class="screen"><form id="tour-form" class="screen-form" data-id="' + h(tour ? tour.id : '') + '">' + screenHeader(tour ? 'Изменить тур' : 'Новый тур', 'Поля карточки тура') + '<div class="screen-scroll">' + simpleField('Название', 'name', item.name) + '<div class="field-grid">' + simpleField('Даты', 'dates', item.dates) + simpleField('Мест', 'capacity', item.capacity, 'number') + '</div>' + simpleField('Маршрут и порядок городов', 'route', item.route) + simpleField('Гиды и сопровождающие', 'guides', item.guides) + simpleField('Цвет', 'color', item.color, 'color') + simpleField('Страница тура', 'site', item.site) + '<label class="field"><span>Описание</span><textarea name="description" rows="4">Авторский тур UNIQUE</textarea></label><div class="form-note">Администраторы чата, порядок маршрута и доступы сохраняются вместе с туром.</div></div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></section>';
+    var item = tour || { name: '', description: '', site: '', country: 'Китай', tourType: 'group', startDate: '', endDate: '', capacity: 12, price: '0', priceCurrency: 'RUB', color: '#2f6bd8', escortUserId: '', chatAdminIds: [''], cityGuides: {}, financeGuideCityId: null };
+    if (!overlay.routeDraft) overlay.routeDraft = tour && tour.id === 'china' ? cities.map(function (city) { return { id: city.id, name: city.name }; }) : (item.cities || ['']).map(function (name, index) { return { id: 'route-draft-' + index, name: name }; });
+    if (!overlay.routeGuideIds) overlay.routeGuideIds = Object.assign({}, item.cityGuides || {});
+    if (overlay.financeGuideCityId === undefined) overlay.financeGuideCityId = item.financeGuideCityId || null;
+    if (!overlay.chatAdminIds) overlay.chatAdminIds = (item.chatAdminIds || ['']).slice();
+    var selectedEscortId = item.escortUserId || ((userDirectory.find(function (user) {
+      return user.name === item.escort && user.roles.indexOf('escort') !== -1;
+    }) || {}).id || '');
+    var routeRows = overlay.routeDraft.map(function (routeCity, index) {
+      return '<div class="route-form-row"><input type="hidden" name="routeCityId" value="' + h(routeCity.id) + '"><input name="routeCityName" data-route-index="' + index + '" value="' + h(routeCity.name) + '" placeholder="Город ' + (index + 1) + '"><div><button type="button" data-action="route-up" data-index="' + index + '" ' + (index === 0 ? 'disabled' : '') + '>↑</button><button type="button" data-action="route-down" data-index="' + index + '" ' + (index === overlay.routeDraft.length - 1 ? 'disabled' : '') + '>↓</button><button type="button" data-action="route-remove" data-index="' + index + '" ' + (overlay.routeDraft.length === 1 ? 'disabled' : '') + '>×</button></div></div>';
+    }).join('');
+    var guideRows = overlay.routeDraft.map(function (routeCity, index) {
+      var selectedGuideId = overlay.routeGuideIds[routeCity.id] || '';
+      return '<div class="guide-form-row"><span><strong>' + h(routeCity.name || 'Город ' + (index + 1)) + '</strong><small>Гид города · routeCityId</small></span><input type="search" data-user-search="guide-' + h(routeCity.id) + '" placeholder="Найти гида…" aria-label="Поиск гида"><select id="guide-' + h(routeCity.id) + '" name="cityGuide" data-route-guide-id="' + h(routeCity.id) + '">' + userOptions('viewer', selectedGuideId) + '</select><label><input type="radio" name="financeGuideCityId" value="' + h(routeCity.id) + '" ' + (overlay.financeGuideCityId === routeCity.id ? 'checked' : '') + '> Сбор оплаты</label></div>';
+    }).join('');
+    var chatRows = overlay.chatAdminIds.map(function (adminId, index) {
+      return '<div class="chat-admin-row"><div><input type="search" data-user-search="chat-admin-' + index + '" placeholder="Найти администра…" aria-label="Поиск администра"><select id="chat-admin-' + index + '" name="chatAdmin" data-chat-index="' + index + '">' + userOptions('chat_admin', adminId) + '</select></div><button type="button" data-action="remove-chat-admin" data-index="' + index + '" ' + (overlay.chatAdminIds.length === 1 ? 'disabled' : '') + '>×</button></div>';
+    }).join('');
+    var lifecycle = tour ? '<div class="tour-lifecycle">' + ((state.role === 'admin' || state.role === 'manager') ? '<button type="button" class="danger-button" data-action="' + (tour.status === 'cancelled' ? 'reopen-tour' : 'cancel-tour') + '">' + (tour.status === 'cancelled' ? 'Открыть снова' : 'Закрыть тур') + '</button>' : '') + (state.role === 'admin' && tour.status !== 'cancelled' ? '<button type="button" class="secondary-button" data-action="archive-tour">' + (tour.isArchived ? 'Вернуть из архива' : 'Архивировать') + '</button>' : '') + '</div>' : '';
+    return '<section class="screen"><form id="tour-form" class="screen-form" data-id="' + h(tour ? tour.id : '') + '">' + screenHeader(tour ? 'Изменить тур' : 'Новый тур', 'Порядок полей совпадает с веб-версией') + '<div class="screen-scroll">' + simpleField('Название *', 'name', item.name) + '<label class="field"><span>Описание</span><textarea name="description" rows="4">' + h(item.description || '') + '</textarea></label>' + simpleField('Страница тура', 'site', item.site, 'url', 'https://example.com/tour/...') + '<div class="field-grid"><label class="field"><span>Страна *</span><select name="country"><option ' + (item.country === 'Китай' ? 'selected' : '') + '>Китай</option><option ' + (item.country === 'Япония' ? 'selected' : '') + '>Япония</option><option ' + (item.country === 'Италия' ? 'selected' : '') + '>Италия</option></select></label><label class="field"><span>Тип тура *</span><select name="tourType"><option value="group" ' + (item.tourType === 'group' ? 'selected' : '') + '>Групповой</option><option value="individual" ' + (item.tourType === 'individual' ? 'selected' : '') + '>Индивидуальный</option><option value="excursion">Экскурсия</option><option value="transfer">Трансфер</option></select></label></div><div class="field"><span>Города маршрута *</span><div class="route-form-list">' + routeRows + '</div><button type="button" class="secondary-button full-button" data-action="route-add">' + icon('plus') + 'Добавить город</button><small class="field-help">Порядок сохраняет отдельный routeCityId, в том числе для повторяющихся городов.</small></div><div class="field"><span>Назначение гидов по городам</span><div class="guide-form-list">' + guideRows + '</div></div><label class="field"><span>Сопровождающий</span><input type="search" data-user-search="escort-user" placeholder="Найти сопровождающего…" aria-label="Поиск сопровождающего"><select id="escort-user" name="escort">' + userOptions('escort', selectedEscortId) + '</select></label><div class="field"><span>Администраторы чата</span>' + chatRows + '<button type="button" class="secondary-button" data-action="add-chat-admin">' + icon('plus') + 'Добавить администратора</button></div><div class="field-grid">' + simpleField('Дата начала *', 'startDate', item.startDate, 'date') + simpleField('Дата окончания *', 'endDate', item.endDate, 'date') + '</div><div class="field-grid">' + simpleField('Лимит участников *', 'capacity', item.capacity, 'number') + '<div class="field"><span>Базовая цена *</span><div class="price-row"><input name="price" type="number" value="' + h(item.price || '0') + '"><select name="priceCurrency"><option ' + (item.priceCurrency === 'RUB' ? 'selected' : '') + '>RUB</option><option>USD</option><option>EUR</option><option>CNY</option></select></div></div></div>' + simpleField('Цвет', 'color', item.color, 'color') + lifecycle + '</div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">Сохранить</button></footer></form></section>';
+  }
+
+  function taskFormScreen(overlay) {
+    var task = overlay.taskId ? tourTasks.find(function (item) { return item.id === overlay.taskId; }) : null;
+    var item = task || { title: '', description: '', priority: 'medium', status: 'todo', dueDate: '' };
+    return '<div class="sheet-layer"><button type="button" class="scrim" data-action="close-overlay"></button><form id="tour-task-form" class="sheet" data-id="' + h(task ? task.id : '') + '"><span class="sheet-handle"></span><header class="sheet-head"><div class="screen-title"><strong>' + (task ? 'Изменить задачу' : 'Новая задача') + '</strong><span>' + h(selectedTourName()) + '</span></div><button type="button" class="close-button" data-action="close-overlay">' + icon('close') + '</button></header><div class="sheet-scroll">' + simpleField('Название *', 'title', item.title, 'text', 'Что нужно сделать') + '<label class="field"><span>Описание</span><textarea name="description" rows="4">' + h(item.description) + '</textarea></label><div class="field-grid"><label class="field"><span>Приоритет</span><select name="priority"><option value="low" ' + (item.priority === 'low' ? 'selected' : '') + '>Низкий</option><option value="medium" ' + (item.priority === 'medium' ? 'selected' : '') + '>Средний</option><option value="high" ' + (item.priority === 'high' ? 'selected' : '') + '>Высокий</option><option value="urgent" ' + (item.priority === 'urgent' ? 'selected' : '') + '>Срочный</option></select></label>' + (task ? '<label class="field"><span>Статус</span><select name="status"><option value="todo" ' + (item.status === 'todo' ? 'selected' : '') + '>К выполнению</option><option value="in_progress" ' + (item.status === 'in_progress' ? 'selected' : '') + '>В работе</option><option value="done" ' + (item.status === 'done' ? 'selected' : '') + '>Готово</option></select></label>' : '') + '</div>' + simpleField('Срок', 'dueDate', item.dueDate, 'date') + (task ? '<button type="button" class="danger-button full-button" data-action="delete-tour-task" data-id="' + h(task.id) + '">Удалить задачу</button>' : '') + '</div><footer class="sheet-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="submit" class="primary-button blue">' + (task ? 'Сохранить' : 'Создать задачу') + '</button></footer></form></div>';
+  }
+
+  function taskDeleteScreen(overlay) {
+    var task = tourTasks.find(function (item) { return item.id === overlay.taskId; });
+    return '<section class="screen">' + screenHeader('Удалить задачу', task ? task.title : 'Задача') + '<div class="screen-scroll"><div class="conflict-summary"><strong>Удалить задачу?</strong><span>Это действие нельзя отменить в mock-сценарии.</span></div></div><footer class="screen-actions"><button type="button" class="secondary-button" data-action="close-overlay">Отмена</button><button type="button" class="danger-button" data-action="confirm-delete-tour-task" data-id="' + h(overlay.taskId) + '">Удалить</button></footer></section>';
   }
 
   function renderOverlay() {
@@ -1901,9 +2526,12 @@
     if (overlay.kind === 'status-menu') return statusMenuScreen(overlay);
     if (overlay.kind === 'ui-states') return uiStatesScreen();
     if (overlay.kind === 'clear-program') return clearProgramScreen();
+    if (overlay.kind === 'regenerate-program') return regenerateProgramScreen();
     if (overlay.kind === 'cancel-tour') return cancelTourScreen(overlay);
     if (overlay.kind === 'program-form') return programFormScreen(overlay);
     if (overlay.kind === 'tour-form') return tourFormScreen(overlay);
+    if (overlay.kind === 'task-form') return taskFormScreen(overlay);
+    if (overlay.kind === 'task-delete') return taskDeleteScreen(overlay);
     if (overlay.kind === 'point-picker') return pointPickerScreen(overlay);
     if (overlay.kind === 'directory') return directoryScreen();
     if (overlay.kind === 'directory-city') return directoryCityScreen(overlay);
@@ -1924,10 +2552,13 @@
       work: workView,
       program: programView,
       'tour-info': tourInfoView,
-      'tour-tasks': tourTasksView
+      'tour-team': tourTeamView,
+      'tour-tasks': tourTasksView,
+      'tour-actions': tourActionsView
     };
     var tourVisible = canViewSelectedTour();
-    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || operationsView) : (state.view === 'tour-info' ? tourInfoView : unsupportedTourView));
+    var nonOperationalViews = ['tour-info', 'tour-team', 'tour-actions'];
+    var view = !tourVisible ? unauthorizedTourView : (tourHasOperationalModel(state.selectedTourId) ? (views[state.view] || tourInfoView) : (nonOperationalViews.indexOf(state.view) !== -1 ? (views[state.view] || tourInfoView) : unsupportedTourView));
     var overlaySafeWithoutTour = state.overlay && ['role-menu', 'tours'].indexOf(state.overlay.kind) !== -1;
     root.innerHTML = '<div class="app">' + view() +
       bottomNav() + (tourVisible || overlaySafeWithoutTour ? renderOverlay() : '') + (state.toast ? '<div class="toast ' + h(state.toastKind) + '" role="status" aria-live="polite">' + icon(state.toastKind === 'error' ? 'alert' : 'success') + '<span>' + h(state.toast) + '</span></div>' : '') + '</div>';
@@ -2024,6 +2655,7 @@
   function removeTouristFromModel(touristId) {
     var tourist = touristById(touristId);
     if (!tourist) return;
+    var priorTourGroupId = tourist.groupId;
     cities.forEach(function (city) {
       ['arrival', 'hotel', 'departure'].forEach(function (stage) {
         delete records[city.id][stage][touristId];
@@ -2043,6 +2675,7 @@
     var index = tourists.findIndex(function (item) { return item.id === touristId; });
     tourists.splice(index, 1);
     canonicalTouristStore = canonicalTouristStore.filter(function (item) { return item.id !== touristId; });
+    normalizeTourGroupRepresentative(priorTourGroupId);
     if (tourist.isPrimary) {
       var replacement = tourists.find(function (item) { return item.leadId === tourist.leadId; });
       if (replacement) replacement.isPrimary = true;
@@ -2050,9 +2683,50 @@
     saveCanonicalTourists();
   }
 
+  function sameNonEmptyTourGroup(memberIds) {
+    var ids = Array.from(new Set(memberIds || []));
+    if (ids.length < 2) return null;
+    var first = touristById(ids[0]);
+    var groupId = first && first.groupId;
+    if (!groupId) return null;
+    return ids.every(function (id) {
+      var tourist = touristById(id);
+      return tourist && tourist.tourId === state.selectedTourId && tourist.groupId === groupId;
+    }) ? groupId : null;
+  }
+
+  function copyDepartureToNextArrival(touristId, routeCityId) {
+    var tourist = touristById(touristId);
+    if (!tourist) return;
+    var touristRouteIndex = tourist.route.indexOf(routeCityId);
+    var nextRouteCityId = touristRouteIndex >= 0 ? tourist.route[touristRouteIndex + 1] : null;
+    var nextCity = cities.find(function (city) { return city.id === nextRouteCityId; });
+    if (!nextCity) return;
+    var departure = records[routeCityId].departure[touristId];
+    if (!departure) return;
+    var arrival = records[nextCity.id].arrival[touristId] || {};
+    var map = { date: 'date', time: 'time', transport: 'transport', number: 'number', point: 'point', transfer: 'transfer' };
+    Object.keys(map).forEach(function (departureKey) {
+      var arrivalKey = map[departureKey];
+      if (!arrival[arrivalKey] && departure[departureKey]) arrival[arrivalKey] = departure[departureKey];
+    });
+    if (!arrival.pointId && departure.point) {
+      // Directory points belong to one city. Preserve the copied web string,
+      // but do not retain an incompatible foreign-city reference.
+      arrival.pointId = '';
+      arrival.pointManual = true;
+    }
+    records[nextCity.id].arrival[touristId] = cleanRecord(arrival, 'arrival');
+  }
+
   function applyStageRecord(memberIds, stage, values, existingGroupId, requestedMasterId) {
     memberIds = Array.from(new Set(memberIds));
     if (!canMutateLogisticsFor(memberIds)) return false;
+    var parentGroupId = memberIds.length > 1 ? sameNonEmptyTourGroup(memberIds) : null;
+    if (memberIds.length > 1 && !parentGroupId) {
+      showToast('Общая операция возможна только внутри одной группы туристов', 'error');
+      return false;
+    }
     var target = stageRecords(stage);
     var groups = stageGroups(stage);
     var existingGroup = existingGroupId ? groups[existingGroupId] : null;
@@ -2071,20 +2745,102 @@
       existingGroup.sourceId = existingSourceId;
       existingGroup.masterId = existingSourceId;
       existingGroup.idempotencyKey = idempotencyKey;
-      target[existingSourceId] = cleanRecord(values, stage);
+      existingGroup.createdFromGroupId = parentGroupId;
+      // Selecting an existing individual record as the shared source must not
+      // rewrite it just to normalize optional metadata (for example,
+      // `pointManual: false`). Persist only an actual field-level change.
+      if (!target[existingSourceId] || recordKey(target[existingSourceId], stage) !== recordKey(values, stage)) {
+        target[existingSourceId] = cleanRecord(values, stage);
+      }
       syncOperationGroup(existingGroup, currentCity().id, stage);
+      if (stage === 'departure') copyDepartureToNextArrival(existingSourceId, currentCity().id);
     } else if (memberIds.length === 1) {
       detachMembersFromStage(stage, memberIds);
       target[memberIds[0]] = cleanRecord(values, stage);
+      if (stage === 'departure') copyDepartureToNextArrival(memberIds[0], currentCity().id);
     } else {
       detachMembersFromStage(stage, memberIds);
       var masterId = memberIds.indexOf(requestedMasterId) !== -1 ? requestedMasterId : memberIds[0];
       var groupId = newGroupId(stage);
-      var parentGroupId = (touristById(masterId) || {}).groupId || null;
-      target[masterId] = cleanRecord(values, stage);
+      if (!target[masterId] || recordKey(target[masterId], stage) !== recordKey(values, stage)) {
+        target[masterId] = cleanRecord(values, stage);
+      }
       groups[groupId] = syncOperationGroup({ id: groupId, subgroupId: groupId, masterId: masterId, sourceId: masterId, createdFromGroupId: parentGroupId, idempotencyKey: idempotencyKey, members: memberIds.slice() }, currentCity().id, stage);
+      if (stage === 'departure') copyDepartureToNextArrival(masterId, currentCity().id);
     }
     return true;
+  }
+
+  function commitTouristGrouping(pendingGroup) {
+    var memberIds = pendingGroup.allMemberIds.slice();
+    var members = memberIds.map(touristById);
+    if (members.some(function (tourist) { return !tourist || tourist.tourId !== state.selectedTourId; })) return false;
+    var snapshot = {
+      touristGroups: currentTourists().map(function (tourist) { return { id: tourist.id, groupId: tourist.groupId, groupRepresentative: tourist.groupRepresentative }; }),
+      records: clone(records),
+      operationGroups: clone(operationGroups),
+      groupNames: clone(groupNames),
+      tourGroupSettings: clone(tourGroupSettings),
+      cityIndex: state.cityIndex
+    };
+    try {
+      pendingGroup.selectedIds.map(touristById).forEach(function (tourist) { tourist.groupId = pendingGroup.groupId; });
+      currentTourists().filter(function (tourist) { return tourist.groupId === pendingGroup.groupId; }).forEach(function (tourist) {
+        tourist.groupRepresentative = tourist.id === pendingGroup.representativeId;
+      });
+      normalizeTourGroupRepresentative(pendingGroup.groupId, pendingGroup.representativeId);
+      groupNames[pendingGroup.groupId] = pendingGroup.groupName;
+      tourGroupSettings[pendingGroup.groupId] = Object.assign({}, pendingGroup.settings);
+      pendingGroup.hotelChoices.forEach(function (choice) {
+        var cityIndex = cities.findIndex(function (city) { return city.id === choice.routeCityId; });
+        if (cityIndex < 0) throw new Error('Unknown route city');
+        state.cityIndex = cityIndex;
+        if (!applyStageRecord(choice.members, 'hotel', choice.values, choice.groupId || null, choice.sourceId)) throw new Error('Hotel choice was rejected');
+      });
+      var unresolved = ensureDefaultSharedHotel(pendingGroup.groupId);
+      if (unresolved.length) throw new Error('Hotel conflict remained unresolved');
+      state.cityIndex = pendingGroup.returnCityIndex;
+      return true;
+    } catch (error) {
+      snapshot.touristGroups.forEach(function (saved) {
+        var tourist = touristById(saved.id);
+        if (tourist) {
+          tourist.groupId = saved.groupId;
+          tourist.groupRepresentative = saved.groupRepresentative;
+        }
+      });
+      records = snapshot.records;
+      operationGroups = snapshot.operationGroups;
+      groupNames = snapshot.groupNames;
+      tourGroupSettings = snapshot.tourGroupSettings;
+      state.cityIndex = snapshot.cityIndex;
+      console.warn('Tourist group transaction rolled back', error);
+      return false;
+    }
+  }
+
+  function applyPendingTouristGroupHotelChoice(pendingGroup, overlay, values, sourceId) {
+    pendingGroup.hotelChoices = pendingGroup.hotelChoices.filter(function (choice) { return choice.routeCityId !== overlay.routeCityId; });
+    pendingGroup.hotelChoices.push({
+      routeCityId: overlay.routeCityId,
+      members: overlay.members.slice(),
+      groupId: overlay.groupId || null,
+      sourceId: sourceId,
+      values: cleanRecord(values, 'hotel')
+    });
+    if (overlay.remainingDefaultHotelConflicts && overlay.remainingDefaultHotelConflicts.length) {
+      openDefaultHotelConflict(pendingGroup, overlay.remainingDefaultHotelConflicts);
+      return;
+    }
+    if (!commitTouristGrouping(pendingGroup)) {
+      state.overlay = null;
+      showToast('Не удалось атомарно создать группу. Исходные данные сохранены.', 'error');
+      return;
+    }
+    saveCanonicalTourists();
+    state.overlay = null;
+    state.view = 'tourists';
+    showToast('Туристы объединены, источники отелей подтверждены');
   }
 
   function applyTouristGrouping() {
@@ -2108,15 +2864,56 @@
       return false;
     }
     var groupId = existingIds[0] || newGroupId('tourists');
-    if (!groupNames[groupId]) {
-      var surnames = selectedTourists.map(function (tourist) { return tourist.name.split(' ').slice(-1)[0]; });
-      groupNames[groupId] = surnames.slice(0, 2).join(' + ');
+    var existingMembers = existingIds.length ? currentTourists().filter(function (tourist) { return tourist.groupId === groupId; }) : [];
+    var allMemberIds = Array.from(new Set(existingMembers.map(function (tourist) { return tourist.id; }).concat(selectedIds)));
+    var allGroupMembers = allMemberIds.map(touristById);
+    var surnames = Array.from(new Set(allGroupMembers.map(function (tourist) { return tourist.lastName || tourist.name.split(' ')[0]; }).filter(Boolean)));
+    var representative = existingIds.length ? existingMembers.find(function (tourist) { return tourist.groupRepresentative; }) : selectedTourists[0];
+    representative = representative || allGroupMembers[0];
+    var pendingGroup = {
+      groupId: groupId,
+      selectedIds: selectedIds.slice(),
+      allMemberIds: allMemberIds,
+      representativeId: representative.id,
+      groupName: groupNames[groupId] || surnames.slice(0, 2).join(' + '),
+      settings: Object.assign({}, tourGroupSettings[groupId] || { sharedHotel: true, sharedArrival: false, sharedDeparture: false }),
+      hotelChoices: [],
+      returnCityIndex: state.cityIndex
+    };
+    var hotelConflicts = previewDefaultSharedHotelConflicts(pendingGroup);
+    if (hotelConflicts.length) {
+      state.view = 'tourists';
+      openDefaultHotelConflict(pendingGroup, hotelConflicts);
+      return false;
     }
-    selectedTourists.forEach(function (tourist) { tourist.groupId = groupId; });
+    if (!commitTouristGrouping(pendingGroup)) {
+      state.overlay.error = 'Не удалось атомарно создать группу. Повторите.';
+      render();
+      return false;
+    }
     state.overlay = null;
     state.view = 'tourists';
     showToast('Туристы объединены в группу');
     return true;
+  }
+
+  function detachTourGroupLinks(groupId, memberIds) {
+    cities.forEach(function (city) {
+      ['arrival', 'hotel', 'departure'].forEach(function (stage) {
+        var groups = operationGroups[city.id][stage];
+        Object.keys(groups).forEach(function (operationGroupId) {
+          var group = groups[operationGroupId];
+          if (group.createdFromGroupId !== groupId) return;
+          group.members = group.members.filter(function (id) { return memberIds.indexOf(id) === -1; });
+          if (group.members.length < 2) delete groups[operationGroupId];
+          else {
+            if (group.members.indexOf(group.sourceId) === -1) group.sourceId = group.members[0];
+            group.masterId = group.sourceId;
+            syncOperationGroup(group, city.id, stage);
+          }
+        });
+      });
+    });
   }
 
   root.addEventListener('input', function (event) {
@@ -2148,6 +2945,19 @@
       if (pointSearch) { pointSearch.focus(); pointSearch.setSelectionRange(state.overlay.query.length, state.overlay.query.length); }
       return;
     }
+    if (event.target.dataset.userSearch !== undefined && state.overlay && state.overlay.kind === 'tour-form') {
+      var userSelect = document.getElementById(event.target.dataset.userSearch);
+      var userQuery = event.target.value.trim().toLowerCase();
+      if (userSelect) Array.from(userSelect.options).forEach(function (option) {
+        option.hidden = Boolean(userQuery && option.value && option.textContent.toLowerCase().indexOf(userQuery) === -1);
+      });
+      return;
+    }
+    if (state.overlay && state.overlay.kind === 'tour-form' && event.target.name === 'routeCityName') {
+      var routeDraftItem = state.overlay.routeDraft[Number(event.target.dataset.routeIndex)];
+      if (routeDraftItem) routeDraftItem.name = event.target.value;
+      return;
+    }
     if (state.overlay && state.overlay.kind === 'profile-edit' && event.target.name) {
       state.overlay.dirty = true;
       if (state.overlay.fieldErrors) delete state.overlay.fieldErrors[event.target.name];
@@ -2166,6 +2976,11 @@
   });
 
   root.addEventListener('change', function (event) {
+    if (state.overlay && state.overlay.kind === 'tour-form') {
+      if (event.target.dataset.routeGuideId !== undefined) state.overlay.routeGuideIds[event.target.dataset.routeGuideId] = event.target.value;
+      if (event.target.name === 'chatAdmin') state.overlay.chatAdminIds[Number(event.target.dataset.chatIndex)] = event.target.value;
+      if (event.target.name === 'financeGuideCityId') state.overlay.financeGuideCityId = event.target.value;
+    }
     if (state.overlay && state.overlay.kind === 'profile-edit' && event.target.name) {
       state.overlay.dirty = true;
       if (state.overlay.fieldErrors) delete state.overlay.fieldErrors[event.target.name];
@@ -2187,7 +3002,8 @@
   root.addEventListener('submit', function (event) {
     event.preventDefault();
     var form = event.target;
-    var data = Object.fromEntries(new FormData(form).entries());
+    var formData = new FormData(form);
+    var data = Object.fromEntries(formData.entries());
     if (form.id === 'profile-section-form') {
       var profileTourist = touristById(form.dataset.id);
       var profileSection = form.dataset.section;
@@ -2200,38 +3016,20 @@
         var personalErrors = {};
         if (!String(data.lastName || '').trim()) personalErrors.lastName = 'Укажите фамилию.';
         if (!String(data.firstName || '').trim()) personalErrors.firstName = 'Укажите имя.';
-        if (!data.birthDate) personalErrors.birthDate = 'Укажите дату рождения.';
-        if (!data.citizenship) personalErrors.citizenship = 'Выберите гражданство.';
-        if (profileTourist.isPrimary && !String(data.middleName || '').trim()) personalErrors.middleName = 'Для основного туриста требуется отчество.';
-        if (profileTourist.isPrimary && !String(data.phone || '').trim()) personalErrors.phone = 'Для основного туриста требуется телефон.';
-        if (profileTourist.isPrimary && canSeePrivateFor(profileTourist) && !String(data.email || '').trim()) personalErrors.email = 'Для основного туриста требуется email.';
         if (Object.keys(personalErrors).length) {
-          showProfileValidation(personalErrors, 'Заполните обязательные личные данные.');
+          showProfileValidation(personalErrors, 'Фамилия и имя обязательны.');
           return;
         }
-        Object.assign(profileTourist, { lastName: data.lastName, firstName: data.firstName, middleName: data.middleName, birthDate: data.birthDate, citizenship: data.citizenship, phone: data.phone, email: data.email == null ? profileTourist.email : data.email, type: data.type });
+        Object.assign(profileTourist, { lastName: data.lastName, firstName: data.firstName, middleName: data.middleName, birthDate: data.birthDate, phone: data.phone, email: data.email == null ? profileTourist.email : data.email });
         profileTourist.name = [profileTourist.lastName, profileTourist.firstName, profileTourist.middleName].filter(Boolean).join(' ');
         profileTourist.initials = [profileTourist.lastName, profileTourist.firstName].map(function (part) { return part.charAt(0); }).join('').toUpperCase();
+      } else if (profileSection === 'citizenship') {
+        profileTourist.citizenship = data.citizenship || '';
       } else if (profileSection === 'domestic' && profileTourist.citizenship === 'Россия') {
-        var domesticErrors = {};
-        if (profileTourist.isPrimary && !String(data.domesticPassport || '').trim()) domesticErrors.domesticPassport = 'Укажите серию и номер паспорта РФ.';
-        if (profileTourist.isPrimary && !String(data.domesticIssuedBy || '').trim()) domesticErrors.domesticIssuedBy = 'Укажите орган выдачи паспорта РФ.';
-        if (Object.keys(domesticErrors).length) {
-          showProfileValidation(domesticErrors, 'Заполните обязательные данные паспорта РФ.');
-          return;
-        }
         Object.assign(profileTourist, { domesticPassport: data.domesticPassport, domesticIssuedBy: data.domesticIssuedBy, registrationAddress: data.registrationAddress });
       } else if (profileSection === 'foreign') {
-        var foreignErrors = {};
-        if (!String(data.latinName || '').trim()) foreignErrors.latinName = 'Укажите ФИО латиницей.';
-        if (!String(data.passport || '').trim()) foreignErrors.passport = 'Укажите номер загранпаспорта.';
-        if (!data.passportExpiry) foreignErrors.passportExpiry = 'Укажите срок действия загранпаспорта.';
-        if (Object.keys(foreignErrors).length) {
-          showProfileValidation(foreignErrors, 'Заполните обязательные данные загранпаспорта.');
-          return;
-        }
         Object.assign(profileTourist, { latinName: data.latinName, passport: data.passport, passportExpiry: data.passportExpiry });
-      } else if (profileSection === 'links') {
+      } else if (profileSection === 'settings') {
         var wantsPrimary = data.isPrimary === 'true';
         if (!wantsPrimary && profileTourist.isPrimary && !tourists.some(function (tourist) { return tourist.id !== profileTourist.id && tourist.leadId === profileTourist.leadId && tourist.isPrimary; })) {
           state.overlay.error = 'Сначала назначьте другого основного туриста этого лида.';
@@ -2240,22 +3038,47 @@
         }
         if (wantsPrimary) tourists.filter(function (tourist) { return tourist.leadId === profileTourist.leadId; }).forEach(function (tourist) { tourist.isPrimary = tourist.id === profileTourist.id; });
         else profileTourist.isPrimary = false;
-        profileTourist.groupRepresentative = data.groupRepresentative === 'true';
-      } else if (profileSection === 'comments') {
+        profileTourist.type = data.type || '';
+        if (data.notes != null) profileTourist.notes = data.notes;
+      } else if (profileSection === 'tour-context') {
         profileTourist.guideComment = data.guideComment;
-        if (data.internalNote != null) profileTourist.internalNote = data.internalNote;
+        var wantsGroupRepresentative = data.groupRepresentative === 'true';
+        if (!profileTourist.groupId) profileTourist.groupRepresentative = false;
+        else if (wantsGroupRepresentative) normalizeTourGroupRepresentative(profileTourist.groupId, profileTourist.id);
+        else {
+          profileTourist.groupRepresentative = false;
+          var replacementRepresentative = tourists.find(function (tourist) {
+            return tourist.groupId === profileTourist.groupId && tourist.id !== profileTourist.id;
+          });
+          normalizeTourGroupRepresentative(profileTourist.groupId, replacementRepresentative && replacementRepresentative.id);
+        }
       }
       saveCanonicalTourists();
-      state.overlay = { kind: 'tourist-detail', touristId: profileTourist.id, expanded: new Set([profileSection]) };
+      state.overlay = { kind: 'tourist-detail', touristId: profileTourist.id, expanded: new Set([profileSection]), detailTab: profileSection === 'tour-context' ? 'tour' : 'profile' };
       showToast('Раздел туриста сохранён');
       return;
     }
     if (form.id === 'program-form') {
       if (mutationBlocked(capabilities().canManageProgram, 'Изменение программы недоступно для этой роли')) return;
-      var day = { date: data.date, city: data.city, title: data.title || 'Новый день программы', text: data.text || 'Описание будет добавлено позже.' };
-      if (form.dataset.index === '') programDays.push(day); else programDays[Number(form.dataset.index)] = day;
+      var programIndex = Number(form.dataset.index);
+      if (!programDays[programIndex]) return;
+      var selectedProgramCityIdx = Number(data.cityIdx);
+      if (!cities[selectedProgramCityIdx]) selectedProgramCityIdx = programDays[programIndex].cityIdx;
+      programDays[programIndex].cityIdx = selectedProgramCityIdx;
+      programDays[programIndex].city = (cities[selectedProgramCityIdx] || {}).name || '';
+      programDays[programIndex].description = data.description || '';
       state.overlay = null;
       showToast('День программы сохранён');
+      return;
+    }
+    if (form.id === 'tour-task-form') {
+      if (mutationBlocked(capabilities().canManageTasks, 'Изменение задач недоступно для этой роли')) return;
+      if (!String(data.title || '').trim()) { showToast('Укажите название задачи', 'error'); return; }
+      var editedTask = form.dataset.id ? tourTasks.find(function (task) { return task.id === form.dataset.id; }) : null;
+      var taskValues = { title: String(data.title).trim(), description: String(data.description || ''), priority: data.priority || 'medium', status: editedTask ? (data.status || editedTask.status) : 'todo', dueDate: data.dueDate || '' };
+      if (editedTask) Object.assign(editedTask, taskValues); else tourTasks.unshift(Object.assign({ id: 'task-' + Date.now() }, taskValues));
+      state.overlay = null;
+      showToast(editedTask ? 'Задача обновлена' : 'Задача создана');
       return;
     }
     if (form.id === 'directory-city-form') {
@@ -2297,19 +3120,60 @@
     if (form.id === 'cancel-tour-form') {
       var cancelledTour = tours.find(function (item) { return item.id === form.dataset.id; });
       if (mutationBlocked(Boolean(cancelledTour) && canManageTourId(form.dataset.id), 'Изменение тура недоступно для этой роли')) return;
-      cancelledTour.status = 'archive';
+      cancelledTour.statusBeforeCancel = cancelledTour.status === 'cancelled' ? (cancelledTour.statusBeforeCancel || 'active') : cancelledTour.status;
+      cancelledTour.status = 'cancelled';
+      cancelledTour.isArchived = false;
       cancelledTour.cancelReason = data.reason;
+      syncLinkedLeadArchive(cancelledTour.id, true);
+      state.overlay = null;
+      state.view = 'tour-actions';
       state.tourFilter = 'archive';
-      state.overlay = { kind: 'tours' };
-      showToast('Тур отменён и перенесён в архив');
+      showToast('Тур закрыт с указанием причины');
       return;
     }
     if (form.id === 'tour-form') {
       var tour = tours.find(function (item) { return item.id === form.dataset.id; });
       var canSaveTour = form.dataset.id ? (Boolean(tour) && canManageTourId(form.dataset.id)) : capabilities().canManageTour;
       if (mutationBlocked(canSaveTour, 'Изменение тура недоступно для этой роли')) return;
-      var tourValues = { name: data.name || 'Новый тур', dates: data.dates, route: data.route, guides: data.guides, capacity: Number(data.capacity || 0), color: data.color, site: data.site };
+      var rawRouteNames = formData.getAll('routeCityName');
+      var rawRouteIds = formData.getAll('routeCityId').map(String);
+      var rawCityGuideIds = formData.getAll('cityGuide').map(String);
+      var routeEntries = rawRouteNames.map(function (value, index) {
+        return { name: String(value).trim(), id: rawRouteIds[index] || '', guideId: rawCityGuideIds[index] || '' };
+      }).filter(function (entry) { return Boolean(entry.name); });
+      var routeNames = routeEntries.map(function (entry) { return entry.name; });
+      var routeIds = routeEntries.map(function (entry) { return entry.id; });
+      if (!String(data.name || '').trim() || !routeNames.length || !data.startDate || !data.endDate) { showToast('Заполните название, маршрут и даты тура', 'error'); return; }
+      var cityGuideIds = routeEntries.map(function (entry) { return entry.guideId; });
+      var chatAdminIds = formData.getAll('chatAdmin').map(String).filter(Boolean);
+      var escortUserId = String(data.escort || '');
+      if (escortUserId && !directoryUser(escortUserId)) {
+        var escortByName = userDirectory.find(function (user) { return user.name === escortUserId && user.roles.indexOf('escort') !== -1; });
+        escortUserId = escortByName ? escortByName.id : '';
+      }
+      var tourTypeLabels = { group: 'Групповой', individual: 'Индивидуальный', excursion: 'Экскурсия', transfer: 'Трансфер' };
+      var tourValues = {
+        name: String(data.name).trim(), description: String(data.description || ''), site: String(data.site || ''), country: data.country,
+        tourType: data.tourType, tourTypeLabel: tourTypeLabels[data.tourType] || data.tourType, cities: routeNames,
+        route: routeNames.join(' → '), cityGuides: routeEntries.reduce(function (result, entry) { if (entry.guideId && directoryUser(entry.guideId)) result[entry.id] = entry.guideId; return result; }, {}),
+        financeGuideCityId: routeIds.indexOf(String(data.financeGuideCityId || '')) !== -1 ? String(data.financeGuideCityId) : null, guides: Array.from(new Set(cityGuideIds.filter(Boolean).map(directoryUserName))).join(', '),
+        escortUserId: escortUserId, escort: directoryUserName(escortUserId), chatAdminIds: chatAdminIds, chatAdmins: chatAdminIds.map(directoryUserName), startDate: data.startDate, endDate: data.endDate,
+        dates: data.startDate + ' — ' + data.endDate, capacity: Number(data.capacity || 0), price: String(data.price || '0'), priceCurrency: data.priceCurrency || 'RUB', color: data.color
+      };
       if (tour) Object.assign(tour, tourValues); else tours.push(Object.assign({ id: 'tour-' + Date.now(), status: 'draft', tourists: 0 }, tourValues));
+      if (tour && tour.id === 'china') {
+        var priorCitiesById = {};
+        cities.forEach(function (city) { priorCitiesById[city.id] = city; });
+        var nextCities = routeEntries.map(function (entry, index) {
+          var routeId = entry.id || 'route-' + Date.now() + '-' + index;
+          var routeCity = priorCitiesById[routeId] || { id: routeId, catalogCityId: null, dates: '', arrival: '', departure: '' };
+          routeCity.name = entry.name;
+          if (!records[routeId]) records[routeId] = { arrival: {}, hotel: {}, departure: {} };
+          if (!operationGroups[routeId]) operationGroups[routeId] = { arrival: {}, hotel: {}, departure: {} };
+          return routeCity;
+        });
+        cities.splice.apply(cities, [0, cities.length].concat(nextCities));
+      }
       state.overlay = { kind: 'tours' };
       state.tourFilter = tour ? tour.status : 'draft';
       showToast(tour ? 'Тур сохранён' : 'Черновик тура создан');
@@ -2321,6 +3185,34 @@
     var button = event.target.closest('[data-action]');
     if (!button || button.disabled) return;
     var action = button.dataset.action;
+
+    if (action === 'route-up' || action === 'route-down' || action === 'route-remove' || action === 'route-add') {
+      if (!state.overlay || state.overlay.kind !== 'tour-form') return;
+      var routeIndex = Number(button.dataset.index);
+      if (action === 'route-up' && routeIndex > 0) state.overlay.routeDraft.splice(routeIndex - 1, 0, state.overlay.routeDraft.splice(routeIndex, 1)[0]);
+      if (action === 'route-down' && routeIndex < state.overlay.routeDraft.length - 1) state.overlay.routeDraft.splice(routeIndex + 1, 0, state.overlay.routeDraft.splice(routeIndex, 1)[0]);
+      if (action === 'route-remove' && state.overlay.routeDraft.length > 1) state.overlay.routeDraft.splice(routeIndex, 1);
+      if (action === 'route-add') state.overlay.routeDraft.push({ id: 'route-draft-' + Date.now(), name: '' });
+      render();
+      return;
+    }
+    if (action === 'add-chat-admin' || action === 'remove-chat-admin') {
+      if (!state.overlay || state.overlay.kind !== 'tour-form') return;
+      if (action === 'add-chat-admin') state.overlay.chatAdminIds.push('');
+      else if (state.overlay.chatAdminIds.length > 1) state.overlay.chatAdminIds.splice(Number(button.dataset.index), 1);
+      render();
+      return;
+    }
+    if (action === 'apply-program-template') {
+      var programTextarea = root.querySelector && root.querySelector('#program-form textarea[name="description"]');
+      if (programTextarea) programTextarea.value = 'Экскурсионная программа, обед в локальном ресторане и свободное время.';
+      showToast('Шаблон добавлен в описание');
+      return;
+    }
+    if (action === 'save-program-template') {
+      showToast('Шаблон дня сохранён на mock-данных');
+      return;
+    }
 
     if (action === 'summary-section') {
       state.view = button.dataset.view;
@@ -2351,7 +3243,17 @@
       return;
     }
     if (action === 'select-role') {
-      state.role = button.dataset.role;
+      var selectedRole = button.dataset.role === 'guide' ? 'viewer' : button.dataset.role;
+      if (['admin', 'manager', 'escort', 'viewer'].indexOf(selectedRole) === -1) selectedRole = 'forbidden';
+      state.role = selectedRole;
+      var scopedLeadTouristAfterRoleChange = state.scopeLead && currentTourists().find(function (tourist) { return tourist.leadId === state.scopeLead; });
+      if (!canSeeSourceLeadFor(scopedLeadTouristAfterRoleChange)) state.scopeLead = null;
+      if (!canOpenSourceLead(state.returnLead)) state.returnLead = null;
+      state.touristQuery = '';
+      state.touristFilters = { needsData: false, documentIssue: false, limitedRoute: false, type: 'all', group: 'all', status: 'all' };
+      state.returnContext = null;
+      state.saveErrorSnapshot = null;
+      state.draft = null;
       state.overlay = null;
       showToast('Роль: ' + roleLabels[state.role]);
       return;
@@ -2363,11 +3265,13 @@
       return;
     }
     if (action === 'open-ui-states') {
+      captureSaveErrorSnapshot(state.overlay);
       state.overlay = { kind: 'ui-states' };
       render();
       return;
     }
     if (action === 'set-ui-state') {
+      if (button.dataset.state === 'save-error' && (!state.saveErrorSnapshot || (state.overlay && ['form', 'operation-select', 'conflict'].indexOf(state.overlay.kind) !== -1))) captureSaveErrorSnapshot(state.overlay);
       state.uiPreview = button.dataset.state;
       state.view = 'operations';
       state.overlay = null;
@@ -2377,6 +3281,16 @@
     if (action === 'reset-ui-state') {
       state.uiPreview = 'ready';
       render();
+      return;
+    }
+    if (action === 'retry-save-state') {
+      state.uiPreview = 'saving';
+      render();
+      return;
+    }
+    if (action === 'return-draft-state') {
+      if (!restoreSaveErrorSnapshot()) state.uiPreview = 'ready';
+      showToast('Черновик, выбор и источник восстановлены');
       return;
     }
     if (action === 'tourist-list-mode') {
@@ -2439,8 +3353,8 @@
     }
     if (action === 'open-tourist-documents') {
       var documentTourist = touristById(button.dataset.id);
-      if (!canViewTouristForSelectedTour(documentTourist)) {
-        showToast('Карточка туриста недоступна в выбранном туре', 'error');
+      if (!canViewDocumentsFor(documentTourist)) {
+        showToast('Документы туриста недоступны для этой роли', 'error');
         return;
       }
       state.returnContext = captureTourContext();
@@ -2469,12 +3383,12 @@
     }
     if (action === 'call-tourist' || action === 'message-tourist' || action === 'copy-tourist-contact') {
       var contactTourist = touristById(button.dataset.id);
-      if (!canViewTouristForSelectedTour(contactTourist)) {
-        showToast('Контакт туриста недоступен в выбранном туре', 'error');
+      if (!canViewContactFor(contactTourist)) {
+        showToast('Контакт туриста недоступен для этой роли', 'error');
         return;
       }
       var contactValue = contactTourist && contactTourist.phone ? contactTourist.phone : 'номер не заполнен';
-      showToast(action === 'call-tourist' ? 'Звонок: ' + contactValue : action === 'message-tourist' ? ((contactTourist && contactTourist.preferredChannel) || 'Чат') + ': ' + contactValue : 'Контакт скопирован: ' + contactValue);
+      showToast(action === 'call-tourist' ? 'Звонок: ' + contactValue : action === 'message-tourist' ? 'Чат: ' + contactValue : 'Контакт скопирован: ' + contactValue);
       return;
     }
     if (action === 'jump-profile-operation') {
@@ -2516,8 +3430,8 @@
     }
     if (action === 'view-scan') {
       var previewTourist = touristById(button.dataset.id);
-      if (!canViewTouristForSelectedTour(previewTourist)) {
-        showToast('Скан туриста недоступен в выбранном туре', 'error');
+      if (!canViewDocumentsFor(previewTourist)) {
+        showToast('Скан туриста недоступен для этой роли', 'error');
         return;
       }
       state.overlay = { kind: 'document-preview', touristId: button.dataset.id, scanId: button.dataset.scan, previous: state.overlay };
@@ -2648,6 +3562,15 @@
       if (mutationBlocked(capabilities().canManageDirectory, 'Справочник может изменять только администратор')) return;
       var pointToDelete = directoryPointById(button.dataset.id);
       if (!pointToDelete) return;
+      // Recheck at the final destructive boundary: the point could have become
+      // referenced after the confirmation screen was opened.
+      if (pointIsUsed(pointToDelete.id)) {
+        pointToDelete.active = false;
+        saveDirectory();
+        state.overlay = { kind: 'directory-city', cityId: pointToDelete.cityId, previous: { kind: 'directory' } };
+        showToast('Точка уже используется: она архивирована, история сохранена');
+        return;
+      }
       directory.points = directory.points.filter(function (point) { return point.id !== pointToDelete.id; });
       saveDirectory();
       state.overlay = { kind: 'directory-city', cityId: pointToDelete.cityId, previous: { kind: 'directory' } };
@@ -2672,6 +3595,12 @@
       if (mutationBlocked(capabilities().canManageDirectory, 'Справочник может изменять только администратор')) return;
       var confirmedCity = directoryCityById(button.dataset.id);
       if (!confirmedCity) return;
+      var cityNowInRoute = cities.some(function (city) { return city.catalogCityId === confirmedCity.id; });
+      var cityNowHasPoints = directory.points.some(function (point) { return point.cityId === confirmedCity.id; });
+      if (cityNowInRoute || cityNowHasPoints) {
+        showToast('Город больше нельзя удалить: появилась связь с маршрутом или точками', 'error');
+        return;
+      }
       directory.cities = directory.cities.filter(function (city) { return city.id !== confirmedCity.id; });
       saveDirectory();
       state.overlay = { kind: 'directory' };
@@ -2693,12 +3622,28 @@
       return;
     }
     if (action === 'toggle-scope') {
+      if (hasLimitedTouristPrivacy()) {
+        state.scopeLead = null;
+        showToast('Фильтр по исходному лиду недоступен для этой роли', 'error');
+        return;
+      }
       if (state.scopeLead) state.scopeLead = null;
       else state.overlay = { kind: 'scope-select' };
       render();
       return;
     }
     if (action === 'select-scope') {
+      if (hasLimitedTouristPrivacy()) {
+        state.scopeLead = null;
+        showToast('Фильтр по исходному лиду недоступен для этой роли', 'error');
+        return;
+      }
+      var scopedLeadTourist = currentTourists().find(function (tourist) { return tourist.leadId === button.dataset.id; });
+      if (!canSeeSourceLeadFor(scopedLeadTourist)) {
+        state.scopeLead = null;
+        showToast('Этот лид не назначен текущему менеджеру', 'error');
+        return;
+      }
       state.scopeLead = button.dataset.id;
       state.overlay = null;
       render();
@@ -2725,6 +3670,10 @@
     if (action === 'open-tours') {
       state.overlay = { kind: 'tours' };
       render();
+      return;
+    }
+    if (action === 'preview-tour-site') {
+      showToast('В рабочей версии откроется сайт тура');
       return;
     }
     if (action === 'tour-menu') {
@@ -2799,7 +3748,14 @@
         return;
       }
       state.returnContext = captureTourContext();
-      state.overlay = { kind: 'tourist-detail', touristId: button.dataset.id };
+      state.overlay = { kind: 'tourist-detail', touristId: button.dataset.id, expanded: new Set(), detailTab: 'profile' };
+      render();
+      return;
+    }
+    if (action === 'tourist-detail-tab') {
+      if (!state.overlay || state.overlay.kind !== 'tourist-detail') return;
+      state.overlay.detailTab = button.dataset.tab === 'tour' ? 'tour' : 'profile';
+      state.overlay.expanded = new Set();
       render();
       return;
     }
@@ -2808,21 +3764,30 @@
       render();
       return;
     }
-    if (action === 'add-program' || action === 'edit-program') {
+    if (action === 'edit-program') {
       if (mutationBlocked(capabilities().canManageProgram, 'Изменение программы недоступно для этой роли')) return;
-      state.overlay = { kind: 'program-form', index: action === 'edit-program' ? Number(button.dataset.index) : null };
+      state.overlay = { kind: 'program-form', index: Number(button.dataset.index) };
       render();
       return;
     }
     if (action === 'generate-program') {
       if (mutationBlocked(capabilities().canManageProgram, 'Изменение программы недоступно для этой роли')) return;
-      if (programDays.length < 5) programDays.push({ date: '17 сен', city: 'Сиань', title: 'Переезд в Сиань', text: 'Поезд G89, размещение и вечерняя прогулка по городской стене.' });
+      if (!programDays.length) programDays.splice.apply(programDays, [0, 0].concat(buildProgramDays(selectedTour(), [], programSeedDescriptions)));
       showToast('Программа сформирована из маршрута');
       return;
     }
     if (action === 'regenerate-program') {
       if (mutationBlocked(capabilities().canManageProgram, 'Изменение программы недоступно для этой роли')) return;
-      showToast('Программа обновлена, ручные правки сохранены');
+      state.overlay = { kind: 'regenerate-program' };
+      render();
+      return;
+    }
+    if (action === 'confirm-regenerate-program') {
+      if (mutationBlocked(capabilities().canManageProgram, 'Изменение программы недоступно для этой роли')) return;
+      var regeneratedDays = buildProgramDays(selectedTour(), programDays, programSeedDescriptions);
+      programDays.splice.apply(programDays, [0, programDays.length].concat(regeneratedDays));
+      state.overlay = null;
+      showToast('Программа обновлена по датам и маршруту');
       return;
     }
     if (action === 'clear-program') {
@@ -2839,7 +3804,7 @@
       return;
     }
     if (action === 'edit-tour') {
-      var editTourId = (state.overlay && state.overlay.tourId) || state.selectedTourId;
+      var editTourId = button.dataset.id || (state.overlay && state.overlay.tourId) || state.selectedTourId;
       var editableTour = tours.find(function (tour) { return tour.id === editTourId; });
       if (mutationBlocked(Boolean(editableTour) && canManageTourId(editTourId), 'Изменение тура недоступно для этой роли')) return;
       state.overlay = { kind: 'tour-form', tourId: editTourId };
@@ -2847,10 +3812,10 @@
       return;
     }
     if (action === 'copy-tour') {
-      var copySourceId = (state.overlay && state.overlay.tourId) || state.selectedTourId;
+      var copySourceId = button.dataset.id || (state.overlay && state.overlay.tourId) || state.selectedTourId;
       var originalTour = tours.find(function (tour) { return tour.id === copySourceId; });
       if (mutationBlocked(Boolean(originalTour) && canManageTourId(copySourceId), 'Копирование тура недоступно для этой роли')) return;
-      tours.push(Object.assign({}, originalTour, { id: 'copy-' + Date.now(), name: originalTour.name + ' · копия', status: 'draft', tourists: 0 }));
+      tours.push(Object.assign({}, originalTour, { id: 'copy-' + Date.now(), name: originalTour.name + ' · копия', status: 'draft', isArchived: false, cancelReason: '', statusBeforeArchive: null, statusBeforeCancel: null, tourists: 0, bookedCount: 0, statusCounts: { confirmed: 0, pending: 0, cancelled: 0 } }));
       state.tourFilter = 'draft';
       state.overlay = { kind: 'tours' };
       showToast('Копия тура создана в черновиках');
@@ -2859,10 +3824,20 @@
     if (action === 'archive-tour') {
       var archiveSourceId = (state.overlay && state.overlay.tourId) || state.selectedTourId;
       var archiveTour = tours.find(function (tour) { return tour.id === archiveSourceId; });
-      if (mutationBlocked(Boolean(archiveTour) && canManageTourId(archiveSourceId), 'Архивирование тура недоступно для этой роли')) return;
-      archiveTour.status = 'archive';
+      if (mutationBlocked(Boolean(archiveTour) && state.role === 'admin', 'Архивирование доступно только администратору')) return;
+      if (!archiveTour.isArchived) {
+        archiveTour.statusBeforeArchive = archiveTour.status === 'archive' ? 'active' : archiveTour.status;
+        archiveTour.isArchived = true;
+        archiveTour.status = 'archive';
+      } else {
+        archiveTour.isArchived = false;
+        archiveTour.status = archiveTour.statusBeforeArchive || 'active';
+        archiveTour.statusBeforeArchive = null;
+      }
+      syncLinkedLeadArchive(archiveTour.id, archiveTour.isArchived);
+      state.tourFilter = archiveTour.isArchived ? 'archive' : archiveTour.status;
       state.overlay = null;
-      showToast('Тур перемещён в архив');
+      showToast(archiveTour.isArchived ? 'Тур перемещён в архив' : 'Тур возвращён из архива');
       return;
     }
     if (action === 'cancel-tour') {
@@ -2873,19 +3848,55 @@
       render();
       return;
     }
-    if (action === 'toggle-tour-task') {
-      if (mutationBlocked(capabilities().canManageTasks, 'Изменение задач недоступно для этой роли')) return;
-      tourTasks[Number(button.dataset.index)].done = !tourTasks[Number(button.dataset.index)].done;
-      render();
+    if (action === 'reopen-tour') {
+      var reopenTourId = (state.overlay && state.overlay.tourId) || state.selectedTourId;
+      var reopenedTour = tours.find(function (tour) { return tour.id === reopenTourId; });
+      if (mutationBlocked(Boolean(reopenedTour) && reopenedTour.status === 'cancelled' && canManageTourId(reopenTourId), 'Повторно открыть можно только отменённый доступный тур')) return;
+      reopenedTour.status = reopenedTour.statusBeforeCancel || 'active';
+      reopenedTour.isArchived = false;
+      reopenedTour.cancelReason = '';
+      reopenedTour.statusBeforeCancel = null;
+      syncLinkedLeadArchive(reopenedTour.id, false);
+      state.tourFilter = reopenedTour.status;
+      state.overlay = null;
+      showToast('Тур открыт снова');
+      return;
+    }
+    if (action === 'delete-tour') {
+      if (mutationBlocked(state.role === 'admin', 'Удаление тура доступно только администратору')) return;
+      showToast('В MVP удаление показано как защищённое действие; данные mock-тура сохранены');
       return;
     }
     if (action === 'add-tour-task') {
-      if (mutationBlocked(capabilities().canManageTasks, 'Создание задач недоступно для этой роли')) return;
-      tourTasks.unshift({ id: 'task-' + Date.now(), title: 'Новая задача по туру', date: 'Сегодня', done: false });
-      showToast('Задача тура добавлена');
+      if (mutationBlocked(capabilities().canManageTasks, 'Изменение задач недоступно для этой роли')) return;
+      state.overlay = { kind: 'task-form', taskId: null };
+      render();
+      return;
+    }
+    if (action === 'edit-tour-task') {
+      if (mutationBlocked(capabilities().canManageTasks, 'Изменение задач недоступно для этой роли')) return;
+      state.overlay = { kind: 'task-form', taskId: button.dataset.id };
+      render();
+      return;
+    }
+    if (action === 'delete-tour-task') {
+      if (mutationBlocked(capabilities().canManageTasks, 'Удаление задач недоступно для этой роли')) return;
+      state.overlay = { kind: 'task-delete', taskId: button.dataset.id };
+      render();
+      return;
+    }
+    if (action === 'confirm-delete-tour-task') {
+      if (mutationBlocked(capabilities().canManageTasks, 'Удаление задач недоступно для этой роли')) return;
+      tourTasks = tourTasks.filter(function (task) { return task.id !== button.dataset.id; });
+      state.overlay = null;
+      showToast('Задача удалена');
       return;
     }
     if (action === 'open-leads') {
+      if (state.role !== 'admin' && state.role !== 'manager') {
+        showToast('Раздел «Лиды» недоступен для этой роли', 'error');
+        return;
+      }
       window.location.href = mobileLeadsHref(state.returnLead, state.returnLead ? state.returnTab : null);
       return;
     }
@@ -2902,7 +3913,7 @@
             logistics.push(tourist.route.indexOf(city.id) === -1 ? 'Не входит в маршрут' : recordSummary(effectiveRecordAt(city.id, stage, tourist.id), stage));
           });
         });
-        return [tourist.name, tourist.lead, globalGroupLabel(tourist)].concat(logistics).map(csvCell).join(',');
+        return [tourist.name, hasRestrictedTouristPrivacy(tourist) ? 'Недоступен' : tourist.lead, globalGroupLabel(tourist)].concat(logistics).map(csvCell).join(',');
       })).join('\n');
       var link = document.createElement('a');
       link.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }));
@@ -2913,6 +3924,10 @@
       return;
     }
     if (action === 'open-source-lead') {
+      if (!canOpenSourceLead(button.dataset.id)) {
+        showToast('Исходный лид недоступен для этой роли', 'error');
+        return;
+      }
       window.location.href = mobileLeadsHref(button.dataset.id, 'overview');
       return;
     }
@@ -3022,10 +4037,11 @@
         render();
         return;
       }
-      if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnLead) {
+      if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnLead && canOpenSourceLead(state.returnLead)) {
         window.location.href = mobileLeadsHref(state.returnLead, state.returnTab);
         return;
       }
+      if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnLead && !canOpenSourceLead(state.returnLead)) state.returnLead = null;
       if (state.overlay && state.overlay.kind === 'tourist-detail' && state.returnContext) {
         var returnContext = state.returnContext;
         state.returnContext = null;
@@ -3087,6 +4103,20 @@
       if (state.overlay.kind === 'operation-select') {
         var selectionGroup = state.overlay.groupId ? stageGroups(state.overlay.stage)[state.overlay.groupId] : null;
         if (!leadConfirmed(selectedTourist) || selectedTourist.route.indexOf(currentCity().id) === -1 || (selectionGroup && selectionGroup.members.indexOf(id) !== -1)) return;
+        var selectedOperationTourists = Array.from(selected).map(touristById).filter(Boolean);
+        var anchorTourist = selectedOperationTourists[0] || null;
+        var anchorGroupId = selectionGroup ? selectionGroup.createdFromGroupId : (anchorTourist && anchorTourist.groupId);
+        if (selected.has(id)) {
+          selected.delete(id);
+          if (state.overlay.error) state.overlay.error = null;
+          render();
+          return;
+        }
+        if ((anchorGroupId && selectedTourist.groupId !== anchorGroupId) || (anchorTourist && !anchorGroupId && selectedTourist.id !== anchorTourist.id)) {
+          state.overlay.error = 'Общая операция объединяет только туристов одной существующей группы.';
+          render();
+          return;
+        }
       }
       if (selected.has(id)) selected.delete(id); else selected.add(id);
       if (state.overlay.error) state.overlay.error = null;
@@ -3095,6 +4125,13 @@
     }
     if (action === 'select-all') {
       var selectable = state.overlay.kind === 'operation-select' ? scopedTourists(false).filter(leadConfirmed) : currentTourists();
+      if (state.overlay.kind === 'operation-select') {
+        var managedOperationGroup = state.overlay.groupId ? stageGroups(state.overlay.stage)[state.overlay.groupId] : null;
+        var firstSelectedTourist = touristById(Array.from(state.overlay.selected)[0]);
+        var selectableGroupId = managedOperationGroup ? managedOperationGroup.createdFromGroupId : (firstSelectedTourist && firstSelectedTourist.groupId);
+        if (!selectableGroupId) selectableGroupId = (selectable.find(function (tourist) { return Boolean(tourist.groupId); }) || {}).groupId;
+        selectable = selectable.filter(function (tourist) { return selectableGroupId && tourist.groupId === selectableGroupId; });
+      }
       selectable.forEach(function (tourist) { state.overlay.selected.add(tourist.id); });
       render();
       return;
@@ -3108,7 +4145,14 @@
         return;
       }
       if (mutationBlocked(canMutateLogisticsFor(selectedForOperation.map(function (tourist) { return tourist.id; })), 'Логистика недоступна для выбранных туристов')) return;
-      openForm(Array.from(state.overlay.selected), Boolean(selectedOperationGroupId), selectedOperationGroupId);
+      if (selectedForOperation.length > 1 && !sameNonEmptyTourGroup(selectedForOperation.map(function (tourist) { return tourist.id; }))) {
+        state.overlay.error = 'Для общей записи выберите туристов одной существующей группы.';
+        render();
+        return;
+      }
+      // Adding members is a preview/apply flow even when the common record
+      // already exists; conflicts must never be bypassed as a plain edit.
+      openForm(Array.from(state.overlay.selected), false, selectedOperationGroupId);
       return;
     }
     if (action === 'pick-source') {
@@ -3128,6 +4172,7 @@
         var ownContextValid = formOverlay.tourId === state.selectedTourId && currentCity().id === formOverlay.routeCityId;
         if (!ownContextValid || mutationBlocked(canEditLogisticsForAt(ownTourist, formOverlay.routeCityId), 'Личная запись недоступна для этого туриста')) return;
         records[formOverlay.routeCityId][formOverlay.stage][ownTouristId] = cleanRecord(state.draft, formOverlay.stage);
+        if (formOverlay.stage === 'departure') copyDepartureToNextArrival(ownTouristId, formOverlay.routeCityId);
         state.overlay = null;
         showToast('Личная запись сохранена');
         return;
@@ -3148,12 +4193,26 @@
           sources: sources,
           sourceId: null,
           previousDraft: Object.assign({}, state.draft),
-          dirtyFields: new Set(formOverlay.dirtyFields || [])
+          dirtyFields: new Set(formOverlay.dirtyFields || []),
+          groupId: formOverlay.groupId || null,
+          routeCityId: formOverlay.routeCityId,
+          tourId: formOverlay.tourId,
+          pendingTouristGroup: formOverlay.pendingTouristGroup || null,
+          remainingDefaultHotelConflicts: (formOverlay.remainingDefaultHotelConflicts || []).slice()
         };
         render();
         return;
       }
-      if (!applyStageRecord(formOverlay.members, formOverlay.stage, state.draft, null, formOverlay.sourceId)) return;
+      if (formOverlay.pendingTouristGroup) {
+        applyPendingTouristGroupHotelChoice(
+          formOverlay.pendingTouristGroup,
+          formOverlay,
+          state.draft,
+          formOverlay.sourceId === 'blank' ? formOverlay.members[0] : formOverlay.sourceId
+        );
+        return;
+      }
+      if (!applyStageRecord(formOverlay.members, formOverlay.stage, state.draft, formOverlay.groupId || null, formOverlay.sourceId)) return;
       state.overlay = null;
       showToast(stageMeta[formOverlay.stage].saved);
       return;
@@ -3171,8 +4230,13 @@
         stage: conflict.stage,
         members: conflict.members.slice(),
         editing: false,
-        groupId: null,
+        groupId: conflict.groupId || null,
         sourceId: conflict.sourceId || 'blank',
+        editMode: 'create',
+        routeCityId: conflict.routeCityId || currentCity().id,
+        tourId: conflict.tourId || state.selectedTourId,
+        pendingTouristGroup: conflict.pendingTouristGroup || null,
+        remainingDefaultHotelConflicts: (conflict.remainingDefaultHotelConflicts || []).slice(),
         dirtyFields: new Set(conflict.dirtyFields || [])
       };
       render();
@@ -3187,7 +4251,16 @@
       Array.from(conflictOverlay.dirtyFields || []).forEach(function (key) {
         mergedValues[key] = conflictOverlay.previousDraft[key];
       });
-      if (!applyStageRecord(conflictOverlay.members, conflictOverlay.stage, mergedValues, null, conflictOverlay.sourceId)) return;
+      if (conflictOverlay.pendingTouristGroup) {
+        applyPendingTouristGroupHotelChoice(
+          conflictOverlay.pendingTouristGroup,
+          conflictOverlay,
+          mergedValues,
+          conflictOverlay.sourceId
+        );
+        return;
+      }
+      if (!applyStageRecord(conflictOverlay.members, conflictOverlay.stage, mergedValues, conflictOverlay.groupId || null, conflictOverlay.sourceId)) return;
       state.overlay = null;
       showToast('Общая запись создана без изменения индивидуальных данных');
       return;
@@ -3296,13 +4369,21 @@
       var globalOverlay = state.overlay;
       var globallyDetached = Array.from(globalOverlay.selected);
       globallyDetached.forEach(function (touristId) {
-        touristById(touristId).groupId = null;
+        var detachedTourist = touristById(touristId);
+        detachedTourist.groupId = null;
+        detachedTourist.groupRepresentative = false;
       });
       var remaining = currentTourists().filter(function (tourist) { return tourist.groupId === globalOverlay.groupId; });
-      if (remaining.length < 2) remaining.forEach(function (tourist) { tourist.groupId = null; globallyDetached.push(tourist.id); });
+      if (remaining.length < 2) remaining.forEach(function (tourist) { tourist.groupId = null; tourist.groupRepresentative = false; globallyDetached.push(tourist.id); });
+      else {
+        var remainingRepresentative = remaining.find(function (tourist) { return tourist.groupRepresentative; }) || remaining[0];
+        remaining.forEach(function (tourist) { tourist.groupRepresentative = tourist.id === remainingRepresentative.id; });
+      }
+      detachTourGroupLinks(globalOverlay.groupId, globallyDetached);
+      if (!currentTourists().some(function (tourist) { return tourist.groupId === globalOverlay.groupId; })) delete tourGroupSettings[globalOverlay.groupId];
       saveCanonicalTourists();
       state.overlay = null;
-      showToast('Группа тура изменена, общие записи операций сохранены');
+      showToast('Группа изменена: зависимые общие связи сняты, личные данные сохранены');
     }
   });
 
@@ -3336,6 +4417,12 @@
         visits: operationVisitSnapshot(),
         records: records,
         operationGroups: operationGroups,
+        tourGroupSettings: tourGroupSettings,
+        tours: tours,
+        userDirectory: userDirectory,
+        leadArchiveMocks: leadArchiveMocks,
+        programDays: programDays,
+        tourTasks: tourTasks,
         directory: directory,
         role: state.role,
         selectedTourId: state.selectedTourId,
@@ -3350,7 +4437,8 @@
         returnContext: state.returnContext,
         scopeLead: state.scopeLead,
         offline: state.offline,
-        uiPreview: state.uiPreview
+        uiPreview: state.uiPreview,
+        saveErrorSnapshot: state.saveErrorSnapshot
       });
     }
   };
